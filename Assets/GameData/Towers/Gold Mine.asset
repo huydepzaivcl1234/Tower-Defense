@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52e9e2226e1a4fc48822f40891d89eda, type: 3}
+  m_Name: Gold Mine
+  m_EditorClassIdentifier: Assembly-CSharp::TowerData
+  towerName: Gold Mine
+  description: Spawn Gold
+  towerPrefab: {fileID: 1011319553682498, guid: 8ad137f6808375f4e885d60451f0c4fc,
+    type: 3}
+  projectilePrefab: {fileID: 0}
+  buildCost: 100
+  isGoldGenerator: 0
+  placementYOffset: 0
+  levels:
+  - strength: 0
+    attackSpeed: 0
+    range: 0
+    upgradeCost: 350
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldPerRound: 50
+  - strength: 0
+    attackSpeed: 0
+    range: 0
+    upgradeCost: 1000
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldPerRound: 0
+  - strength: 0
+    attackSpeed: 0
+    range: 0
+    upgradeCost: 2500
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldPerRound: 0

@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52e9e2226e1a4fc48822f40891d89eda, type: 3}
+  m_Name: Ultimate tower
+  m_EditorClassIdentifier: Assembly-CSharp::TowerData
+  towerName: Ultimate Tower
+  description: powerfull tower
+  towerPrefab: {fileID: 4524869034136014146, guid: 27760e07b915c3145b3ca375a9c5a5ad,
+    type: 3}
+  projectilePrefab: {fileID: 532332587456997213, guid: 10ecff9d9c4ed454386b7fbb8a8fab4d,
+    type: 3}
+  buildCost: 10000
+  placementYOffset: 0.5
+  levels:
+  - strength: 500
+    attackSpeed: 1
+    range: 7
+    upgradeCost: 5000
+    splashRadius: 3
+    bleedDamagePerTick: 20
+    bleedTickInterval: 5
+    bleedDuration: 5
+    slowPercent: 0.45
+    slowDuration: 10
+    knockbackDistance: 0
+  - strength: 600
+    attackSpeed: 1.5
+    range: 8
+    upgradeCost: 5500
+    splashRadius: 3
+    bleedDamagePerTick: 30
+    bleedTickInterval: 5
+    bleedDuration: 5
+    slowPercent: 0.45
+    slowDuration: 10
+    knockbackDistance: 0
+  - strength: 700
+    attackSpeed: 2
+    range: 9
+    upgradeCost: 6000
+    splashRadius: 3
+    bleedDamagePerTick: 40
+    bleedTickInterval: 5
+    bleedDuration: 5
+    slowPercent: 0.45
+    slowDuration: 10
+    knockbackDistance: 0
+  - strength: 800
+    attackSpeed: 2.5
+    range: 10
+    upgradeCost: 6500
+    splashRadius: 3
+    bleedDamagePerTick: 50
+    bleedTickInterval: 5
+    bleedDuration: 5
+    slowPercent: 0.45
+    slowDuration: 10
+    knockbackDistance: 0

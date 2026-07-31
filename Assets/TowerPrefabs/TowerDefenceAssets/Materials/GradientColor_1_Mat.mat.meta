@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1c1ea66f7006c7440a80d2f207212aac
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 314066
+  packageName: Low Poly Tower Defence Pack
+  packageVersion: 1.0
+  assetPath: Assets/TowerDefenceAssets/Materials/GradientColor_1_Mat.mat
+  uploadId: 740887

@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52e9e2226e1a4fc48822f40891d89eda, type: 3}
+  m_Name: Archer Tower
+  m_EditorClassIdentifier: Assembly-CSharp::TowerData
+  towerName: Archer Tower
+  description: this shoot arrow
+  towerPrefab: {fileID: 9196973140890037373, guid: e6df9020cbaf5f7489bc4dfef7073957,
+    type: 3}
+  projectilePrefab: {fileID: 532332587456997213, guid: 508b3f39536b4784692152c52d9fb30c,
+    type: 3}
+  buildCost: 20
+  placementYOffset: 0
+  levels:
+  - strength: 2
+    attackSpeed: 2
+    range: 6
+    upgradeCost: 50
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldRewardPerWave: 0
+  - strength: 3
+    attackSpeed: 2.3
+    range: 6.5
+    upgradeCost: 75
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldRewardPerWave: 0
+  - strength: 7
+    attackSpeed: 2.6
+    range: 7
+    upgradeCost: 125
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldRewardPerWave: 0
+  - strength: 15
+    attackSpeed: 3.2
+    range: 7.5
+    upgradeCost: 200
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldRewardPerWave: 0
