@@ -33,6 +33,8 @@ public class TowerUpgradeUI : MonoBehaviour
     public Button sellButton;
     public TMP_Text sellButtonLabel;
     public Button closeButton;
+    [Tooltip("Optional second Close button used by the clean UI layout.")]
+    public Button secondaryCloseButton;
 
     [Header("Range Preview")]
     [Tooltip("A dedicated RangeIndicator instance used only for showing the selected tower's range - use a separate one from the placement ghost's")]
@@ -50,6 +52,7 @@ public class TowerUpgradeUI : MonoBehaviour
         if (upgradeButton != null) upgradeButton.onClick.AddListener(OnUpgradePressed);
         if (sellButton != null) sellButton.onClick.AddListener(OnSellPressed);
         if (closeButton != null) closeButton.onClick.AddListener(ClosePanel);
+        if (secondaryCloseButton != null) secondaryCloseButton.onClick.AddListener(ClosePanel);
     }
 
     private void HandleTowerClicked(Tower tower)
