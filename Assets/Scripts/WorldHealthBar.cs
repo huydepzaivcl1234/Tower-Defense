@@ -36,6 +36,12 @@ public class WorldHealthBar : MonoBehaviour
 
     public void SetData(Enemy e)
     {
+        // Enemy objects are pooled. Hide() disables this child when an enemy dies, so a reused
+        // pooled enemy must explicitly reactivate the health bar on its next Initialize call.
+        // Without this, later waves randomly contain enemies with no visible HP bar.
+        if (!gameObject.activeSelf)
+            gameObject.SetActive(true);
+
         enemy = e;
         modelRenderer = e.GetComponentInChildren<Renderer>(); // used every frame to find the model's real top, regardless of scale
 
