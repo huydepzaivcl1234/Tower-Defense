@@ -4,7 +4,7 @@ using TMPro;
 
 /// <summary>
 /// Main HUD: gold, lives, wave counter, start-wave button, and end-game panels.
-/// Put this on your HUD Canvas (or a child manager object) and wire up the references.
+/// Visual layout can be replaced freely; gameplay/event wiring stays here.
 /// </summary>
 public class HUDManager : MonoBehaviour
 {
@@ -63,19 +63,20 @@ public class HUDManager : MonoBehaviour
 
     private void UpdateGold(int value)
     {
-        if (goldText != null) goldText.text = $"$: {value}";
+        if (goldText != null) goldText.text = value.ToString();
     }
 
     private void UpdateLives(int value)
     {
-        if (livesText != null) livesText.text = $"Lives: {value}";
+        if (livesText != null) livesText.text = value.ToString();
     }
 
     private void UpdateWaveText()
     {
         if (waveText == null || WaveManager.Instance == null) return;
-        int current = Mathf.Clamp(WaveManager.Instance.CurrentWaveNumber, 1, Mathf.Max(1, WaveManager.Instance.TotalWaves));
-        waveText.text = $"Wave: {current}/{WaveManager.Instance.TotalWaves}";
+        int total = Mathf.Max(1, WaveManager.Instance.TotalWaves);
+        int current = Mathf.Clamp(WaveManager.Instance.CurrentWaveNumber, 1, total);
+        waveText.text = $"Wave {current} / {total}";
     }
 
     private void OnStartWavePressed() => WaveManager.Instance?.StartNextWave();
