@@ -3,9 +3,8 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// The Upgrade UI. Opens automatically whenever a placed Tower is clicked (via
-/// Tower.OnAnyTowerClicked), shows its current level and stats, and lets the
-/// player spend gold to upgrade it (up to its max level) or sell it for a refund.
+/// Tower upgrade panel. Existing upgrade/sell/close behaviour is preserved.
+/// Additional next-level fields are optional and are used by the clean right-side panel.
 /// </summary>
 public class TowerUpgradeUI : MonoBehaviour
 {
@@ -18,6 +17,13 @@ public class TowerUpgradeUI : MonoBehaviour
     public TMP_Text strengthText;
     public TMP_Text attackSpeedText;
     public TMP_Text rangeText;
+
+    [Header("Next Level (optional)")]
+    public GameObject nextLevelRoot;
+    public TMP_Text nextLevelTitleText;
+    public TMP_Text nextStrengthText;
+    public TMP_Text nextAttackSpeedText;
+    public TMP_Text nextRangeText;
 
     [Header("Buttons")]
     public Button upgradeButton;
@@ -55,34 +61,50 @@ public class TowerUpgradeUI : MonoBehaviour
 
     private void Refresh()
     {
-        if (selectedTower == null) return;
+        if (selectedTower == null || selectedTower.data == null) return;
         TowerLevelStats stats = selectedTower.CurrentStats;
 
         if (towerNameText != null) towerNameText.text = selectedTower.data.towerName;
-        if (levelText != null) levelText.text = $"Level {selectedTower.CurrentLevelNumber}/{selectedTower.MaxLevelNumber}";
-        if (strengthText != null) strengthText.text = $"Strength: {stats.strength:0.#}";
-        if (attackSpeedText != null) attackSpeedText.text = $"Attack Speed: {stats.attackSpeed:0.##}/s";
-        if (rangeText != null) rangeText.text = $"Range: {stats.range:0.#}";
+        if (levelText != null) levelText.text = $"Level {selectedTower.CurrentLevelNumber}";
+        if (strengthText != null) strengthText.text = $"{stats.strength:0.#}";
+        if (attackSpeedText != null) attackSpeedText.text = $"{stats.attackSpeed:0.##}/s";
+        if (rangeText != null) rangeText.text = $"{stats.range:0.#}";
 
         if (selectedTower.CanUpgrade())
         {
+            int nextIndex = selectedTower.CurrentLevelNumber;
+            TowerLevelStats next = selectedTower.data.levels[nextIndex];
             int cost = selectedTower.GetNextUpgradeCost();
-            if (upgradeButtonLabel != null) upgradeButtonLabel.text = $"Upgrade  ·  {cost}g";
-            if (upgradeCostText != null) upgradeCostText.text = $"{cost}";
+
+            if (nextLevelRoot != null) nextLevelRoot.SetActive(true);
+            if (nextLevelTitleText != null) nextLevelTitleText.text = $"NEXT LEVEL ({selectedTower.CurrentLevelNumber + 1})";
+            if (nextStrengthText != null) nextStrengthText.text = FormatNext(next.strength, next.strength - stats.strength);
+            if (nextAttackSpeedText != null) nextAttackSpeedText.text = FormatNext(next.attackSpeed, next.attackSpeed - stats.attackSpeed, "/s");
+            if (nextRangeText != null) nextRangeText.text = FormatNext(next.range, next.range - stats.range);
+
+            if (upgradeButtonLabel != null) upgradeButtonLabel.text = "UPGRADE";
+            if (upgradeCostText != null) upgradeCostText.text = cost.ToString();
             if (upgradeButton != null)
                 upgradeButton.interactable = GameManager.Instance != null && GameManager.Instance.CurrentGold >= cost;
         }
         else
         {
-            if (upgradeButtonLabel != null) upgradeButtonLabel.text = "Max Level";
+            if (nextLevelRoot != null) nextLevelRoot.SetActive(false);
+            if (upgradeButtonLabel != null) upgradeButtonLabel.text = "MAX LEVEL";
             if (upgradeCostText != null) upgradeCostText.text = "-";
             if (upgradeButton != null) upgradeButton.interactable = false;
         }
 
-        if (sellButtonLabel != null) sellButtonLabel.text = $"Sell ({selectedTower.GetSellValue()}g)";
+        if (sellButtonLabel != null) sellButtonLabel.text = $"SELL  {selectedTower.GetSellValue()}";
 
         if (rangeIndicator != null)
             rangeIndicator.Show(selectedTower.transform.position, stats.range, rangeColor);
+    }
+
+    private static string FormatNext(float value, float delta, string suffix = "")
+    {
+        string sign = delta > 0.0001f ? "+" : string.Empty;
+        return $"{value:0.##}{suffix}   <color=#55E86A>{sign}{delta:0.##}{suffix}</color>";
     }
 
     private void OnUpgradePressed()
@@ -115,7 +137,6 @@ public class TowerUpgradeUI : MonoBehaviour
 
     private void Update()
     {
-        // Keep affordability / button state live while the panel is open (e.g. gold changes from other towers killing enemies)
         if (panelRoot != null && panelRoot.activeSelf && selectedTower != null)
             Refresh();
     }
