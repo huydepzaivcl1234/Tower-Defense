@@ -4,16 +4,13 @@ using System.Collections.Generic;
 /// <summary>
 /// Core tower behaviour: finds the enemy furthest along the path within range,
 /// rotates an optional turret head toward it, fires at the level's attack speed,
-/// and supports upgrading through the levels defined on its TowerData (default 3).
-/// Requires ANY Collider on the prefab (e.g. Box/Capsule sized to the model) so
-/// OnMouseDown can detect clicks for the Upgrade UI.
+/// and supports upgrading through the levels defined on its TowerData.
+/// Requires ANY Collider on the prefab so OnMouseDown can detect clicks.
 /// </summary>
 public class Tower : MonoBehaviour
 {
-    /// <summary>Raised whenever any tower is clicked in the world. TowerUpgradeUI listens to this.</summary>
     public static event System.Action<Tower> OnAnyTowerClicked;
 
-    /// <summary>Every currently-alive tower in the scene, used by TowerPlacementManager to block overlapping placement.</summary>
     private static readonly List<Tower> activeTowers = new List<Tower>();
     public static IReadOnlyList<Tower> ActiveTowers => activeTowers;
 
@@ -21,14 +18,17 @@ public class Tower : MonoBehaviour
     public TowerData data;
     [Tooltip("Optional child transform that rotates to face the current target")]
     public Transform turretHead;
-    [Tooltip("Extra Y-axis rotation added on top of the aim direction, to compensate for this model's " +
-             "authored 'front' not matching Unity's +Z convention. If the barrel points away from " +
-             "enemies instead of at them, try 180 first; for a 90°-off model try 90 or -90.")]
+    [Tooltip("Extra Y-axis rotation added on top of the aim direction.")]
     public float turretForwardOffset = 0f;
     [Tooltip("Point projectiles spawn from. Defaults to tower position if empty")]
     public Transform firePoint;
     [Tooltip("Layer(s) enemies are on. If left as 'Nothing' the tower falls back to checking all layers.")]
     public LayerMask enemyLayerMask;
+
+    [Header("Visual Upgrade Phases (optional)")]
+    [Tooltip("Visual roots for Phase 1, 2, 3, 4... Index follows the tower's current level. " +
+             "Only the current phase is enabled. Safe to leave empty for old tower prefabs.")]
+    public GameObject[] visualPhases;
 
     [Header("Audio (optional)")]
     public AudioClip fireSound;
@@ -49,22 +49,30 @@ public class Tower : MonoBehaviour
     private Enemy currentTarget;
     private AudioSource audioSource;
 
-    private static readonly Collider[] overlapBuffer = new Collider[64]; // shared, reused each scan - avoids allocating a new array every 0.2s per tower
+    private static readonly Collider[] overlapBuffer = new Collider[64];
 
     public int CurrentLevelNumber => currentLevelIndex + 1;
-    public int MaxLevelNumber => data != null ? data.levels.Length : 1;
-    public bool IsMaxLevel => data == null || currentLevelIndex >= data.levels.Length - 1;
+    public int MaxLevelNumber => data != null && data.levels != null ? data.levels.Length : 1;
+    public bool IsMaxLevel => data == null || data.levels == null || currentLevelIndex >= data.levels.Length - 1;
     public TowerLevelStats CurrentStats => data.levels[Mathf.Clamp(currentLevelIndex, 0, data.levels.Length - 1)];
 
     private void Awake()
     {
         audioSource = GetComponent<AudioSource>();
+        ApplyVisualPhase();
+    }
+
+    private void Start()
+    {
+        // TowerData can be assigned immediately after Instantiate by TowerPlacementManager,
+        // so re-apply once Start runs to guarantee the correct starting visual.
+        ApplyVisualPhase();
     }
 
     private void OnEnable()
     {
         activeTowers.Add(this);
-        WaveManager.OnWaveCleared += HandleWaveCleared; // every tower subscribes; HandleWaveCleared itself checks Is Gold Generator once data is set
+        WaveManager.OnWaveCleared += HandleWaveCleared;
     }
 
     private void OnDisable()
@@ -98,13 +106,13 @@ public class Tower : MonoBehaviour
     private void Update()
     {
         if (data == null || data.levels == null || data.levels.Length == 0) return;
-        if (data.isGoldGenerator) return; // gold towers never target/fire - they only react to WaveManager.OnWaveCleared
+        if (data.isGoldGenerator) return;
 
         targetSearchCooldown -= Time.deltaTime;
         if (targetSearchCooldown <= 0f)
         {
             AcquireTarget();
-            targetSearchCooldown = 0.2f; // re-scan 5x/sec instead of every frame, cheap on performance
+            targetSearchCooldown = 0.2f;
         }
 
         if (currentTarget == null || !currentTarget.IsAlive)
@@ -125,14 +133,11 @@ public class Tower : MonoBehaviour
 
     private void AcquireTarget()
     {
-        // Keep the current target if it's still alive and in range - avoids target-flicker between equally-ranked enemies.
         if (currentTarget != null && currentTarget.IsAlive &&
             Vector3.Distance(transform.position, currentTarget.transform.position) <= CurrentStats.range)
-        {
             return;
-        }
 
-        int mask = enemyLayerMask.value != 0 ? enemyLayerMask.value : ~0; // fallback so an unset layer mask doesn't silently break targeting
+        int mask = enemyLayerMask.value != 0 ? enemyLayerMask.value : ~0;
         int count = Physics.OverlapSphereNonAlloc(transform.position, CurrentStats.range, overlapBuffer, mask);
 
         float bestProgress = -1f;
@@ -165,7 +170,7 @@ public class Tower : MonoBehaviour
         if (currentTarget == null) return;
         if (fireSound != null && audioSource != null) audioSource.PlayOneShot(fireSound);
 
-        if (data.projectilePrefab == null) return; // allow "hitscan-less" towers without a configured projectile to just sit idle rather than error
+        if (data.projectilePrefab == null) return;
         Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position + Vector3.up;
         GameObject projGO = ObjectPool.Instance != null
             ? ObjectPool.Instance.Get(data.projectilePrefab, spawnPos, Quaternion.identity)
@@ -186,6 +191,17 @@ public class Tower : MonoBehaviour
     {
         if (IsMaxLevel) return;
         currentLevelIndex++;
+        ApplyVisualPhase();
+    }
+
+    /// <summary>Enables only the visual that matches the current level.</summary>
+    public void ApplyVisualPhase()
+    {
+        if (visualPhases == null || visualPhases.Length == 0) return;
+        int activeIndex = Mathf.Clamp(currentLevelIndex, 0, visualPhases.Length - 1);
+        for (int i = 0; i < visualPhases.Length; i++)
+            if (visualPhases[i] != null)
+                visualPhases[i].SetActive(i == activeIndex);
     }
 
     /// <summary>Refunds 50% of total gold spent (build cost + upgrade costs paid so far).</summary>
@@ -201,10 +217,9 @@ public class Tower : MonoBehaviour
     {
         if (UnityEngine.EventSystems.EventSystem.current != null &&
             UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
-        {
-            return; // ignore clicks that are actually landing on UI
-        }
-        TowerPlacementManager.Instance?.CancelPlacement(); // clicking an existing tower means "select it", not "place here"
+            return;
+
+        TowerPlacementManager.Instance?.CancelPlacement();
         OnAnyTowerClicked?.Invoke(this);
     }
 
