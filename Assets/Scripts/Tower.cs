@@ -27,7 +27,8 @@ public class Tower : MonoBehaviour
 
     [Header("Visual Upgrade Phases (optional)")]
     [Tooltip("Visual roots for Phase 1, 2, 3, 4... Index follows the tower's current level. " +
-             "Only the current phase is enabled. Safe to leave empty for old tower prefabs.")]
+             "Only the current phase is enabled. Each generated phase can contain its own TurretHead and FirePoint. " +
+             "Safe to leave empty for old tower prefabs.")]
     public GameObject[] visualPhases;
 
     [Header("Audio (optional)")]
@@ -64,8 +65,6 @@ public class Tower : MonoBehaviour
 
     private void Start()
     {
-        // TowerData can be assigned immediately after Instantiate by TowerPlacementManager,
-        // so re-apply once Start runs to guarantee the correct starting visual.
         ApplyVisualPhase();
     }
 
@@ -194,14 +193,38 @@ public class Tower : MonoBehaviour
         ApplyVisualPhase();
     }
 
-    /// <summary>Enables only the visual that matches the current level.</summary>
+    /// <summary>
+    /// Enables only the visual matching the current level. If the active phase contains children named
+    /// "TurretHead" and "FirePoint", references are automatically moved to that phase so aiming and
+    /// projectile spawning keep working after the weapon changes shape.
+    /// </summary>
     public void ApplyVisualPhase()
     {
         if (visualPhases == null || visualPhases.Length == 0) return;
+
         int activeIndex = Mathf.Clamp(currentLevelIndex, 0, visualPhases.Length - 1);
+        GameObject activePhase = null;
         for (int i = 0; i < visualPhases.Length; i++)
-            if (visualPhases[i] != null)
-                visualPhases[i].SetActive(i == activeIndex);
+        {
+            if (visualPhases[i] == null) continue;
+            bool active = i == activeIndex;
+            visualPhases[i].SetActive(active);
+            if (active) activePhase = visualPhases[i];
+        }
+
+        if (activePhase == null) return;
+        Transform newHead = activePhase.transform.Find("TurretHead");
+        if (newHead != null)
+        {
+            turretHead = newHead;
+            Transform newFirePoint = newHead.Find("FirePoint");
+            if (newFirePoint != null) firePoint = newFirePoint;
+        }
+        else
+        {
+            Transform newFirePoint = activePhase.transform.Find("FirePoint");
+            if (newFirePoint != null) firePoint = newFirePoint;
+        }
     }
 
     /// <summary>Refunds 50% of total gold spent (build cost + upgrade costs paid so far).</summary>
