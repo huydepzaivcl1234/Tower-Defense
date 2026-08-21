@@ -3,19 +3,20 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Adds and tunes TowerFireAnimator on the generated modern-classic tower prefabs.
+/// Adds and tunes TowerFireAnimator on tower prefabs found anywhere under Assets/TowerPrefabs.
 /// Visual-only: does not change TowerData stats, projectile prefabs, costs or gameplay effects.
 /// Safe to run repeatedly.
 /// </summary>
 public static class TowerFireAnimationSetup
 {
-    private const string Root = "Assets/TowerPrefabs/GeneratedModernClassic";
+    private const string Root = "Assets/TowerPrefabs";
 
     [MenuItem("Tower Defense/Models/Setup Tower Fire Animations")]
     public static void Setup()
     {
         string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { Root });
         int changed = 0;
+        int skippedNoTower = 0;
 
         foreach (string guid in guids)
         {
@@ -25,6 +26,13 @@ public static class TowerFireAnimationSetup
 
             Tower tower = root.GetComponent<Tower>();
             if (tower == null)
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+                skippedNoTower++;
+                continue;
+            }
+
+            if (tower.data != null && tower.data.isGoldGenerator)
             {
                 PrefabUtility.UnloadPrefabContents(root);
                 continue;
@@ -44,6 +52,8 @@ public static class TowerFireAnimationSetup
         EditorUtility.DisplayDialog(
             "Tower Fire Animation",
             "Đã setup hiệu ứng bắn cho " + changed + " tower prefab.\n\n" +
+            "Quét toàn bộ: " + Root + "\n" +
+            "Prefab không có Tower component đã bỏ qua: " + skippedNoTower + "\n\n" +
             "Hiệu ứng gồm recoil, punch, idle mechanical motion, muzzle flash particles và muzzle light.\n" +
             "Không thay đổi Damage / Attack Speed / Range / Cost.",
             "OK");
@@ -137,7 +147,6 @@ public static class TowerFireAnimationSetup
         }
         else
         {
-            // Archer and other light projectile towers.
             fx.style = TowerFireAnimator.FireStyle.Light;
             fx.recoilDistance = 0.065f;
             fx.recoilReturnTime = 0.065f;
