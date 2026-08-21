@@ -84,9 +84,18 @@ public class Enemy : MonoBehaviour
         currentWaypointIndex = 0;
         isDead = false;
         PathProgress = 0f;
+
+        // IMPORTANT: every pooled spawn is a completely fresh enemy life.
+        // Reset both timers AND stored magnitudes so status effects from a previous
+        // instance can never leak into a later spawn that reuses this GameObject.
+        bleedDamagePerTick = 0f;
+        bleedTickInterval = 0f;
         bleedTimeRemaining = 0f;
+        bleedTickTimer = 0f;
+        slowPercent = 0f;
         slowTimeRemaining = 0f;
         knockbackRemaining = 0f;
+
         currentShield = 0f;
         shieldTimeRemaining = 0f;
         hpThresholdShieldUsed = false;
@@ -95,7 +104,11 @@ public class Enemy : MonoBehaviour
 
         // Reset Animator state for reused pooled enemies
         if (animator != null)
+        {
             animator.Rebind(); // resets all parameters to default
+            if (!string.IsNullOrEmpty(speedParam))
+                animator.SetFloat(speedParam, data.moveSpeed);
+        }
 
         if (healthBar != null) healthBar.SetData(this);
         ApplyTintColor(data.tintColor);
@@ -153,7 +166,16 @@ public class Enemy : MonoBehaviour
         if (slowTimeRemaining > 0f)
         {
             slowTimeRemaining -= Time.deltaTime;
-            if (slowTimeRemaining <= 0f) slowPercent = 0f;
+            if (slowTimeRemaining <= 0f)
+            {
+                slowTimeRemaining = 0f;
+                slowPercent = 0f;
+            }
+        }
+        else if (slowPercent != 0f)
+        {
+            // Defensive cleanup for pooled/reused objects or interrupted effects.
+            slowPercent = 0f;
         }
 
         if (shieldTimeRemaining > 0f)
@@ -181,7 +203,7 @@ public class Enemy : MonoBehaviour
     /// Duration is reduced by this enemy's CC Resist Percent (100% resist = fully immune).</summary>
     public void ApplySlow(float percent, float duration)
     {
-        if (isDead || percent <= 0f || duration <= 0f) return;
+        if (isDead || data == null || percent <= 0f || duration <= 0f) return;
         float effectiveDuration = duration * (1f - data.ccResistPercent);
         if (effectiveDuration <= 0f) return; // fully resisted
         slowPercent = Mathf.Clamp01(percent);
@@ -239,7 +261,11 @@ public class Enemy : MonoBehaviour
         if (target == null) { currentWaypointIndex++; return; }
 
         Vector3 toTarget = target.position - transform.position;
-        float effectiveSpeed = data.moveSpeed * (1f - slowPercent);
+
+        // Slow only affects THIS enemy while this enemy's own slow timer is active.
+        // A stale magnitude can never slow a freshly spawned pooled instance.
+        float activeSlow = slowTimeRemaining > 0f ? slowPercent : 0f;
+        float effectiveSpeed = data.moveSpeed * (1f - activeSlow);
         float step = effectiveSpeed * Time.deltaTime;
 
         if (animator != null && !string.IsNullOrEmpty(speedParam))
