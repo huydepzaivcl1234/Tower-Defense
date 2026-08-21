@@ -49,6 +49,7 @@ public class Tower : MonoBehaviour
     private float targetSearchCooldown;
     private Enemy currentTarget;
     private AudioSource audioSource;
+    private TowerFireAnimator fireAnimator;
 
     private static readonly Collider[] overlapBuffer = new Collider[64];
 
@@ -60,6 +61,7 @@ public class Tower : MonoBehaviour
     private void Awake()
     {
         audioSource = GetComponent<AudioSource>();
+        fireAnimator = GetComponent<TowerFireAnimator>();
         ApplyVisualPhase();
     }
 
@@ -170,6 +172,10 @@ public class Tower : MonoBehaviour
         if (fireSound != null && audioSource != null) audioSource.PlayOneShot(fireSound);
 
         if (data.projectilePrefab == null) return;
+
+        // Visual-only kick / muzzle FX. Projectile and damage logic remain unchanged.
+        fireAnimator?.PlayFire();
+
         Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position + Vector3.up;
         GameObject projGO = ObjectPool.Instance != null
             ? ObjectPool.Instance.Get(data.projectilePrefab, spawnPos, Quaternion.identity)
@@ -200,7 +206,11 @@ public class Tower : MonoBehaviour
     /// </summary>
     public void ApplyVisualPhase()
     {
-        if (visualPhases == null || visualPhases.Length == 0) return;
+        if (visualPhases == null || visualPhases.Length == 0)
+        {
+            fireAnimator?.Rebind();
+            return;
+        }
 
         int activeIndex = Mathf.Clamp(currentLevelIndex, 0, visualPhases.Length - 1);
         GameObject activePhase = null;
@@ -212,7 +222,12 @@ public class Tower : MonoBehaviour
             if (active) activePhase = visualPhases[i];
         }
 
-        if (activePhase == null) return;
+        if (activePhase == null)
+        {
+            fireAnimator?.Rebind();
+            return;
+        }
+
         Transform newHead = activePhase.transform.Find("TurretHead");
         if (newHead != null)
         {
@@ -225,6 +240,8 @@ public class Tower : MonoBehaviour
             Transform newFirePoint = activePhase.transform.Find("FirePoint");
             if (newFirePoint != null) firePoint = newFirePoint;
         }
+
+        fireAnimator?.Rebind();
     }
 
     /// <summary>Refunds 50% of total gold spent (build cost + upgrade costs paid so far).</summary>
