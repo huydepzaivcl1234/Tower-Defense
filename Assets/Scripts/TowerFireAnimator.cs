@@ -76,7 +76,6 @@ public class TowerFireAnimator : MonoBehaviour
 
         if (boundPart != next)
         {
-            // Restore the previous phase before switching references.
             RestoreBoundPart();
             boundPart = next;
             baseLocalPosition = boundPart.localPosition;
@@ -96,9 +95,7 @@ public class TowerFireAnimator : MonoBehaviour
 
         if (muzzleParticles != null)
         {
-            var emission = muzzleParticles.emission;
             muzzleParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            muzzleParticles.Play(true);
             muzzleParticles.Emit(particleBurst);
         }
 
@@ -128,7 +125,6 @@ public class TowerFireAnimator : MonoBehaviour
             localIdle.y = wave * idleAmplitude;
         }
 
-        // Keep the base local placement, then move backward along the CURRENT aiming direction.
         Transform parent = boundPart.parent;
         Vector3 baseWorld = parent != null
             ? parent.TransformPoint(baseLocalPosition + localIdle)
@@ -174,7 +170,13 @@ public class TowerFireAnimator : MonoBehaviour
         Transform fp = tower.firePoint;
         if (muzzleParticles != null && muzzleParticles.transform.parent == fp) return;
 
-        if (muzzleParticles != null) Destroy(muzzleParticles.gameObject);
+        if (muzzleParticles != null)
+        {
+            muzzleParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            Destroy(muzzleParticles.gameObject);
+            muzzleParticles = null;
+            muzzleLight = null;
+        }
 
         GameObject fx = new GameObject("RuntimeMuzzleFX");
         fx.transform.SetParent(fp, false);
@@ -182,6 +184,11 @@ public class TowerFireAnimator : MonoBehaviour
         fx.transform.localRotation = Quaternion.identity;
 
         muzzleParticles = fx.AddComponent<ParticleSystem>();
+
+        // A newly-added ParticleSystem can already be considered playing for this frame.
+        // Stop and clear it BEFORE changing duration/module settings to avoid Unity's runtime warning.
+        muzzleParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
         var main = muzzleParticles.main;
         main.loop = false;
         main.playOnAwake = false;
@@ -206,7 +213,6 @@ public class TowerFireAnimator : MonoBehaviour
         var colorOverLifetime = muzzleParticles.colorOverLifetime;
         colorOverLifetime.enabled = true;
         Gradient g = new Gradient();
-        Color transparent = new Color(muzzleColor.r, muzzleColor.g, muzzleColor.b, 0f);
         g.SetKeys(
             new[] { new GradientColorKey(muzzleColor, 0f), new GradientColorKey(muzzleColor, 1f) },
             new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
@@ -234,21 +240,15 @@ public class TowerFireAnimator : MonoBehaviour
 
     private void ApplyStyleDefaultsIfNeeded()
     {
-        // Inspector values remain fully editable. These only provide sensible visual intensity
-        // when the editor setup tool adds the component to existing prefabs.
         switch (style)
         {
             case FireStyle.Crossbow:
-                break;
             case FireStyle.Cannon:
-                break;
             case FireStyle.HeavyCannon:
-                break;
             case FireStyle.Mortar:
-                break;
             case FireStyle.Flame:
-                break;
             case FireStyle.Energy:
+            case FireStyle.Light:
                 break;
         }
     }
