@@ -18,8 +18,10 @@ public class EnemyData : ScriptableObject
     public float maxHP = 100f;
     [Tooltip("Movement speed in world units per second")]
     public float moveSpeed = 3f;
-    [Tooltip("HP regenerated per second while alive and not at full HP")]
+    [Tooltip("Average HP regenerated per second while alive and not at full HP. Healing is applied in ticks, similar to Burning tower's damage-over-time ticks.")]
     public float hpRegenPerSec = 0f;
+    [Tooltip("Seconds between regeneration ticks. Example: 10 HP/s with 0.5s interval heals +5 every 0.5s. Set <= 0 to use 1 second.")]
+    [Min(0f)] public float hpRegenTickInterval = 1f;
 
     [Header("Rewards & Penalties")]
     [Tooltip("Gold granted to the player when this enemy is killed")]
