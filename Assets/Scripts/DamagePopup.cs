@@ -13,13 +13,15 @@ public class DamagePopup : MonoBehaviour
     [Tooltip("Extra scale punch at the start. Heal popups use a slightly stronger bounce.")]
     public float bounceStrength = 0.22f;
 
+    [Header("Combat Text Colors")]
+    public Color damageColor = new Color(1f, 0.18f, 0.14f, 1f);
+    public Color healColor = new Color(0.30f, 1f, 0.36f, 1f);
+
     private float timer;
     private Color startColor = Color.white;
     private Camera mainCam;
     private Vector3 baseScale = Vector3.one;
     private float activeBounceStrength;
-
-    private static readonly Color HealGreen = new Color(0.30f, 1f, 0.36f, 1f);
 
     private void Awake()
     {
@@ -38,7 +40,9 @@ public class DamagePopup : MonoBehaviour
 
     public void SetDamage(float amount)
     {
-        startColor = Color.white;
+        // Always force damage to red. This also prevents a pooled popup that was
+        // previously green (heal) or gold from leaking its old color into damage text.
+        startColor = damageColor;
         activeBounceStrength = bounceStrength;
         if (label != null)
         {
@@ -49,7 +53,7 @@ public class DamagePopup : MonoBehaviour
 
     public void SetHealText(float amount)
     {
-        startColor = HealGreen;
+        startColor = healColor;
         activeBounceStrength = bounceStrength * 1.35f;
         if (label != null)
         {
