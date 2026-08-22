@@ -2,10 +2,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// Tower upgrade panel. Existing upgrade/sell/close behaviour is preserved.
-/// Additional next-level fields are optional and are used by the clean right-side panel.
-/// </summary>
 public class TowerUpgradeUI : MonoBehaviour
 {
     [Header("Panel Root")]
@@ -28,16 +24,13 @@ public class TowerUpgradeUI : MonoBehaviour
     [Header("Buttons")]
     public Button upgradeButton;
     public TMP_Text upgradeButtonLabel;
-    [Tooltip("Optional separate cost display, e.g. a small text next to a gold icon, independent from the button's own label")]
     public TMP_Text upgradeCostText;
     public Button sellButton;
     public TMP_Text sellButtonLabel;
     public Button closeButton;
-    [Tooltip("Optional second Close button used by the clean UI layout.")]
     public Button secondaryCloseButton;
 
     [Header("Range Preview")]
-    [Tooltip("A dedicated RangeIndicator instance used only for showing the selected tower's range - use a separate one from the placement ghost's")]
     public RangeIndicator rangeIndicator;
     public Color rangeColor = new Color(0.3f, 0.75f, 1f, 1f);
 
@@ -62,16 +55,24 @@ public class TowerUpgradeUI : MonoBehaviour
         if (panelRoot != null) panelRoot.SetActive(true);
     }
 
+    private float Damage(float value) => RelicManager.Instance != null ? RelicManager.Instance.ApplyDamage(value) : value;
+    private float Speed(float value) => RelicManager.Instance != null ? RelicManager.Instance.ApplyAttackSpeed(value) : value;
+    private float Range(float value) => RelicManager.Instance != null ? RelicManager.Instance.ApplyRange(value) : value;
+
     private void Refresh()
     {
         if (selectedTower == null || selectedTower.data == null) return;
         TowerLevelStats stats = selectedTower.CurrentStats;
 
+        float curDamage = Damage(stats.strength);
+        float curSpeed = Speed(stats.attackSpeed);
+        float curRange = Range(stats.range);
+
         if (towerNameText != null) towerNameText.text = selectedTower.data.towerName;
         if (levelText != null) levelText.text = $"Level {selectedTower.CurrentLevelNumber}";
-        if (strengthText != null) strengthText.text = CompactNumber.Format(stats.strength);
-        if (attackSpeedText != null) attackSpeedText.text = $"{CompactNumber.Format(stats.attackSpeed)}/s";
-        if (rangeText != null) rangeText.text = CompactNumber.Format(stats.range);
+        if (strengthText != null) strengthText.text = CompactNumber.Format(curDamage);
+        if (attackSpeedText != null) attackSpeedText.text = $"{CompactNumber.Format(curSpeed)}/s";
+        if (rangeText != null) rangeText.text = CompactNumber.Format(curRange);
 
         if (selectedTower.CanUpgrade())
         {
@@ -79,11 +80,15 @@ public class TowerUpgradeUI : MonoBehaviour
             TowerLevelStats next = selectedTower.data.levels[nextIndex];
             int cost = selectedTower.GetNextUpgradeCost();
 
+            float nextDamage = Damage(next.strength);
+            float nextSpeed = Speed(next.attackSpeed);
+            float nextRange = Range(next.range);
+
             if (nextLevelRoot != null) nextLevelRoot.SetActive(true);
             if (nextLevelTitleText != null) nextLevelTitleText.text = $"NEXT LEVEL ({selectedTower.CurrentLevelNumber + 1})";
-            if (nextStrengthText != null) nextStrengthText.text = FormatNext(next.strength, next.strength - stats.strength);
-            if (nextAttackSpeedText != null) nextAttackSpeedText.text = FormatNext(next.attackSpeed, next.attackSpeed - stats.attackSpeed, "/s");
-            if (nextRangeText != null) nextRangeText.text = FormatNext(next.range, next.range - stats.range);
+            if (nextStrengthText != null) nextStrengthText.text = FormatNext(nextDamage, nextDamage - curDamage);
+            if (nextAttackSpeedText != null) nextAttackSpeedText.text = FormatNext(nextSpeed, nextSpeed - curSpeed, "/s");
+            if (nextRangeText != null) nextRangeText.text = FormatNext(nextRange, nextRange - curRange);
 
             if (upgradeButtonLabel != null) upgradeButtonLabel.text = "UPGRADE";
             if (upgradeCostText != null) upgradeCostText.text = CompactNumber.Format(cost);
@@ -99,9 +104,8 @@ public class TowerUpgradeUI : MonoBehaviour
         }
 
         if (sellButtonLabel != null) sellButtonLabel.text = $"SELL  {CompactNumber.Format(selectedTower.GetSellValue())}";
-
         if (rangeIndicator != null)
-            rangeIndicator.Show(selectedTower.transform.position, stats.range, rangeColor);
+            rangeIndicator.Show(selectedTower.transform.position, curRange, rangeColor);
     }
 
     private static string FormatNext(float value, float delta, string suffix = "")
@@ -115,7 +119,6 @@ public class TowerUpgradeUI : MonoBehaviour
         if (selectedTower == null || !selectedTower.CanUpgrade()) return;
         int cost = selectedTower.GetNextUpgradeCost();
         if (GameManager.Instance == null || !GameManager.Instance.SpendGold(cost)) return;
-
         selectedTower.Upgrade();
         Refresh();
     }
@@ -123,10 +126,8 @@ public class TowerUpgradeUI : MonoBehaviour
     private void OnSellPressed()
     {
         if (selectedTower == null) return;
-
-        GameManager.Instance?.AddGold(selectedTower.GetSellValue());
+        GameManager.Instance?.AddGold(selectedTower.GetSellValue(), false);
         if (selectedTower.occupiedSpot != null) selectedTower.occupiedSpot.ClearSpot();
-
         Destroy(selectedTower.gameObject);
         ClosePanel();
     }
@@ -140,7 +141,6 @@ public class TowerUpgradeUI : MonoBehaviour
 
     private void Update()
     {
-        if (panelRoot != null && panelRoot.activeSelf && selectedTower != null)
-            Refresh();
+        if (panelRoot != null && panelRoot.activeSelf && selectedTower != null) Refresh();
     }
 }
