@@ -63,12 +63,12 @@ public class HUDManager : MonoBehaviour
 
     private void UpdateGold(int value)
     {
-        if (goldText != null) goldText.text = value.ToString();
+        if (goldText != null) goldText.text = CompactNumber.Format(value);
     }
 
     private void UpdateLives(int value)
     {
-        if (livesText != null) livesText.text = value.ToString();
+        if (livesText != null) livesText.text = CompactNumber.Format(value);
     }
 
     private void UpdateWaveText()
@@ -76,7 +76,7 @@ public class HUDManager : MonoBehaviour
         if (waveText == null || WaveManager.Instance == null) return;
         int total = Mathf.Max(1, WaveManager.Instance.TotalWaves);
         int current = Mathf.Clamp(WaveManager.Instance.CurrentWaveNumber, 1, total);
-        waveText.text = $"Wave {current} / {total}";
+        waveText.text = $"Wave {CompactNumber.Format(current)} / {CompactNumber.Format(total)}";
     }
 
     private void OnStartWavePressed() => WaveManager.Instance?.StartNextWave();
