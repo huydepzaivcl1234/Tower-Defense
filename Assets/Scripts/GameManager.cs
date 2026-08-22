@@ -1,10 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Tracks gold and lives, and fires events the UI subscribes to. One per scene.
-/// Put this on an empty "GameManager" GameObject.
-/// </summary>
+/// <summary>Tracks gold, lives and run end state.</summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
@@ -45,10 +42,19 @@ public class GameManager : MonoBehaviour
         return true;
     }
 
-    public void AddGold(int amount)
+    /// <summary>
+    /// Adds earned gold and returns the actual amount granted after relic bonuses.
+    /// Set applyRelicBonus=false for refunds/selling so bonus-gold relics cannot multiply refunds.
+    /// </summary>
+    public int AddGold(int amount, bool applyRelicBonus = true)
     {
-        CurrentGold += amount;
+        int granted = amount;
+        if (applyRelicBonus && RelicManager.Instance != null)
+            granted = RelicManager.Instance.ApplyGoldGain(amount);
+
+        CurrentGold += granted;
         OnGoldChanged?.Invoke(CurrentGold);
+        return granted;
     }
 
     public void LoseLives(int amount)
@@ -59,7 +65,6 @@ public class GameManager : MonoBehaviour
         if (CurrentLives <= 0) TriggerGameOver();
     }
 
-    /// <summary>Called by WaveManager once every wave is spawned AND every enemy from it is gone.</summary>
     public void HandleAllWavesCleared()
     {
         if (IsGameOver) return;
