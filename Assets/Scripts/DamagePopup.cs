@@ -2,46 +2,69 @@ using UnityEngine;
 using TMPro;
 
 /// <summary>
-/// A small floating damage number that rises and fades out, then returns to the pool.
-/// Set this up as a prefab: an empty GameObject with a child World Space Canvas
-/// (scaled down, e.g. 0.01) containing a TMP_Text - same pattern as WorldHealthBar.
-/// Assign the prefab to Enemy's "Damage Popup Prefab" field; Enemy spawns one on every hit.
+/// Floating combat text used for damage, healing and gold.
+/// Supports compact large-number formatting and a small bounce/punch animation.
 /// </summary>
 public class DamagePopup : MonoBehaviour
 {
     public TMP_Text label;
     public float floatSpeed = 1.2f;
     public float lifetime = 0.8f;
+    [Tooltip("Extra scale punch at the start. Heal popups use a slightly stronger bounce.")]
+    public float bounceStrength = 0.22f;
 
     private float timer;
     private Color startColor = Color.white;
     private Camera mainCam;
+    private Vector3 baseScale = Vector3.one;
+    private float activeBounceStrength;
+
+    private static readonly Color HealGreen = new Color(0.30f, 1f, 0.36f, 1f);
 
     private void Awake()
     {
         mainCam = Camera.main;
+        baseScale = transform.localScale;
         if (label != null) startColor = label.color;
     }
 
-    // Fires every time this becomes active - both the first time and every time it's reused from the pool -
-    // so leftover state from a previous use never carries over.
     private void OnEnable()
     {
         timer = 0f;
+        activeBounceStrength = bounceStrength;
+        transform.localScale = baseScale;
         if (label != null) label.color = startColor;
     }
 
     public void SetDamage(float amount)
     {
-        if (label != null) label.text = Mathf.RoundToInt(amount).ToString();
+        startColor = Color.white;
+        activeBounceStrength = bounceStrength;
+        if (label != null)
+        {
+            label.text = CompactNumber.Format(amount);
+            label.color = startColor;
+        }
+    }
+
+    public void SetHealText(float amount)
+    {
+        startColor = HealGreen;
+        activeBounceStrength = bounceStrength * 1.35f;
+        if (label != null)
+        {
+            label.text = "+" + CompactNumber.Format(amount);
+            label.color = startColor;
+        }
     }
 
     public void SetGoldText(int amount, Color color)
     {
+        startColor = color;
+        activeBounceStrength = bounceStrength;
         if (label != null)
         {
-            label.text = amount.ToString();
-            startColor = color;
+            label.text = CompactNumber.Format(amount);
             label.color = color;
         }
     }
@@ -49,15 +72,23 @@ public class DamagePopup : MonoBehaviour
     private void Update()
     {
         transform.position += Vector3.up * floatSpeed * Time.deltaTime;
-        if (mainCam != null) transform.rotation = mainCam.transform.rotation; // billboard toward camera, same trick as WorldHealthBar
+        if (mainCam == null) mainCam = Camera.main;
+        if (mainCam != null) transform.rotation = mainCam.transform.rotation;
 
         timer += Time.deltaTime;
         float t = Mathf.Clamp01(timer / lifetime);
+
+        // Quick squash/pop near the start, then settle to normal size.
+        float bounceWindow = Mathf.Clamp01(1f - t * 4f);
+        float pulse = Mathf.Sin(t * Mathf.PI * 4f) * activeBounceStrength * bounceWindow;
+        transform.localScale = baseScale * (1f + pulse);
+
         if (label != null)
             label.color = new Color(startColor.r, startColor.g, startColor.b, 1f - t);
 
         if (timer >= lifetime)
         {
+            transform.localScale = baseScale;
             if (ObjectPool.Instance != null) ObjectPool.Instance.Release(gameObject);
             else Destroy(gameObject);
         }
