@@ -36,7 +36,10 @@ public static class RelicSystemSetupTool
         }
 
         RelicChoiceUI ui = Object.FindFirstObjectByType<RelicChoiceUI>(FindObjectsInactive.Include);
-        if (ui == null) ui = CreateUI();
+        if (ui == null)
+            ui = CreateUI();
+        else
+            UpgradeExistingUI(ui);
 
         Undo.RecordObject(manager, "Configure Relic Manager");
         manager.wavesPerChoice = 3;
@@ -45,11 +48,29 @@ public static class RelicSystemSetupTool
         manager.relicPool = relics;
         manager.choiceUI = ui;
         EditorUtility.SetDirty(manager);
+        EditorUtility.SetDirty(ui);
 
         Selection.activeGameObject = manager.gameObject;
         AssetDatabase.SaveAssets();
         EditorUtility.DisplayDialog("Relic System",
-            "Setup complete.\n\nEvery 3 cleared waves: 3 random relics appear, player picks 1.\nBuffs stack for the current run and reset when the scene/restart reloads.\n\nCustomize timing on RelicManager and buff values in Assets/Data/Relics.", "OK");
+            "Setup complete.\n\nRelic cards now include a large Icon area above Name / Description / Stack.\nAssign a Sprite to each RelicData > Icon field and it will appear automatically at runtime.\n\nExisting Relic UI was upgraded in place.", "OK");
+    }
+
+    [MenuItem("Tower Defense/Relics/Upgrade Existing Relic UI")]
+    public static void UpgradeExistingRelicUIFromMenu()
+    {
+        RelicChoiceUI ui = Object.FindFirstObjectByType<RelicChoiceUI>(FindObjectsInactive.Include);
+        if (ui == null)
+        {
+            EditorUtility.DisplayDialog("Relic UI", "No RelicChoiceUI found in the open scene. Run Setup Relic System first.", "OK");
+            return;
+        }
+
+        UpgradeExistingUI(ui);
+        EditorUtility.SetDirty(ui);
+        AssetDatabase.SaveAssets();
+        Selection.activeGameObject = ui.gameObject;
+        EditorUtility.DisplayDialog("Relic UI", "Existing relic cards upgraded with icon slots.", "OK");
     }
 
     private static RelicData CreateRelic(string fileName, string displayName, string description,
@@ -93,7 +114,7 @@ public static class RelicSystemSetupTool
         bg.color = new Color(0.025f, 0.035f, 0.05f, 0.92f);
 
         TextMeshProUGUI title = MakeText("Title", panel.transform, "CHOOSE A RELIC", 42, TextAlignmentOptions.Center);
-        SetRect(title.rectTransform, new Vector2(0.5f, 0.86f), new Vector2(0.5f, 0.86f), new Vector2(900, 80), Vector2.zero);
+        SetRect(title.rectTransform, new Vector2(0.5f, 0.88f), new Vector2(0.5f, 0.88f), new Vector2(900, 80), Vector2.zero);
 
         RelicChoiceUI ui = canvasGO.AddComponent<RelicChoiceUI>();
         ui.panelRoot = panel;
@@ -112,23 +133,138 @@ public static class RelicSystemSetupTool
     {
         GameObject cardGO = UIObject("RelicCard" + index, parent);
         RectTransform r = cardGO.GetComponent<RectTransform>();
-        SetRect(r, new Vector2(x, 0.48f), new Vector2(x, 0.48f), new Vector2(420, 520), Vector2.zero);
+        SetRect(r, new Vector2(x, 0.48f), new Vector2(x, 0.48f), new Vector2(420, 590), Vector2.zero);
+
         Image img = cardGO.AddComponent<Image>();
         img.color = new Color(0.08f, 0.10f, 0.14f, 0.98f);
         Button button = cardGO.AddComponent<Button>();
         button.targetGraphic = img;
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+        colors.pressedColor = new Color(0.82f, 0.88f, 1f, 1f);
+        colors.selectedColor = colors.highlightedColor;
+        button.colors = colors;
+
+        Image icon = CreateIconArea(cardGO.transform);
 
         TextMeshProUGUI name = MakeText("Name", cardGO.transform, "RELIC", 30, TextAlignmentOptions.Center);
-        SetRect(name.rectTransform, new Vector2(0.5f, 0.82f), new Vector2(0.5f, 0.82f), new Vector2(360, 90), Vector2.zero);
+        name.fontStyle = FontStyles.Bold;
+        SetRect(name.rectTransform, new Vector2(0.5f, 0.57f), new Vector2(0.5f, 0.57f), new Vector2(360, 64), Vector2.zero);
 
-        TextMeshProUGUI desc = MakeText("Description", cardGO.transform, "Description", 22, TextAlignmentOptions.Center);
+        TextMeshProUGUI desc = MakeText("Description", cardGO.transform, "Description", 21, TextAlignmentOptions.Center);
         desc.enableWordWrapping = true;
-        SetRect(desc.rectTransform, new Vector2(0.5f, 0.50f), new Vector2(0.5f, 0.50f), new Vector2(340, 200), Vector2.zero);
+        desc.color = new Color(0.83f, 0.88f, 0.95f, 1f);
+        SetRect(desc.rectTransform, new Vector2(0.5f, 0.34f), new Vector2(0.5f, 0.34f), new Vector2(340, 150), Vector2.zero);
 
         TextMeshProUGUI stack = MakeText("Stack", cardGO.transform, "STACK", 17, TextAlignmentOptions.Center);
-        SetRect(stack.rectTransform, new Vector2(0.5f, 0.16f), new Vector2(0.5f, 0.16f), new Vector2(300, 50), Vector2.zero);
+        stack.color = new Color(0.35f, 0.88f, 1f, 1f);
+        SetRect(stack.rectTransform, new Vector2(0.5f, 0.10f), new Vector2(0.5f, 0.10f), new Vector2(300, 42), Vector2.zero);
 
-        return new RelicChoiceUI.RelicCard { button = button, nameText = name, descriptionText = desc, stackText = stack, icon = null };
+        return new RelicChoiceUI.RelicCard
+        {
+            button = button,
+            nameText = name,
+            descriptionText = desc,
+            stackText = stack,
+            icon = icon
+        };
+    }
+
+    private static Image CreateIconArea(Transform card)
+    {
+        GameObject frameGO = UIObject("IconFrame", card);
+        Image frame = frameGO.AddComponent<Image>();
+        frame.color = new Color(0.035f, 0.055f, 0.085f, 1f);
+        SetRect(frame.rectTransform, new Vector2(0.5f, 0.79f), new Vector2(0.5f, 0.79f), new Vector2(230, 230), Vector2.zero);
+
+        GameObject iconGO = UIObject("Icon", frameGO.transform);
+        Image icon = iconGO.AddComponent<Image>();
+        icon.color = Color.white;
+        icon.preserveAspect = true;
+        icon.raycastTarget = false;
+        SetRect(icon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(198, 198), Vector2.zero);
+        icon.enabled = false;
+        return icon;
+    }
+
+    /// <summary>
+    /// Upgrades the already-generated scene UI instead of requiring the user to delete/recreate it.
+    /// This is intentionally name-based because the existing tool generated predictable card child names.
+    /// </summary>
+    private static void UpgradeExistingUI(RelicChoiceUI ui)
+    {
+        if (ui == null || ui.cards == null) return;
+
+        Undo.RecordObject(ui, "Upgrade Relic UI");
+
+        for (int i = 0; i < ui.cards.Length; i++)
+        {
+            RelicChoiceUI.RelicCard card = ui.cards[i];
+            if (card == null || card.button == null) continue;
+
+            GameObject cardGO = card.button.gameObject;
+            RectTransform cardRect = cardGO.GetComponent<RectTransform>();
+            if (cardRect != null)
+                cardRect.sizeDelta = new Vector2(420, 590);
+
+            Transform frameTransform = cardGO.transform.Find("IconFrame");
+            Image icon;
+            if (frameTransform == null)
+            {
+                icon = CreateIconArea(cardGO.transform);
+            }
+            else
+            {
+                Transform iconTransform = frameTransform.Find("Icon");
+                if (iconTransform == null)
+                {
+                    GameObject iconGO = UIObject("Icon", frameTransform);
+                    icon = iconGO.AddComponent<Image>();
+                }
+                else
+                {
+                    icon = iconTransform.GetComponent<Image>();
+                    if (icon == null) icon = iconTransform.gameObject.AddComponent<Image>();
+                }
+
+                icon.preserveAspect = true;
+                icon.raycastTarget = false;
+                SetRect(icon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(198, 198), Vector2.zero);
+            }
+
+            card.icon = icon;
+
+            if (card.nameText != null)
+            {
+                card.nameText.fontStyle = FontStyles.Bold;
+                SetRect(card.nameText.rectTransform, new Vector2(0.5f, 0.57f), new Vector2(0.5f, 0.57f), new Vector2(360, 64), Vector2.zero);
+            }
+
+            if (card.descriptionText != null)
+            {
+                card.descriptionText.fontSize = 21;
+                card.descriptionText.color = new Color(0.83f, 0.88f, 0.95f, 1f);
+                SetRect(card.descriptionText.rectTransform, new Vector2(0.5f, 0.34f), new Vector2(0.5f, 0.34f), new Vector2(340, 150), Vector2.zero);
+            }
+
+            if (card.stackText != null)
+            {
+                card.stackText.color = new Color(0.35f, 0.88f, 1f, 1f);
+                SetRect(card.stackText.rectTransform, new Vector2(0.5f, 0.10f), new Vector2(0.5f, 0.10f), new Vector2(300, 42), Vector2.zero);
+            }
+
+            ColorBlock colors = card.button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+            colors.pressedColor = new Color(0.82f, 0.88f, 1f, 1f);
+            colors.selectedColor = colors.highlightedColor;
+            card.button.colors = colors;
+
+            EditorUtility.SetDirty(cardGO);
+        }
+
+        EditorUtility.SetDirty(ui);
     }
 
     private static GameObject UIObject(string name, Transform parent)
