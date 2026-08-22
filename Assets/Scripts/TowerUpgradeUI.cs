@@ -69,9 +69,9 @@ public class TowerUpgradeUI : MonoBehaviour
 
         if (towerNameText != null) towerNameText.text = selectedTower.data.towerName;
         if (levelText != null) levelText.text = $"Level {selectedTower.CurrentLevelNumber}";
-        if (strengthText != null) strengthText.text = $"{stats.strength:0.#}";
-        if (attackSpeedText != null) attackSpeedText.text = $"{stats.attackSpeed:0.##}/s";
-        if (rangeText != null) rangeText.text = $"{stats.range:0.#}";
+        if (strengthText != null) strengthText.text = CompactNumber.Format(stats.strength);
+        if (attackSpeedText != null) attackSpeedText.text = $"{CompactNumber.Format(stats.attackSpeed)}/s";
+        if (rangeText != null) rangeText.text = CompactNumber.Format(stats.range);
 
         if (selectedTower.CanUpgrade())
         {
@@ -86,7 +86,7 @@ public class TowerUpgradeUI : MonoBehaviour
             if (nextRangeText != null) nextRangeText.text = FormatNext(next.range, next.range - stats.range);
 
             if (upgradeButtonLabel != null) upgradeButtonLabel.text = "UPGRADE";
-            if (upgradeCostText != null) upgradeCostText.text = cost.ToString();
+            if (upgradeCostText != null) upgradeCostText.text = CompactNumber.Format(cost);
             if (upgradeButton != null)
                 upgradeButton.interactable = GameManager.Instance != null && GameManager.Instance.CurrentGold >= cost;
         }
@@ -98,7 +98,7 @@ public class TowerUpgradeUI : MonoBehaviour
             if (upgradeButton != null) upgradeButton.interactable = false;
         }
 
-        if (sellButtonLabel != null) sellButtonLabel.text = $"SELL  {selectedTower.GetSellValue()}";
+        if (sellButtonLabel != null) sellButtonLabel.text = $"SELL  {CompactNumber.Format(selectedTower.GetSellValue())}";
 
         if (rangeIndicator != null)
             rangeIndicator.Show(selectedTower.transform.position, stats.range, rangeColor);
@@ -107,7 +107,7 @@ public class TowerUpgradeUI : MonoBehaviour
     private static string FormatNext(float value, float delta, string suffix = "")
     {
         string sign = delta > 0.0001f ? "+" : string.Empty;
-        return $"{value:0.##}{suffix}   <color=#55E86A>{sign}{delta:0.##}{suffix}</color>";
+        return $"{CompactNumber.Format(value)}{suffix}   <color=#55E86A>{sign}{CompactNumber.Format(delta)}{suffix}</color>";
     }
 
     private void OnUpgradePressed()
