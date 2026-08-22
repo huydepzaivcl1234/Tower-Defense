@@ -54,13 +54,14 @@ public class BuildMenuUI : MonoBehaviour
     {
         if (binding == null || binding.towerData == null) return;
         TowerData data = binding.towerData;
+        string cost = CompactNumber.Format(data.buildCost);
 
         if (binding.label != null)
-            binding.label.text = $"{data.towerName}\n{data.buildCost}g";
+            binding.label.text = $"{data.towerName}\n{cost}g";
         if (binding.nameText != null)
             binding.nameText.text = data.towerName;
         if (binding.costText != null)
-            binding.costText.text = $"{data.buildCost}";
+            binding.costText.text = cost;
     }
 
     private void RefreshVisualState()
