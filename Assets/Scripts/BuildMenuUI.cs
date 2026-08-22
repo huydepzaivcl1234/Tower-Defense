@@ -2,10 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// Build menu binding layer. Gameplay behaviour is unchanged: selecting a card still delegates
-/// placement to TowerPlacementManager. Extra visual references are optional so old scenes keep working.
-/// </summary>
+/// <summary>Build menu binding layer.</summary>
 public class BuildMenuUI : MonoBehaviour
 {
     [System.Serializable]
@@ -13,9 +10,7 @@ public class BuildMenuUI : MonoBehaviour
     {
         public TowerData towerData;
         public Button button;
-        [Tooltip("Legacy combined label. Kept for backward compatibility.")]
         public TMP_Text label;
-
         [Header("Clean UI (optional)")]
         public TMP_Text nameText;
         public TMP_Text costText;
@@ -38,10 +33,7 @@ public class BuildMenuUI : MonoBehaviour
         RefreshVisualState();
     }
 
-    private void Update()
-    {
-        RefreshVisualState();
-    }
+    private void Update() => RefreshVisualState();
 
     private void SelectTower(TowerButtonBinding binding, TowerData data)
     {
@@ -50,18 +42,21 @@ public class BuildMenuUI : MonoBehaviour
         RefreshVisualState();
     }
 
+    private int GetBuildCost(TowerData data)
+    {
+        if (data == null) return 0;
+        return RelicManager.Instance != null ? RelicManager.Instance.GetBuildCost(data.buildCost) : data.buildCost;
+    }
+
     private void RefreshBinding(TowerButtonBinding binding)
     {
         if (binding == null || binding.towerData == null) return;
         TowerData data = binding.towerData;
-        string cost = CompactNumber.Format(data.buildCost);
+        string cost = CompactNumber.Format(GetBuildCost(data));
 
-        if (binding.label != null)
-            binding.label.text = $"{data.towerName}\n{cost}g";
-        if (binding.nameText != null)
-            binding.nameText.text = data.towerName;
-        if (binding.costText != null)
-            binding.costText.text = cost;
+        if (binding.label != null) binding.label.text = $"{data.towerName}\n{cost}g";
+        if (binding.nameText != null) binding.nameText.text = data.towerName;
+        if (binding.costText != null) binding.costText.text = cost;
     }
 
     private void RefreshVisualState()
@@ -74,12 +69,11 @@ public class BuildMenuUI : MonoBehaviour
             if (binding == null || binding.towerData == null) continue;
             RefreshBinding(binding);
             if (binding.button != null)
-                binding.button.interactable = gold >= binding.towerData.buildCost;
+                binding.button.interactable = gold >= GetBuildCost(binding.towerData);
             if (binding.selectedFrame != null)
                 binding.selectedFrame.SetActive(placementActive && binding == selectedBinding);
         }
 
-        if (!placementActive)
-            selectedBinding = null;
+        if (!placementActive) selectedBinding = null;
     }
 }
