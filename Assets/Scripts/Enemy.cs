@@ -2,10 +2,8 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Walks along a WaypointPath, taking damage from towers, regenerating HP over time,
-/// and either dying (rewarding gold) or reaching the end (costing the player lives).
-/// Put this on the enemy prefab's root, on the "Enemy" layer, with a Collider (any type)
-/// so Physics.OverlapSphere on towers can find it.
+/// Walks along a WaypointPath, takes damage/status effects from towers, regenerates HP in ticks,
+/// and either dies (rewarding gold) or reaches the end (costing player lives).
 /// </summary>
 public class Enemy : MonoBehaviour
 {
@@ -16,24 +14,17 @@ public class Enemy : MonoBehaviour
     public EnemyData data;
 
     [Header("Optional")]
-    [Tooltip("Child WorldHealthBar that shows HP above the enemy. Safe to leave empty.")]
     public WorldHealthBar healthBar;
-    [Tooltip("Sound played once when this enemy dies. Safe to leave empty.")]
     public AudioClip deathSound;
 
     [Header("Animation (optional - safe to leave empty for a non-animated placeholder model)")]
-    [Tooltip("The Animator on this enemy's model. Works with any imported model/rig as long as the " +
-             "Animator Controller has a matching float parameter and trigger (see names below).")]
     public Animator animator;
-    [Tooltip("Animator float parameter driven by current move speed, for a walk/idle blend tree. Leave blank to skip.")]
     public string speedParam = "Speed";
-    [Tooltip("Animator trigger fired the instant this enemy dies.")]
     public string dieTrigger = "Die";
-    [Tooltip("Seconds to keep the enemy alive after triggering Die, so its death animation has time to play, before removing it. Match this to your death clip's length.")]
     public float deathAnimDuration = 1f;
 
-    [Header("Damage Popup (optional)")]
-    [Tooltip("Prefab spawned above the enemy's head each time it takes damage, showing the amount. See DamagePopup.cs.")]
+    [Header("Damage / Heal Popup (optional)")]
+    [Tooltip("Same floating popup prefab is reused for damage and healing. Healing is shown green with a + prefix.")]
     public GameObject damagePopupPrefab;
     public Vector3 damagePopupOffset = new Vector3(0f, 1.6f, 0f);
 
@@ -58,7 +49,7 @@ public class Enemy : MonoBehaviour
     private bool hpThresholdShieldUsed;
     private bool isShieldVisualActive;
 
-    private float regenRefreshTimer;
+    private float regenTickTimer;
 
     public bool IsAlive => !isDead && currentHP > 0f;
     public float CurrentHP => currentHP;
@@ -68,14 +59,11 @@ public class Enemy : MonoBehaviour
     public bool IsShielded => currentShield > 0f;
     public float CurrentShield => currentShield;
 
-    /// <summary>Approximate progress along the path (waypoint index + fractional distance to next).
-    /// Used by towers to prioritize the enemy furthest along the route.</summary>
     public float PathProgress { get; private set; }
 
-    /// <summary>Called by WaveManager right after Instantiate or from object pool.</summary>
+    /// <summary>Called by WaveManager right after Instantiate or reuse from object pool.</summary>
     public void Initialize(EnemyData enemyData, List<Transform> path)
     {
-        // Cancel any pending delayed-release Invoke from a previous life (if reused from pool)
         CancelInvoke(nameof(ReleaseToPool));
 
         data = enemyData;
@@ -85,9 +73,7 @@ public class Enemy : MonoBehaviour
         isDead = false;
         PathProgress = 0f;
 
-        // IMPORTANT: every pooled spawn is a completely fresh enemy life.
-        // Reset both timers AND stored magnitudes so status effects from a previous
-        // instance can never leak into a later spawn that reuses this GameObject.
+        // Every pooled spawn is a fresh enemy life. No old status may leak into the new spawn.
         bleedDamagePerTick = 0f;
         bleedTickInterval = 0f;
         bleedTimeRemaining = 0f;
@@ -100,12 +86,11 @@ public class Enemy : MonoBehaviour
         shieldTimeRemaining = 0f;
         hpThresholdShieldUsed = false;
         isShieldVisualActive = false;
-        regenRefreshTimer = 0.5f;
+        regenTickTimer = GetRegenInterval();
 
-        // Reset Animator state for reused pooled enemies
         if (animator != null)
         {
-            animator.Rebind(); // resets all parameters to default
+            animator.Rebind();
             if (!string.IsNullOrEmpty(speedParam))
                 animator.SetFloat(speedParam, data.moveSpeed);
         }
@@ -114,14 +99,20 @@ public class Enemy : MonoBehaviour
         ApplyTintColor(data.tintColor);
     }
 
+    private float GetRegenInterval()
+    {
+        if (data == null) return 1f;
+        return data.hpRegenTickInterval > 0f ? data.hpRegenTickInterval : 1f;
+    }
+
     private void ApplyTintColor(Color color)
     {
         foreach (var rend in GetComponentsInChildren<Renderer>())
         {
-            foreach (var mat in rend.materials) // .materials (not sharedMaterials) instances per-enemy, doesn't touch the shared asset or other enemies
+            foreach (var mat in rend.materials)
             {
-                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color); // URP Lit
-                else if (mat.HasProperty("_Color")) mat.color = color;                 // Built-in Standard
+                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+                else if (mat.HasProperty("_Color")) mat.color = color;
             }
         }
     }
@@ -130,24 +121,45 @@ public class Enemy : MonoBehaviour
     {
         if (isDead || data == null || waypoints == null || waypoints.Count == 0) return;
 
-        if (data.hpRegenPerSec > 0f && currentHP < data.maxHP)
-        {
-            currentHP = Mathf.Min(data.maxHP, currentHP + data.hpRegenPerSec * Time.deltaTime);
-            regenRefreshTimer -= Time.deltaTime;
-            if (regenRefreshTimer <= 0f)
-            {
-                if (healthBar != null) healthBar.Refresh(true); // isHeal = true
-                regenRefreshTimer = 0.5f; // throttle so an animated bar (e.g. MicroBar) isn't re-triggered 60x/sec
-            }
-        }
-
+        UpdateRegeneration();
         UpdateStatusEffects();
-        if (isDead) return; // a bleed tick may have just finished this enemy off
+        if (isDead) return;
 
         if (knockbackRemaining > 0f)
             ApplyKnockbackMovement();
         else
             MoveAlongPath();
+    }
+
+    /// <summary>
+    /// Regeneration now works like a DoT/bleed timer, but in reverse:
+    /// hpRegenPerSec is converted into a heal amount per tick using hpRegenTickInterval.
+    /// Example: 10 HP/s at 0.5s interval => +5 every 0.5 seconds.
+    /// </summary>
+    private void UpdateRegeneration()
+    {
+        if (data.hpRegenPerSec <= 0f || currentHP >= data.maxHP)
+        {
+            // Being full should not bank timer progress. After the next hit, the first heal waits a full interval.
+            regenTickTimer = GetRegenInterval();
+            return;
+        }
+
+        float interval = GetRegenInterval();
+        regenTickTimer -= Time.deltaTime;
+        if (regenTickTimer > 0f) return;
+
+        regenTickTimer += interval;
+
+        float requestedHeal = data.hpRegenPerSec * interval;
+        float oldHP = currentHP;
+        currentHP = Mathf.Min(data.maxHP, currentHP + requestedHeal);
+        float actualHeal = currentHP - oldHP;
+
+        if (actualHeal <= 0f) return;
+
+        if (healthBar != null) healthBar.Refresh(true);
+        SpawnHealPopup(actualHeal);
     }
 
     private void UpdateStatusEffects()
@@ -158,7 +170,7 @@ public class Enemy : MonoBehaviour
             if (bleedTickTimer <= 0f)
             {
                 TakeDamage(bleedDamagePerTick);
-                bleedTickTimer += bleedTickInterval; // += (not =) so leftover time isn't lost if a frame runs long
+                bleedTickTimer += bleedTickInterval;
             }
             bleedTimeRemaining -= Time.deltaTime;
         }
@@ -174,7 +186,6 @@ public class Enemy : MonoBehaviour
         }
         else if (slowPercent != 0f)
         {
-            // Defensive cleanup for pooled/reused objects or interrupted effects.
             slowPercent = 0f;
         }
 
@@ -184,53 +195,44 @@ public class Enemy : MonoBehaviour
             if (shieldTimeRemaining <= 0f)
             {
                 currentShield = 0f;
-                UpdateShieldVisual(); // only update visual when shield expires
+                UpdateShieldVisual();
             }
         }
     }
 
-    /// <summary>"Chảy máu" - damage over time, ticking every Tick Interval seconds. A new application overwrites (refreshes) any current bleed.</summary>
     public void ApplyBleed(float damagePerTick, float tickInterval, float duration)
     {
         if (isDead || damagePerTick <= 0f || tickInterval <= 0f || duration <= 0f) return;
         bleedDamagePerTick = damagePerTick;
         bleedTickInterval = tickInterval;
         bleedTimeRemaining = duration;
-        bleedTickTimer = tickInterval; // first tick fires after one interval, e.g. "10 dmg every 1s" ticks at t=1,2,3...
+        bleedTickTimer = tickInterval;
     }
 
-    /// <summary>"Làm chậm" - temporary move-speed reduction. A new application overwrites (refreshes) any current slow.
-    /// Duration is reduced by this enemy's CC Resist Percent (100% resist = fully immune).</summary>
     public void ApplySlow(float percent, float duration)
     {
         if (isDead || data == null || percent <= 0f || duration <= 0f) return;
         float effectiveDuration = duration * (1f - data.ccResistPercent);
-        if (effectiveDuration <= 0f) return; // fully resisted
+        if (effectiveDuration <= 0f) return;
         slowPercent = Mathf.Clamp01(percent);
         slowTimeRemaining = effectiveDuration;
     }
 
-    /// <summary>"Đẩy lùi" - pushes the enemy back along the path over the next few frames.
-    /// Distance is reduced by this enemy's CC Resist Percent (100% resist = fully immune).
-    /// Multiple hits in quick succession stack (add together).</summary>
     public void ApplyKnockback(float distance)
     {
         if (isDead || distance <= 0f) return;
         float effectiveDistance = distance * (1f - data.ccResistPercent);
-        if (effectiveDistance <= 0f) return; // fully resisted
+        if (effectiveDistance <= 0f) return;
         knockbackRemaining += effectiveDistance;
     }
 
     private void ApplyKnockbackMovement()
     {
         float step = Mathf.Min(knockbackRemaining, knockbackSpeed * Time.deltaTime);
-        transform.position -= transform.forward * step; // push back along whatever direction it's currently facing (away from the goal)
+        transform.position -= transform.forward * step;
         knockbackRemaining -= step;
     }
 
-    /// <summary>"Giáp ảo" - grants a shield that absorbs incoming damage before real HP is touched.
-    /// Stacks additively with any existing shield; duration takes whichever is longer.
-    /// Public so EnemyShieldAura (support-type enemies) can call it on other enemies too.</summary>
     public void GrantShield(float amount, float duration)
     {
         if (isDead || amount <= 0f || duration <= 0f) return;
@@ -241,10 +243,10 @@ public class Enemy : MonoBehaviour
 
     private void UpdateShieldVisual()
     {
-        if (healthBar != null) healthBar.RefreshShield(); // update the shield bar's fill amount every call, so it visibly shrinks as it absorbs hits
+        if (healthBar != null) healthBar.RefreshShield();
 
         bool shouldShow = currentShield > 0f;
-        if (shouldShow == isShieldVisualActive) return; // tint only needs to change on an actual show/hide transition
+        if (shouldShow == isShieldVisualActive) return;
         isShieldVisualActive = shouldShow;
         ApplyTintColor(shouldShow ? data.shieldTintColor : data.tintColor);
     }
@@ -261,9 +263,6 @@ public class Enemy : MonoBehaviour
         if (target == null) { currentWaypointIndex++; return; }
 
         Vector3 toTarget = target.position - transform.position;
-
-        // Slow only affects THIS enemy while this enemy's own slow timer is active.
-        // A stale magnitude can never slow a freshly spawned pooled instance.
         float activeSlow = slowTimeRemaining > 0f ? slowPercent : 0f;
         float effectiveSpeed = data.moveSpeed * (1f - activeSlow);
         float step = effectiveSpeed * Time.deltaTime;
@@ -297,7 +296,7 @@ public class Enemy : MonoBehaviour
     {
         if (isDead || amount <= 0f) return;
 
-        SpawnDamagePopup(amount); // shows the full incoming hit, whether it lands on shield or real HP
+        SpawnDamagePopup(amount);
 
         if (currentShield > 0f)
         {
@@ -311,26 +310,39 @@ public class Enemy : MonoBehaviour
 
         if (!hpThresholdShieldUsed && data.shieldTriggerHPPercent > 0f && currentHP <= data.maxHP * data.shieldTriggerHPPercent)
         {
-            hpThresholdShieldUsed = true; // once per life, so it can't re-trigger every frame while low
+            hpThresholdShieldUsed = true;
             GrantShield(data.shieldTriggerAmount, data.shieldTriggerDuration);
         }
 
-        if (healthBar != null) healthBar.Refresh();
+        if (healthBar != null) healthBar.Refresh(false);
         if (currentHP <= 0f) Die();
+    }
+
+    private GameObject SpawnPopupObject()
+    {
+        if (damagePopupPrefab == null) return null;
+        Vector3 jitter = new Vector3(Random.Range(-0.3f, 0.3f), 0f, Random.Range(-0.3f, 0.3f));
+        Vector3 pos = transform.position + damagePopupOffset + jitter;
+
+        return ObjectPool.Instance != null
+            ? ObjectPool.Instance.Get(damagePopupPrefab, pos, Quaternion.identity)
+            : Instantiate(damagePopupPrefab, pos, Quaternion.identity);
     }
 
     private void SpawnDamagePopup(float amount)
     {
-        if (damagePopupPrefab == null) return;
-        Vector3 jitter = new Vector3(Random.Range(-0.3f, 0.3f), 0f, Random.Range(-0.3f, 0.3f)); // so rapid hits don't perfectly overlap
-        Vector3 pos = transform.position + damagePopupOffset + jitter;
-
-        GameObject go = ObjectPool.Instance != null
-            ? ObjectPool.Instance.Get(damagePopupPrefab, pos, Quaternion.identity)
-            : Instantiate(damagePopupPrefab, pos, Quaternion.identity);
-
+        GameObject go = SpawnPopupObject();
+        if (go == null) return;
         DamagePopup popup = go.GetComponent<DamagePopup>();
         if (popup != null) popup.SetDamage(amount);
+    }
+
+    private void SpawnHealPopup(float amount)
+    {
+        GameObject go = SpawnPopupObject();
+        if (go == null) return;
+        DamagePopup popup = go.GetComponent<DamagePopup>();
+        if (popup != null) popup.SetHealText(amount);
     }
 
     private void Die()
@@ -340,12 +352,11 @@ public class Enemy : MonoBehaviour
         if (GameManager.Instance != null) GameManager.Instance.AddGold(data.goldReward);
         if (deathSound != null) AudioSource.PlayClipAtPoint(deathSound, transform.position);
         if (healthBar != null) healthBar.Hide();
-        OnAnyEnemyDied?.Invoke(this); // fires immediately - wave/gold logic shouldn't wait on a cosmetic animation
+        OnAnyEnemyDied?.Invoke(this);
 
         if (animator != null && !string.IsNullOrEmpty(dieTrigger))
         {
             animator.SetTrigger(dieTrigger);
-            // Release to pool after death animation completes (instead of Destroy)
             Invoke(nameof(ReleaseToPool), deathAnimDuration);
         }
         else
@@ -369,7 +380,6 @@ public class Enemy : MonoBehaviour
         if (GameManager.Instance != null) GameManager.Instance.LoseLives(data.damageToPlayer);
         OnAnyEnemyReachedEnd?.Invoke(this);
 
-        // Release to pool instead of destroying
         if (ObjectPool.Instance != null)
             ObjectPool.Instance.Release(gameObject);
         else
