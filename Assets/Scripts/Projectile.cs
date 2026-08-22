@@ -1,17 +1,12 @@
 using UnityEngine;
 
 /// <summary>
-/// Simple, reliable projectile movement (no Rigidbody/physics collision needed).
-/// Moves toward its target each frame and applies damage + all status effects on arrival.
+/// Simple projectile movement. Carries a snapshot of tower stats at launch.
 /// </summary>
 public class Projectile : MonoBehaviour
 {
-    [Tooltip("Units traveled per second")]
     public float speed = 20f;
-    [Tooltip("If true, continuously tracks the target's current position. " +
-             "If false, flies straight toward where the target was at launch (still guaranteed to hit - simplified TD behaviour).")]
     public bool homing = true;
-    [Tooltip("Optional particle/VFX prefab spawned on impact")]
     public GameObject impactEffectPrefab;
 
     private Enemy target;
@@ -25,13 +20,15 @@ public class Projectile : MonoBehaviour
     private float knockbackDistance;
     private Vector3 destination;
 
-    /// <summary>Launch carrying a full level's stats, so splash/bleed/slow/knockback all ride along
-    /// automatically - add a new effect field to TowerLevelStats and it's available here with no
-    /// signature changes needed.</summary>
     public void Launch(Enemy targetEnemy, TowerLevelStats stats)
     {
+        Launch(targetEnemy, stats, stats != null ? stats.strength : 0f);
+    }
+
+    public void Launch(Enemy targetEnemy, TowerLevelStats stats, float effectiveDamage)
+    {
         target = targetEnemy;
-        damage = stats.strength;
+        damage = effectiveDamage;
         splashRadius = stats.splashRadius;
         bleedDamagePerTick = stats.bleedDamagePerTick;
         bleedTickInterval = stats.bleedTickInterval;
@@ -49,7 +46,6 @@ public class Projectile : MonoBehaviour
 
         Vector3 dir = destination - transform.position;
         float step = speed * Time.deltaTime;
-
         if (dir.magnitude <= step)
         {
             HitTarget();
@@ -69,9 +65,7 @@ public class Projectile : MonoBehaviour
             ApplyStatusEffects(target);
         }
 
-        if (splashRadius > 0f)
-            ApplySplashDamage();
-
+        if (splashRadius > 0f) ApplySplashDamage();
         if (impactEffectPrefab != null)
             Instantiate(impactEffectPrefab, transform.position, Quaternion.identity);
 
@@ -79,7 +73,7 @@ public class Projectile : MonoBehaviour
         else Destroy(gameObject);
     }
 
-    private static readonly Collider[] overlapBuffer = new Collider[64]; // shared, reused each splash hit - avoids allocating a new array every explosion
+    private static readonly Collider[] overlapBuffer = new Collider[64];
 
     private void ApplySplashDamage()
     {
@@ -87,7 +81,7 @@ public class Projectile : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             Enemy e = overlapBuffer[i].GetComponent<Enemy>();
-            if (e == null || !e.IsAlive || e == target) continue; // primary target already took its hit above
+            if (e == null || !e.IsAlive || e == target) continue;
             e.TakeDamage(damage);
             ApplyStatusEffects(e);
         }
