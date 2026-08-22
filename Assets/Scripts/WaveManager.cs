@@ -22,16 +22,9 @@ public class Wave
     public float startDelay = 1f;
 }
 
-/// <summary>
-/// Spawns waves along a WaypointPath and reports back to GameManager when the level is cleared.
-/// Put this on an empty "WaveManager" GameObject, one per scene, and assign the Path field.
-/// </summary>
 public class WaveManager : MonoBehaviour
 {
     public static WaveManager Instance { get; private set; }
-
-    /// <summary>Fires once each time the battlefield is fully cleared of enemies after a wave
-    /// (aliveEnemies drops to 0 while not currently spawning). Gold Towers listen to this.</summary>
     public static event System.Action OnWaveCleared;
 
     [Header("Setup")]
@@ -69,13 +62,16 @@ public class WaveManager : MonoBehaviour
     {
         aliveEnemies = Mathf.Max(0, aliveEnemies - 1);
         if (aliveEnemies == 0 && !waveInProgress)
-            OnWaveCleared?.Invoke(); // battlefield just cleared - Gold Towers grant their gold here
+            OnWaveCleared?.Invoke();
         CheckForWin();
     }
 
-    public bool CanStartNextWave() => !waveInProgress && currentWaveIndex < waves.Count - 1;
+    public bool CanStartNextWave()
+    {
+        bool relicChoiceOpen = RelicManager.Instance != null && RelicManager.Instance.IsChoosing;
+        return !waveInProgress && !relicChoiceOpen && currentWaveIndex < waves.Count - 1;
+    }
 
-    /// <summary>Called by the HUD's "Start Wave" button.</summary>
     public void StartNextWave()
     {
         if (!CanStartNextWave()) return;
@@ -98,7 +94,7 @@ public class WaveManager : MonoBehaviour
         }
 
         waveInProgress = false;
-        CheckForWin(); // also covers the edge case of an empty final wave
+        CheckForWin();
     }
 
     private void CheckForWin()
