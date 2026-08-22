@@ -132,7 +132,7 @@ public class Enemy : MonoBehaviour
     }
 
     /// <summary>
-    /// Regeneration now works like a DoT/bleed timer, but in reverse:
+    /// Regeneration works like a DoT/bleed timer, but in reverse:
     /// hpRegenPerSec is converted into a heal amount per tick using hpRegenTickInterval.
     /// Example: 10 HP/s at 0.5s interval => +5 every 0.5 seconds.
     /// </summary>
@@ -150,16 +150,25 @@ public class Enemy : MonoBehaviour
         if (regenTickTimer > 0f) return;
 
         regenTickTimer += interval;
+        Heal(data.hpRegenPerSec * interval, true);
+    }
 
-        float requestedHeal = data.hpRegenPerSec * interval;
+    /// <summary>
+    /// Shared healing entry point used by self regeneration and support/healer enemies.
+    /// Returns the actual HP restored after clamping to Max HP.
+    /// </summary>
+    public float Heal(float amount, bool showPopup = true)
+    {
+        if (isDead || data == null || amount <= 0f || currentHP >= data.maxHP) return 0f;
+
         float oldHP = currentHP;
-        currentHP = Mathf.Min(data.maxHP, currentHP + requestedHeal);
+        currentHP = Mathf.Min(data.maxHP, currentHP + amount);
         float actualHeal = currentHP - oldHP;
-
-        if (actualHeal <= 0f) return;
+        if (actualHeal <= 0f) return 0f;
 
         if (healthBar != null) healthBar.Refresh(true);
-        SpawnHealPopup(actualHeal);
+        if (showPopup) SpawnHealPopup(actualHeal);
+        return actualHeal;
     }
 
     private void UpdateStatusEffects()
