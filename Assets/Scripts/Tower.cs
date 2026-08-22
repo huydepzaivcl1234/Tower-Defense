@@ -2,10 +2,8 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Core tower behaviour: finds the enemy furthest along the path within range,
-/// rotates an optional turret head toward it, fires at the level's attack speed,
-/// and supports upgrading through the levels defined on its TowerData.
-/// Requires ANY Collider on the prefab so OnMouseDown can detect clicks.
+/// Core tower behaviour: targeting, aiming, firing and upgrades.
+/// Relic modifiers are read at runtime and never mutate TowerData assets.
 /// </summary>
 public class Tower : MonoBehaviour
 {
@@ -16,26 +14,18 @@ public class Tower : MonoBehaviour
 
     [Header("Configuration")]
     public TowerData data;
-    [Tooltip("Optional child transform that rotates to face the current target")]
     public Transform turretHead;
-    [Tooltip("Extra Y-axis rotation added on top of the aim direction.")]
     public float turretForwardOffset = 0f;
-    [Tooltip("Point projectiles spawn from. Defaults to tower position if empty")]
     public Transform firePoint;
-    [Tooltip("Layer(s) enemies are on. If left as 'Nothing' the tower falls back to checking all layers.")]
     public LayerMask enemyLayerMask;
 
     [Header("Visual Upgrade Phases (optional)")]
-    [Tooltip("Visual roots for Phase 1, 2, 3, 4... Index follows the tower's current level. " +
-             "Only the current phase is enabled. Each generated phase can contain its own TurretHead and FirePoint. " +
-             "Safe to leave empty for old tower prefabs.")]
     public GameObject[] visualPhases;
 
     [Header("Audio (optional)")]
     public AudioClip fireSound;
 
-    [Header("Gold Popup (only used if this tower's data has Is Gold Generator checked)")]
-    [Tooltip("Prefab shown above this tower's head each time it grants gold - reuse the same DamagePopup prefab used for enemies.")]
+    [Header("Gold Popup")]
     public GameObject goldPopupPrefab;
     public Vector3 goldPopupOffset = new Vector3(0f, 2f, 0f);
     public Color goldPopupColor = new Color(1f, 0.84f, 0f, 1f);
@@ -58,6 +48,10 @@ public class Tower : MonoBehaviour
     public bool IsMaxLevel => data == null || data.levels == null || currentLevelIndex >= data.levels.Length - 1;
     public TowerLevelStats CurrentStats => data.levels[Mathf.Clamp(currentLevelIndex, 0, data.levels.Length - 1)];
 
+    public float CurrentDamage => RelicManager.Instance != null ? RelicManager.Instance.ApplyDamage(CurrentStats.strength) : CurrentStats.strength;
+    public float CurrentAttackSpeed => RelicManager.Instance != null ? RelicManager.Instance.ApplyAttackSpeed(CurrentStats.attackSpeed) : CurrentStats.attackSpeed;
+    public float CurrentRange => RelicManager.Instance != null ? RelicManager.Instance.ApplyRange(CurrentStats.range) : CurrentStats.range;
+
     private void Awake()
     {
         audioSource = GetComponent<AudioSource>();
@@ -65,10 +59,7 @@ public class Tower : MonoBehaviour
         ApplyVisualPhase();
     }
 
-    private void Start()
-    {
-        ApplyVisualPhase();
-    }
+    private void Start() => ApplyVisualPhase();
 
     private void OnEnable()
     {
@@ -87,19 +78,17 @@ public class Tower : MonoBehaviour
         if (data == null || !data.isGoldGenerator) return;
         int amount = Mathf.RoundToInt(CurrentStats.goldPerRound);
         if (amount <= 0) return;
-        GameManager.Instance?.AddGold(amount);
-        SpawnGoldPopup(amount);
+        int granted = GameManager.Instance != null ? GameManager.Instance.AddGold(amount) : amount;
+        SpawnGoldPopup(granted);
     }
 
     private void SpawnGoldPopup(int amount)
     {
         if (goldPopupPrefab == null) return;
         Vector3 pos = transform.position + goldPopupOffset;
-
         GameObject go = ObjectPool.Instance != null
             ? ObjectPool.Instance.Get(goldPopupPrefab, pos, Quaternion.identity)
             : Instantiate(goldPopupPrefab, pos, Quaternion.identity);
-
         DamagePopup popup = go.GetComponent<DamagePopup>();
         if (popup != null) popup.SetGoldText(amount, goldPopupColor);
     }
@@ -123,24 +112,23 @@ public class Tower : MonoBehaviour
         }
 
         FaceTarget();
-
         fireCooldown -= Time.deltaTime;
         if (fireCooldown <= 0f)
         {
             Fire();
-            fireCooldown = 1f / Mathf.Max(0.01f, CurrentStats.attackSpeed);
+            fireCooldown = 1f / Mathf.Max(0.01f, CurrentAttackSpeed);
         }
     }
 
     private void AcquireTarget()
     {
+        float range = CurrentRange;
         if (currentTarget != null && currentTarget.IsAlive &&
-            Vector3.Distance(transform.position, currentTarget.transform.position) <= CurrentStats.range)
+            Vector3.Distance(transform.position, currentTarget.transform.position) <= range)
             return;
 
         int mask = enemyLayerMask.value != 0 ? enemyLayerMask.value : ~0;
-        int count = Physics.OverlapSphereNonAlloc(transform.position, CurrentStats.range, overlapBuffer, mask);
-
+        int count = Physics.OverlapSphereNonAlloc(transform.position, range, overlapBuffer, mask);
         float bestProgress = -1f;
         Enemy best = null;
         for (int i = 0; i < count; i++)
@@ -168,12 +156,8 @@ public class Tower : MonoBehaviour
 
     private void Fire()
     {
-        if (currentTarget == null) return;
+        if (currentTarget == null || data.projectilePrefab == null) return;
         if (fireSound != null && audioSource != null) audioSource.PlayOneShot(fireSound);
-
-        if (data.projectilePrefab == null) return;
-
-        // Visual-only kick / muzzle FX. Projectile and damage logic remain unchanged.
         fireAnimator?.PlayFire();
 
         Vector3 spawnPos = firePoint != null ? firePoint.position : transform.position + Vector3.up;
@@ -181,7 +165,7 @@ public class Tower : MonoBehaviour
             ? ObjectPool.Instance.Get(data.projectilePrefab, spawnPos, Quaternion.identity)
             : Instantiate(data.projectilePrefab, spawnPos, Quaternion.identity);
         Projectile proj = projGO.GetComponent<Projectile>();
-        if (proj != null) proj.Launch(currentTarget, CurrentStats);
+        if (proj != null) proj.Launch(currentTarget, CurrentStats, CurrentDamage);
     }
 
     public bool CanUpgrade() => !IsMaxLevel;
@@ -189,7 +173,8 @@ public class Tower : MonoBehaviour
     public int GetNextUpgradeCost()
     {
         if (IsMaxLevel) return -1;
-        return data.levels[currentLevelIndex + 1].upgradeCost;
+        int baseCost = data.levels[currentLevelIndex + 1].upgradeCost;
+        return RelicManager.Instance != null ? RelicManager.Instance.GetUpgradeCost(baseCost) : baseCost;
     }
 
     public void Upgrade()
@@ -199,11 +184,6 @@ public class Tower : MonoBehaviour
         ApplyVisualPhase();
     }
 
-    /// <summary>
-    /// Enables only the visual matching the current level. If the active phase contains children named
-    /// "TurretHead" and "FirePoint", references are automatically moved to that phase so aiming and
-    /// projectile spawning keep working after the weapon changes shape.
-    /// </summary>
     public void ApplyVisualPhase()
     {
         if (visualPhases == null || visualPhases.Length == 0)
@@ -222,11 +202,7 @@ public class Tower : MonoBehaviour
             if (active) activePhase = visualPhases[i];
         }
 
-        if (activePhase == null)
-        {
-            fireAnimator?.Rebind();
-            return;
-        }
+        if (activePhase == null) { fireAnimator?.Rebind(); return; }
 
         Transform newHead = activePhase.transform.Find("TurretHead");
         if (newHead != null)
@@ -240,25 +216,25 @@ public class Tower : MonoBehaviour
             Transform newFirePoint = activePhase.transform.Find("FirePoint");
             if (newFirePoint != null) firePoint = newFirePoint;
         }
-
         fireAnimator?.Rebind();
     }
 
-    /// <summary>Refunds 50% of total gold spent (build cost + upgrade costs paid so far).</summary>
     public int GetSellValue()
     {
-        int total = data.buildCost;
+        int build = RelicManager.Instance != null ? RelicManager.Instance.GetBuildCost(data.buildCost) : data.buildCost;
+        int total = build;
         for (int i = 1; i <= currentLevelIndex; i++)
-            total += data.levels[i].upgradeCost;
+        {
+            int baseUpgrade = data.levels[i].upgradeCost;
+            total += RelicManager.Instance != null ? RelicManager.Instance.GetUpgradeCost(baseUpgrade) : baseUpgrade;
+        }
         return Mathf.RoundToInt(total * 0.5f);
     }
 
     private void OnMouseDown()
     {
         if (UnityEngine.EventSystems.EventSystem.current != null &&
-            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
-            return;
-
+            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
         TowerPlacementManager.Instance?.CancelPlacement();
         OnAnyTowerClicked?.Invoke(this);
     }
@@ -267,6 +243,7 @@ public class Tower : MonoBehaviour
     {
         if (data == null || data.levels == null || data.levels.Length == 0) return;
         Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position, CurrentStats.range);
+        float range = Application.isPlaying ? CurrentRange : CurrentStats.range;
+        Gizmos.DrawWireSphere(transform.position, range);
     }
 }
