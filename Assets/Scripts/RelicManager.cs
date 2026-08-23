@@ -74,11 +74,19 @@ public class RelicManager : MonoBehaviour
     private void OnEnable()
     {
         WaveManager.OnWaveCleared += HandleWaveCleared;
+        Enemy.OnAnyEnemyDied += HandleEnemyDied;
     }
 
     private void OnDisable()
     {
         WaveManager.OnWaveCleared -= HandleWaveCleared;
+        Enemy.OnAnyEnemyDied -= HandleEnemyDied;
+    }
+
+    private void HandleEnemyDied(Enemy enemy)
+    {
+        if (enemy == null || enemy.data == null) return;
+        TrySpawnEnemyRelicDrops(enemy.data, enemy.transform.position);
     }
 
     private void HandleWaveCleared()
@@ -151,7 +159,7 @@ public class RelicManager : MonoBehaviour
         RefreshRewardNotification();
     }
 
-    /// <summary>Called by Enemy on death. Handles both normal chance and guaranteed boss rewards.</summary>
+    /// <summary>Handles both each enemy's normal chance and guaranteed boss rewards.</summary>
     public void TrySpawnEnemyRelicDrops(EnemyData enemyData, Vector3 deathPosition)
     {
         if (enemyData == null) return;
