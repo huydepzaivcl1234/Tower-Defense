@@ -22,8 +22,6 @@ public class GameSpeedController : MonoBehaviour
     public Color selectedColor = new Color(0.08f, 0.67f, 0.88f, 1f);
     [Tooltip("Color used by speed buttons that are not selected.")]
     public Color normalColor = new Color(0.055f, 0.105f, 0.145f, 1f);
-    [Tooltip("How much an unselected speed button brightens while hovered.")]
-    [Range(1f, 1.5f)] public float hoverBrightness = 1.18f;
 
     public int CurrentMultiplier { get; private set; } = 1;
 
@@ -39,9 +37,9 @@ public class GameSpeedController : MonoBehaviour
         if (speed2Button != null) speed2Button.onClick.AddListener(() => SetSpeed(2));
         if (speed3Button != null) speed3Button.onClick.AddListener(() => SetSpeed(3));
 
-        ConfigureButtonColors(speed1Button);
-        ConfigureButtonColors(speed2Button);
-        ConfigureButtonColors(speed3Button);
+        ConfigureButton(speed1Button);
+        ConfigureButton(speed2Button);
+        ConfigureButton(speed3Button);
 
         SetSpeed(1);
     }
@@ -62,15 +60,13 @@ public class GameSpeedController : MonoBehaviour
         RefreshButton(speed3Button, multiplier == 3);
     }
 
-    private void ConfigureButtonColors(Button button)
+    private void ConfigureButton(Button button)
     {
         if (button == null) return;
 
-        // Keep Unity's Button transition from flashing back to its default white tint.
-        ColorBlock colors = button.colors;
-        colors.colorMultiplier = 1f;
-        colors.fadeDuration = 0.08f;
-        button.colors = colors;
+        // Do not let Unity's built-in Color Tint transition overwrite the explicit selected/unselected
+        // background colors. Hover/press feedback is already handled by UIPunchButton.
+        button.transition = Selectable.Transition.None;
     }
 
     private void RefreshButton(Button button, bool selected)
@@ -80,23 +76,8 @@ public class GameSpeedController : MonoBehaviour
         Color baseColor = selected ? selectedColor : normalColor;
         button.targetGraphic.color = baseColor;
 
-        // Color Tint multiplies the target graphic color. Keep states near white so the explicit
-        // selected/normal base color remains visible instead of getting replaced by Unity's white.
-        ColorBlock colors = button.colors;
-        colors.normalColor = Color.white;
-        colors.selectedColor = Color.white;
-        colors.highlightedColor = selected ? Color.white : Brighten(Color.white, hoverBrightness);
-        colors.pressedColor = new Color(0.84f, 0.90f, 0.96f, 1f);
-        colors.disabledColor = new Color(0.55f, 0.58f, 0.62f, 0.7f);
-        button.colors = colors;
-    }
-
-    private static Color Brighten(Color color, float multiplier)
-    {
-        return new Color(
-            Mathf.Clamp01(color.r * multiplier),
-            Mathf.Clamp01(color.g * multiplier),
-            Mathf.Clamp01(color.b * multiplier),
-            color.a);
+        UIPunchButton feedback = button.GetComponent<UIPunchButton>();
+        if (feedback != null)
+            feedback.SetBaseGraphicColor(baseColor);
     }
 }
