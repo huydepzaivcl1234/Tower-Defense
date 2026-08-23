@@ -31,6 +31,7 @@ public class MainMenuController : MonoBehaviour
     public float gameplayTimeScale = 1f;
 
     private AudioSettingsManager audioSettings;
+    private bool menuBlocksGameplay;
 
     private void Awake()
     {
@@ -58,8 +59,17 @@ public class MainMenuController : MonoBehaviour
             HideAllMenus();
     }
 
+    private void LateUpdate()
+    {
+        // Prevent GameSpeedController or another system from unpausing gameplay
+        // while either main menu panel is still open.
+        if (menuBlocksGameplay && Time.timeScale != 0f)
+            Time.timeScale = 0f;
+    }
+
     public void ShowMainMenu()
     {
+        menuBlocksGameplay = true;
         Time.timeScale = 0f;
         if (mainPanel != null) mainPanel.SetActive(true);
         if (settingsPanel != null) settingsPanel.SetActive(false);
@@ -67,12 +77,14 @@ public class MainMenuController : MonoBehaviour
 
     public void PlayGame()
     {
+        menuBlocksGameplay = false;
         HideAllMenus();
         Time.timeScale = Mathf.Max(0.01f, gameplayTimeScale);
     }
 
     public void OpenSettings()
     {
+        menuBlocksGameplay = true;
         SyncAudioUI();
         if (mainPanel != null) mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(true);
@@ -80,6 +92,7 @@ public class MainMenuController : MonoBehaviour
 
     public void CloseSettings()
     {
+        menuBlocksGameplay = true;
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
     }
