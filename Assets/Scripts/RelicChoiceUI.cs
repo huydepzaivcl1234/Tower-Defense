@@ -41,11 +41,16 @@ public class RelicChoiceUI : MonoBehaviour
 
     public void Show(List<RelicData> choices)
     {
+        Show(choices, "CHOOSE A RELIC");
+    }
+
+    public void Show(List<RelicData> choices, string title)
+    {
         currentChoices.Clear();
         if (choices != null) currentChoices.AddRange(choices);
 
         WireButtons();
-        if (titleText != null) titleText.text = "CHOOSE A RELIC";
+        if (titleText != null) titleText.text = string.IsNullOrWhiteSpace(title) ? "CHOOSE A RELIC" : title;
 
         for (int i = 0; i < cards.Length; i++)
         {
@@ -61,12 +66,16 @@ public class RelicChoiceUI : MonoBehaviour
             if (card.stackText != null)
             {
                 int nextStack = (RelicManager.Instance != null ? RelicManager.Instance.GetStacks(relic) : 0) + 1;
-                card.stackText.text = relic.maxStacks > 1 ? $"STACK {nextStack}/{relic.maxStacks}" : "UNIQUE";
+                string rarity = relic.rarity.ToString().ToUpperInvariant();
+                string stack = relic.maxStacks > 1 ? $"STACK {nextStack}/{relic.maxStacks}" : "UNIQUE";
+                card.stackText.text = $"{rarity}   •   {stack}";
+                card.stackText.color = RelicManager.GetRarityColor(relic.rarity);
             }
             if (card.icon != null)
             {
                 card.icon.sprite = relic.icon;
                 card.icon.enabled = relic.icon != null;
+                card.icon.color = Color.white;
             }
         }
 
