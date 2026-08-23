@@ -3,12 +3,12 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// Per-button UI sound feedback. Each button can use its own click AudioClip,
-/// volume and pitch settings. The generated AudioSource is categorized as SFX,
-/// so AudioSettingsManager's SFX slider controls it automatically.
+/// Per-button UI sound feedback. Click and hover use separate AudioSources so
+/// leaving a button can stop only its hover sound without cutting off click SFX.
+/// Both sources are categorized as SFX and follow AudioSettingsManager.
 /// </summary>
 [RequireComponent(typeof(Button))]
-public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler
+public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Click SFX")]
     public AudioClip clickClip;
@@ -18,43 +18,69 @@ public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     [Header("Optional Variation")]
     [Tooltip("Random +/- pitch variation applied per click. 0 disables random pitch.")]
     [Range(0f, 0.5f)] public float randomPitchRange = 0f;
-    [Tooltip("Allow click sound even if the Button is currently not interactable.")]
+    [Tooltip("Allow sounds even if the Button is currently not interactable.")]
     public bool playWhenDisabled = false;
 
-    [Header("Optional Hover SFX")]
+    [Header("Hover SFX")]
+    [Tooltip("Play Hover Clip only while the pointer is over this button.")]
     public bool enableHoverSound = false;
     public AudioClip hoverClip;
     [Range(0f, 1f)] public float hoverVolume = 0.55f;
+    [Range(0.25f, 3f)] public float hoverPitch = 1f;
+    [Tooltip("If enabled, the hover clip loops for as long as the mouse stays over the button. Pointer exit always stops it immediately.")]
+    public bool loopHoverWhileInside = false;
 
     private Button button;
-    private AudioSource source;
+    private AudioSource clickSource;
+    private AudioSource hoverSource;
 
     private void Awake()
     {
         button = GetComponent<Button>();
-        EnsureAudioSource();
+        EnsureAudioSources();
     }
 
     private void Start()
     {
-        // Register immediately with the current SFX volume instead of waiting for
+        // Apply the currently saved SFX volume immediately instead of waiting for
         // AudioSettingsManager's periodic source scan.
         AudioSettingsManager.Instance?.ApplyAll();
     }
 
-    private void EnsureAudioSource()
+    private void OnDisable()
     {
-        source = GetComponent<AudioSource>();
-        if (source == null)
-            source = gameObject.AddComponent<AudioSource>();
+        StopHover();
+    }
 
-        source.playOnAwake = false;
-        source.loop = false;
-        source.spatialBlend = 0f;
+    private void EnsureAudioSources()
+    {
+        AudioSource[] sources = GetComponents<AudioSource>();
 
-        GameAudioCategory category = source.GetComponent<GameAudioCategory>();
+        if (sources.Length > 0)
+            clickSource = sources[0];
+        else
+            clickSource = gameObject.AddComponent<AudioSource>();
+
+        if (sources.Length > 1)
+            hoverSource = sources[1];
+        else
+            hoverSource = gameObject.AddComponent<AudioSource>();
+
+        ConfigureSource(clickSource, false);
+        ConfigureSource(hoverSource, false);
+    }
+
+    private static void ConfigureSource(AudioSource audioSource, bool loop)
+    {
+        if (audioSource == null) return;
+
+        audioSource.playOnAwake = false;
+        audioSource.loop = loop;
+        audioSource.spatialBlend = 0f;
+
+        GameAudioCategory category = audioSource.GetComponent<GameAudioCategory>();
         if (category == null)
-            category = source.gameObject.AddComponent<GameAudioCategory>();
+            category = audioSource.gameObject.AddComponent<GameAudioCategory>();
         category.type = GameAudioType.SFX;
     }
 
@@ -69,23 +95,52 @@ public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         PlayHover();
     }
 
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        StopHover();
+    }
+
     public void PlayClick()
     {
         if (clickClip == null) return;
-        if (!playWhenDisabled && button != null && !button.interactable) return;
-        if (source == null) EnsureAudioSource();
+        if (!CanPlay()) return;
+        if (clickSource == null) EnsureAudioSources();
 
-        source.pitch = Mathf.Clamp(pitch + Random.Range(-randomPitchRange, randomPitchRange), 0.25f, 3f);
-        source.PlayOneShot(clickClip, Mathf.Clamp01(volume));
+        clickSource.pitch = Mathf.Clamp(
+            pitch + Random.Range(-randomPitchRange, randomPitchRange),
+            0.25f,
+            3f);
+        clickSource.PlayOneShot(clickClip, Mathf.Clamp01(volume));
     }
 
     public void PlayHover()
     {
         if (!enableHoverSound || hoverClip == null) return;
-        if (!playWhenDisabled && button != null && !button.interactable) return;
-        if (source == null) EnsureAudioSource();
+        if (!CanPlay()) return;
+        if (hoverSource == null) EnsureAudioSources();
 
-        source.pitch = 1f;
-        source.PlayOneShot(hoverClip, Mathf.Clamp01(hoverVolume));
+        // Re-entering a button restarts the hover cue from the beginning rather
+        // than stacking multiple copies of the same sound.
+        hoverSource.Stop();
+        hoverSource.clip = hoverClip;
+        hoverSource.pitch = Mathf.Clamp(hoverPitch, 0.25f, 3f);
+        hoverSource.loop = loopHoverWhileInside;
+        hoverSource.volume = Mathf.Clamp01(hoverVolume);
+        hoverSource.Play();
+    }
+
+    public void StopHover()
+    {
+        if (hoverSource == null) return;
+
+        // Pointer exit must silence the hover cue immediately.
+        hoverSource.Stop();
+        hoverSource.clip = null;
+        hoverSource.loop = false;
+    }
+
+    private bool CanPlay()
+    {
+        return playWhenDisabled || button == null || button.interactable;
     }
 }
