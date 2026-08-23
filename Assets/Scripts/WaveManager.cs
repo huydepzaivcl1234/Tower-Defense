@@ -35,6 +35,10 @@ public class WaveManager : MonoBehaviour
     private int aliveEnemies = 0;
     private bool waveInProgress = false;
 
+    // Prevents the same wave from firing OnWaveCleared more than once.
+    // Important when the last enemy dies at the same time the spawn coroutine finishes.
+    private int lastClearedWaveIndex = -1;
+
     public int CurrentWaveNumber => currentWaveIndex + 1;
     public int TotalWaves => waves.Count;
     public bool IsWaveInProgress => waveInProgress;
@@ -61,15 +65,30 @@ public class WaveManager : MonoBehaviour
     private void HandleEnemyRemoved(Enemy e)
     {
         aliveEnemies = Mathf.Max(0, aliveEnemies - 1);
-        if (aliveEnemies == 0 && !waveInProgress)
-            OnWaveCleared?.Invoke();
+        TryCompleteCurrentWave();
         CheckForWin();
+    }
+
+    /// <summary>
+    /// Completes the current wave only after every configured spawn has finished and no enemy remains.
+    /// Safe when the final enemy is killed immediately after spawning: HandleEnemyRemoved may run while
+    /// waveInProgress is still true, then SpawnWave calls this again as soon as spawning finishes.
+    /// </summary>
+    private void TryCompleteCurrentWave()
+    {
+        if (waveInProgress) return;
+        if (aliveEnemies > 0) return;
+        if (currentWaveIndex < 0 || currentWaveIndex >= waves.Count) return;
+        if (lastClearedWaveIndex == currentWaveIndex) return;
+
+        lastClearedWaveIndex = currentWaveIndex;
+        OnWaveCleared?.Invoke();
     }
 
     public bool CanStartNextWave()
     {
         bool relicChoiceOpen = RelicManager.Instance != null && RelicManager.Instance.IsChoosing;
-        return !waveInProgress && !relicChoiceOpen && currentWaveIndex < waves.Count - 1;
+        return !waveInProgress && aliveEnemies == 0 && !relicChoiceOpen && currentWaveIndex < waves.Count - 1;
     }
 
     public void StartNextWave()
@@ -86,14 +105,24 @@ public class WaveManager : MonoBehaviour
 
         foreach (var entry in wave.entries)
         {
+            if (entry == null) continue;
+
             for (int i = 0; i < entry.count; i++)
             {
                 SpawnEnemy(entry.enemyData);
-                yield return new WaitForSeconds(entry.spawnInterval);
+
+                // Do not add an unnecessary vulnerable delay after the very last spawn in this entry.
+                // The next entry can still begin immediately, while its own interval controls its spawns.
+                if (i < entry.count - 1 && entry.spawnInterval > 0f)
+                    yield return new WaitForSeconds(entry.spawnInterval);
             }
         }
 
         waveInProgress = false;
+
+        // Critical race-condition fix: the last enemy may already have died while spawning was active.
+        // Re-check completion now that no more enemies can spawn for this wave.
+        TryCompleteCurrentWave();
         CheckForWin();
     }
 
@@ -115,8 +144,10 @@ public class WaveManager : MonoBehaviour
         Enemy e = go.GetComponent<Enemy>();
         if (e != null)
         {
-            e.Initialize(data, path.GetWaypoints());
+            // Count the enemy before initialization so even an enemy that can die immediately during
+            // initialization/runtime callbacks can never make the alive count go negative or miss clear.
             aliveEnemies++;
+            e.Initialize(data, path.GetWaypoints());
         }
     }
 }
