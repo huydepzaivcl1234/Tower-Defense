@@ -89,7 +89,11 @@ public class TowerPlacementManager : MonoBehaviour
             ghostInstance.SetActive(true);
 
             bool relicAllowsBuild = RelicManager.Instance == null || RelicManager.Instance.CanBuildTower(selectedTowerData);
-            currentPositionValid = relicAllowsBuild && (path == null || !path.IsTooCloseToPath(hit.point)) && !IsTooCloseToOtherTowers(hit.point);
+            bool clearOfPath = path == null || !path.IsTooCloseToPath(hit.point);
+            bool clearOfTowers = !IsTooCloseToOtherTowers(hit.point);
+            bool clearOfBlockedObjects = !IsInsideBuildExclusionZone(hit.point);
+
+            currentPositionValid = relicAllowsBuild && clearOfPath && clearOfTowers && clearOfBlockedObjects;
             Color tint = currentPositionValid ? validColor : invalidColor;
             ApplyGhostTint(tint);
 
@@ -158,6 +162,16 @@ public class TowerPlacementManager : MonoBehaviour
             Vector3 diff = t.transform.position - point;
             diff.y = 0f;
             if (diff.magnitude < minSpacingBetweenTowers) return true;
+        }
+        return false;
+    }
+
+    private static bool IsInsideBuildExclusionZone(Vector3 point)
+    {
+        foreach (BuildExclusionZone zone in BuildExclusionZone.ActiveZones)
+        {
+            if (zone == null || !zone.isActiveAndEnabled) continue;
+            if (zone.Contains(point)) return true;
         }
         return false;
     }
