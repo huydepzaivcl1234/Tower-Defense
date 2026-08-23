@@ -37,6 +37,7 @@ public class BuildMenuUI : MonoBehaviour
 
     private void SelectTower(TowerButtonBinding binding, TowerData data)
     {
+        if (RelicManager.Instance != null && !RelicManager.Instance.CanBuildTower(data)) return;
         selectedBinding = binding;
         TowerPlacementManager.Instance?.SelectTowerToBuild(data);
         RefreshVisualState();
@@ -68,8 +69,9 @@ public class BuildMenuUI : MonoBehaviour
         {
             if (binding == null || binding.towerData == null) continue;
             RefreshBinding(binding);
+            bool relicAllowsBuild = RelicManager.Instance == null || RelicManager.Instance.CanBuildTower(binding.towerData);
             if (binding.button != null)
-                binding.button.interactable = gold >= GetBuildCost(binding.towerData);
+                binding.button.interactable = relicAllowsBuild && gold >= GetBuildCost(binding.towerData);
             if (binding.selectedFrame != null)
                 binding.selectedFrame.SetActive(placementActive && binding == selectedBinding);
         }
