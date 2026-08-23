@@ -1,14 +1,8 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
-using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-/// <summary>
-/// Imports/configures the Blender-generated Main Base hero asset for the current URP-oriented project.
-/// It creates prototype materials, remaps FBX material slots by stable Blender material names,
-/// saves a prefab, and places the base at the final enemy waypoint facing the incoming path.
-/// </summary>
 public static class MainBaseModelSetupTool
 {
     private const string ModelPath = "Assets/Models/MainBase/MainBase.fbx";
@@ -22,10 +16,8 @@ public static class MainBaseModelSetupTool
         GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
         if (model == null)
         {
-            EditorUtility.DisplayDialog(
-                "Main Base FBX Not Found",
-                "Run Assets/Art/Blender/MainBaseGenerator.py in Blender first.\n\n" +
-                "It exports the model to:\n" + ModelPath,
+            EditorUtility.DisplayDialog("Main Base FBX Not Found",
+                "Run Assets/Art/Blender/MainBaseGenerator.py in Blender first.\n\nIt exports the model to:\n" + ModelPath,
                 "OK");
             return;
         }
@@ -41,97 +33,71 @@ public static class MainBaseModelSetupTool
         Material portal = GetOrCreateMaterial("MainBase_Portal", new Color(0.008f, 0.08f, 0.22f, 1f), 0.0f, 0.86f, new Color(0.0f, 0.45f, 1.0f) * 5.0f);
 
         GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
-        if (instance == null)
-            instance = Object.Instantiate(model);
-
+        if (instance == null) instance = Object.Instantiate(model);
         instance.name = "MainBase";
         Undo.RegisterCreatedObjectUndo(instance, "Create Main Base");
 
+        BuildExclusionZone exclusion = instance.GetComponent<BuildExclusionZone>();
+        if (exclusion == null) exclusion = Undo.AddComponent<BuildExclusionZone>(instance);
+        exclusion.radius = 7.5f;
+        exclusion.centerOffset = Vector3.zero;
+
         Dictionary<string, Material> map = new Dictionary<string, Material>
         {
-            { "MAT_Stone", stone },
-            { "MAT_Gold", gold },
-            { "MAT_Crystal", crystal },
-            { "MAT_Banner", banner },
-            { "MAT_Moss", moss },
-            { "MAT_Portal", portal }
+            { "MAT_Stone", stone }, { "MAT_Gold", gold }, { "MAT_Crystal", crystal },
+            { "MAT_Banner", banner }, { "MAT_Moss", moss }, { "MAT_Portal", portal }
         };
         RemapRendererMaterials(instance, map);
-
         PlaceAtPathGoal(instance);
 
         GameObject prefab = PrefabUtility.SaveAsPrefabAsset(instance, PrefabPath);
-        if (prefab == null)
-            Debug.LogWarning("MainBase prefab could not be saved, but the scene instance was created.");
+        if (prefab == null) Debug.LogWarning("MainBase prefab could not be saved, but the scene instance was created.");
 
         Selection.activeGameObject = instance;
         EditorUtility.SetDirty(instance);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        EditorUtility.DisplayDialog(
-            "Main Base Ready",
-            "MainBase was configured and placed at the final waypoint.\n\n" +
-            "Prototype URP materials were created under Assets/Models/MainBase/Materials.\n" +
-            "Prefab: " + PrefabPath + "\n\n" +
-            "For production quality, replace the prototype materials with baked/scanned PBR textures while keeping the material slot names.",
+        EditorUtility.DisplayDialog("Main Base Ready",
+            "MainBase was configured at the final waypoint.\n\nTower placement is blocked inside a 7.5m radius around the base. You can change this on BuildExclusionZone.\n\nPrefab: " + PrefabPath,
             "OK");
     }
 
     private static void PlaceAtPathGoal(GameObject instance)
     {
         WaypointPath path = Object.FindFirstObjectByType<WaypointPath>(FindObjectsInactive.Include);
-        if (path == null)
-        {
-            Debug.LogWarning("MainBase: no WaypointPath found. Base left at world origin.");
-            instance.transform.position = Vector3.zero;
-            return;
-        }
-
+        if (path == null) { instance.transform.position = Vector3.zero; return; }
         List<Transform> points = path.GetWaypoints();
-        if (points == null || points.Count == 0 || points[points.Count - 1] == null)
-        {
-            Debug.LogWarning("MainBase: WaypointPath has no valid final waypoint. Base left at world origin.");
-            instance.transform.position = Vector3.zero;
-            return;
-        }
+        if (points == null || points.Count == 0 || points[points.Count - 1] == null) { instance.transform.position = Vector3.zero; return; }
 
         Transform goal = points[points.Count - 1];
         instance.transform.position = goal.position;
-
         if (points.Count >= 2 && points[points.Count - 2] != null)
         {
             Vector3 incoming = points[points.Count - 2].position - goal.position;
             incoming.y = 0f;
-            if (incoming.sqrMagnitude > 0.001f)
-                instance.transform.rotation = Quaternion.LookRotation(incoming.normalized, Vector3.up);
+            if (incoming.sqrMagnitude > 0.001f) instance.transform.rotation = Quaternion.LookRotation(incoming.normalized, Vector3.up);
         }
     }
 
     private static void RemapRendererMaterials(GameObject root, Dictionary<string, Material> map)
     {
-        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
-        foreach (Renderer renderer in renderers)
+        foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
         {
             Material[] current = renderer.sharedMaterials;
             bool changed = false;
-
             for (int i = 0; i < current.Length; i++)
             {
                 string sourceName = current[i] != null ? current[i].name : string.Empty;
                 foreach (KeyValuePair<string, Material> pair in map)
                 {
-                    if (sourceName.Contains(pair.Key))
-                    {
-                        current[i] = pair.Value;
-                        changed = true;
-                        break;
-                    }
+                    if (!sourceName.Contains(pair.Key)) continue;
+                    current[i] = pair.Value;
+                    changed = true;
+                    break;
                 }
             }
-
-            if (changed)
-                renderer.sharedMaterials = current;
+            if (changed) renderer.sharedMaterials = current;
         }
     }
 
@@ -142,9 +108,7 @@ public static class MainBaseModelSetupTool
         if (mat == null)
         {
             Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null)
-                shader = Shader.Find("Standard");
-
+            if (shader == null) shader = Shader.Find("Standard");
             mat = new Material(shader) { name = fileName };
             AssetDatabase.CreateAsset(mat, path);
         }
@@ -154,9 +118,7 @@ public static class MainBaseModelSetupTool
         if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", metallic);
         if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", smoothness);
         if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", smoothness);
-
-        bool hasEmission = emission.maxColorComponent > 0.001f;
-        if (hasEmission)
+        if (emission.maxColorComponent > 0.001f)
         {
             mat.EnableKeyword("_EMISSION");
             if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", emission);
@@ -166,7 +128,6 @@ public static class MainBaseModelSetupTool
             mat.DisableKeyword("_EMISSION");
             if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", Color.black);
         }
-
         EditorUtility.SetDirty(mat);
         return mat;
     }
@@ -178,8 +139,7 @@ public static class MainBaseModelSetupTool
         for (int i = 1; i < parts.Length; i++)
         {
             string next = current + "/" + parts[i];
-            if (!AssetDatabase.IsValidFolder(next))
-                AssetDatabase.CreateFolder(current, parts[i]);
+            if (!AssetDatabase.IsValidFolder(next)) AssetDatabase.CreateFolder(current, parts[i]);
             current = next;
         }
     }
