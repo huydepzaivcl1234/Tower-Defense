@@ -39,9 +39,19 @@ public class MainMenuController : MonoBehaviour
     public bool showMenuOnSceneStart = true;
     public float gameplayTimeScale = 1f;
 
+    [Header("Play Fade Transition")]
+    [Tooltip("Fade the screen to black before entering gameplay, then fade back in.")]
+    public bool fadeOnPlay = true;
+    [Min(0f)] public float fadeOutDuration = 0.55f;
+    [Min(0f)] public float blackHoldDuration = 0.12f;
+    [Min(0f)] public float fadeInDuration = 0.70f;
+    public Color fadeColor = Color.black;
+
     private AudioSettingsManager audioSettings;
+    private MenuScreenFader screenFader;
     private bool menuBlocksGameplay;
     private bool gameplayStarted;
+    private bool playTransitionInProgress;
     private SettingsReturnTarget settingsReturnTarget = SettingsReturnTarget.MainMenu;
 
     public bool IsMainMenuVisible => mainPanel != null && mainPanel.activeSelf;
@@ -88,7 +98,8 @@ public class MainMenuController : MonoBehaviour
 
     private void LateUpdate()
     {
-        // Main menu/settings are modal. GameSpeedController must not be able to unpause behind them.
+        // Main menu/settings and the fade-out half of Play are modal.
+        // GameSpeedController must not be able to unpause behind them.
         if (menuBlocksGameplay && Time.timeScale != 0f)
             Time.timeScale = 0f;
     }
@@ -96,6 +107,7 @@ public class MainMenuController : MonoBehaviour
     public void ShowMainMenu()
     {
         gameplayStarted = false;
+        playTransitionInProgress = false;
         settingsReturnTarget = SettingsReturnTarget.MainMenu;
         menuBlocksGameplay = true;
         Time.timeScale = 0f;
@@ -106,15 +118,50 @@ public class MainMenuController : MonoBehaviour
 
     public void PlayGame()
     {
+        if (playTransitionInProgress) return;
+
+        if (!fadeOnPlay || (fadeOutDuration <= 0f && blackHoldDuration <= 0f && fadeInDuration <= 0f))
+        {
+            EnterGameplayImmediately();
+            return;
+        }
+
+        playTransitionInProgress = true;
+        menuBlocksGameplay = true;
+        Time.timeScale = 0f;
+
+        screenFader = MenuScreenFader.GetOrCreate();
+        screenFader.SetFadeColor(fadeColor);
+        screenFader.PlayTransition(
+            fadeOutDuration,
+            blackHoldDuration,
+            fadeInDuration,
+            EnterGameplayAtBlack,
+            () => playTransitionInProgress = false);
+    }
+
+    private void EnterGameplayAtBlack()
+    {
+        gameplayStarted = true;
+        settingsReturnTarget = SettingsReturnTarget.Gameplay;
+        HideAllMenus();
+        menuBlocksGameplay = false;
+        RestoreGameplaySpeed();
+    }
+
+    private void EnterGameplayImmediately()
+    {
         gameplayStarted = true;
         settingsReturnTarget = SettingsReturnTarget.Gameplay;
         menuBlocksGameplay = false;
         HideAllMenus();
         RestoreGameplaySpeed();
+        playTransitionInProgress = false;
     }
 
     public void OpenSettings()
     {
+        if (playTransitionInProgress) return;
         settingsReturnTarget = SettingsReturnTarget.MainMenu;
         OpenSettingsInternal();
     }
@@ -125,7 +172,7 @@ public class MainMenuController : MonoBehaviour
     /// </summary>
     public void OpenSettingsFromGameplay(bool returnToPauseMenu)
     {
-        if (!gameplayStarted) return;
+        if (!gameplayStarted || playTransitionInProgress) return;
         settingsReturnTarget = returnToPauseMenu ? SettingsReturnTarget.PauseMenu : SettingsReturnTarget.Gameplay;
         OpenSettingsInternal();
     }
