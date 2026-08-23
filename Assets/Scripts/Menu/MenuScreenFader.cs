@@ -5,7 +5,8 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Runtime-created full-screen fade overlay for menu/game transitions.
-/// Uses unscaled time so it works while the main menu has Time.timeScale = 0.
+/// Uses unscaled time so it works while gameplay is paused.
+/// Persists across scene reloads so Retry/Main Menu transitions never flash.
 /// </summary>
 public class MenuScreenFader : MonoBehaviour
 {
@@ -26,6 +27,7 @@ public class MenuScreenFader : MonoBehaviour
         }
 
         Instance = this;
+        DontDestroyOnLoad(gameObject);
         BuildOverlayIfNeeded();
         SetAlphaImmediate(0f, false);
     }
@@ -106,8 +108,6 @@ public class MenuScreenFader : MonoBehaviour
         {
             timer += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(timer / duration);
-
-            // SmoothStep keeps the start/end soft instead of linear/harsh.
             t = t * t * (3f - 2f * t);
             canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, t);
             yield return null;
