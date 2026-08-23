@@ -27,12 +27,11 @@ public class HUDManager : MonoBehaviour
     [Header("Wave Control")]
     public Button startWaveButton;
 
-    [Header("End Screens")]
+    [Header("Legacy End Screens")]
+    [Tooltip("Legacy panels are automatically ignored when EndGameUIController is present.")]
     public GameObject gameOverPanel;
     public GameObject winPanel;
-    [Tooltip("The restart button that lives ON the Game Over panel")]
     public Button gameOverRestartButton;
-    [Tooltip("The restart button that lives ON the Win panel (a separate button, even though it does the same thing)")]
     public Button winRestartButton;
 
     private Tween goldTween;
@@ -64,8 +63,13 @@ public class HUDManager : MonoBehaviour
     private void Start()
     {
         if (startWaveButton != null) startWaveButton.onClick.AddListener(OnStartWavePressed);
-        if (gameOverRestartButton != null) gameOverRestartButton.onClick.AddListener(() => GameManager.Instance?.RestartLevel());
-        if (winRestartButton != null) winRestartButton.onClick.AddListener(() => GameManager.Instance?.RestartLevel());
+
+        // Keep old scenes functional if the new unified end screen has not been set up yet.
+        if (EndGameUIController.Instance == null)
+        {
+            if (gameOverRestartButton != null) gameOverRestartButton.onClick.AddListener(() => GameManager.Instance?.RestartLevel());
+            if (winRestartButton != null) winRestartButton.onClick.AddListener(() => GameManager.Instance?.RestartLevel());
+        }
 
         if (livesText != null)
         {
@@ -96,7 +100,6 @@ public class HUDManager : MonoBehaviour
     {
         if (goldText == null) return;
 
-        // Before Start() finishes, snap once so the scene boots cleanly.
         if (!initialized)
         {
             displayedGold = value;
@@ -160,11 +163,13 @@ public class HUDManager : MonoBehaviour
 
     private void ShowGameOver()
     {
+        if (EndGameUIController.Instance != null) return;
         if (gameOverPanel != null) gameOverPanel.SetActive(true);
     }
 
     private void ShowWin()
     {
+        if (EndGameUIController.Instance != null) return;
         if (winPanel != null) winPanel.SetActive(true);
     }
 }
