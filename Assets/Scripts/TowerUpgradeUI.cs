@@ -55,38 +55,34 @@ public class TowerUpgradeUI : MonoBehaviour
         if (panelRoot != null) panelRoot.SetActive(true);
     }
 
-    private float Damage(float value) => RelicManager.Instance != null ? RelicManager.Instance.ApplyDamage(value) : value;
-    private float Speed(float value) => RelicManager.Instance != null ? RelicManager.Instance.ApplyAttackSpeed(value) : value;
-    private float Range(float value) => RelicManager.Instance != null ? RelicManager.Instance.ApplyRange(value) : value;
-
     private void Refresh()
     {
-        if (selectedTower == null || selectedTower.data == null) return;
-        TowerLevelStats stats = selectedTower.CurrentStats;
+        if (selectedTower == null || selectedTower.data == null || selectedTower.data.levels == null || selectedTower.data.levels.Length == 0)
+            return;
 
-        float curDamage = Damage(stats.strength);
-        float curSpeed = Speed(stats.attackSpeed);
-        float curRange = Range(stats.range);
+        int currentIndex = selectedTower.CurrentLevelIndex;
+        float curDamage = selectedTower.GetEffectiveDamageForLevel(currentIndex);
+        float curSpeed = selectedTower.GetEffectiveAttackSpeedForLevel(currentIndex);
+        float curRange = selectedTower.GetEffectiveRangeForLevel(currentIndex);
 
         if (towerNameText != null) towerNameText.text = selectedTower.data.towerName;
         if (levelText != null) levelText.text = $"Level {selectedTower.CurrentLevelNumber}";
-        if (strengthText != null) strengthText.text = CompactNumber.Format(curDamage);
+        if (strengthText != null) strengthText.text = FormatDamagePreview(selectedTower.data, curDamage);
         if (attackSpeedText != null) attackSpeedText.text = $"{CompactNumber.Format(curSpeed)}/s";
         if (rangeText != null) rangeText.text = CompactNumber.Format(curRange);
 
         if (selectedTower.CanUpgrade())
         {
-            int nextIndex = selectedTower.CurrentLevelNumber;
-            TowerLevelStats next = selectedTower.data.levels[nextIndex];
+            int nextIndex = currentIndex + 1;
             int cost = selectedTower.GetNextUpgradeCost();
 
-            float nextDamage = Damage(next.strength);
-            float nextSpeed = Speed(next.attackSpeed);
-            float nextRange = Range(next.range);
+            float nextDamage = selectedTower.GetEffectiveDamageForLevel(nextIndex);
+            float nextSpeed = selectedTower.GetEffectiveAttackSpeedForLevel(nextIndex);
+            float nextRange = selectedTower.GetEffectiveRangeForLevel(nextIndex);
 
             if (nextLevelRoot != null) nextLevelRoot.SetActive(true);
-            if (nextLevelTitleText != null) nextLevelTitleText.text = $"NEXT LEVEL ({selectedTower.CurrentLevelNumber + 1})";
-            if (nextStrengthText != null) nextStrengthText.text = FormatNext(nextDamage, nextDamage - curDamage);
+            if (nextLevelTitleText != null) nextLevelTitleText.text = $"NEXT LEVEL ({nextIndex + 1})";
+            if (nextStrengthText != null) nextStrengthText.text = FormatNextDamage(selectedTower.data, curDamage, nextDamage);
             if (nextAttackSpeedText != null) nextAttackSpeedText.text = FormatNext(nextSpeed, nextSpeed - curSpeed, "/s");
             if (nextRangeText != null) nextRangeText.text = FormatNext(nextRange, nextRange - curRange);
 
@@ -104,8 +100,37 @@ public class TowerUpgradeUI : MonoBehaviour
         }
 
         if (sellButtonLabel != null) sellButtonLabel.text = $"SELL  {CompactNumber.Format(selectedTower.GetSellValue())}";
+
+        // IMPORTANT: use the exact effective range used by target acquisition.
+        // Cannon Hero's +flat range now updates the visible circle immediately after the relic is chosen.
         if (rangeIndicator != null)
             rangeIndicator.Show(selectedTower.transform.position, curRange, rangeColor);
+    }
+
+    private static string FormatDamagePreview(TowerData towerData, float launchDamage)
+    {
+        if (RelicManager.Instance == null || !RelicManager.Instance.IsCannonHeroTower(towerData))
+            return CompactNumber.Format(launchDamage);
+
+        float maxDamage = RelicManager.Instance.GetMaxProjectileDamage(towerData, launchDamage);
+        if (maxDamage <= launchDamage + 0.001f)
+            return CompactNumber.Format(launchDamage);
+
+        // Hero Cannon damage depends on projectile travel distance, so showing a single number is misleading.
+        // Display near-hit damage -> maximum travel-bonus damage.
+        return $"{CompactNumber.Format(launchDamage)} <color=#55E86A>→ {CompactNumber.Format(maxDamage)}</color>";
+    }
+
+    private static string FormatNextDamage(TowerData towerData, float currentDamage, float nextDamage)
+    {
+        float delta = nextDamage - currentDamage;
+        string sign = delta > 0.0001f ? "+" : string.Empty;
+
+        if (RelicManager.Instance == null || !RelicManager.Instance.IsCannonHeroTower(towerData))
+            return $"{CompactNumber.Format(nextDamage)}   <color=#55E86A>{sign}{CompactNumber.Format(delta)}</color>";
+
+        float nextMax = RelicManager.Instance.GetMaxProjectileDamage(towerData, nextDamage);
+        return $"{CompactNumber.Format(nextDamage)}→{CompactNumber.Format(nextMax)}   <color=#55E86A>{sign}{CompactNumber.Format(delta)}</color>";
     }
 
     private static string FormatNext(float value, float delta, string suffix = "")
@@ -141,6 +166,7 @@ public class TowerUpgradeUI : MonoBehaviour
 
     private void Update()
     {
+        // Keeps an already-open panel synchronized the same frame a relic changes stats.
         if (panelRoot != null && panelRoot.activeSelf && selectedTower != null) Refresh();
     }
 }
