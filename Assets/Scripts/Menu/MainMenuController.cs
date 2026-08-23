@@ -10,6 +10,8 @@ public class MainMenuController : MonoBehaviour
 {
     public static MainMenuController Instance { get; private set; }
 
+    private static bool startGameplayAfterSceneReload;
+
     private enum SettingsReturnTarget
     {
         MainMenu,
@@ -59,6 +61,9 @@ public class MainMenuController : MonoBehaviour
     public bool IsAnyMenuVisible => IsMainMenuVisible || IsSettingsVisible;
     public bool GameplayStarted => gameplayStarted;
 
+    public static void RequestGameplayAfterSceneReload() => startGameplayAfterSceneReload = true;
+    public static void ClearSceneReloadRequest() => startGameplayAfterSceneReload = false;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -86,20 +91,21 @@ public class MainMenuController : MonoBehaviour
 
         SyncAudioUI();
 
+        if (startGameplayAfterSceneReload)
+        {
+            startGameplayAfterSceneReload = false;
+            EnterGameplayImmediately();
+            return;
+        }
+
         if (showMenuOnSceneStart)
             ShowMainMenu();
         else
-        {
-            gameplayStarted = true;
-            menuBlocksGameplay = false;
-            HideAllMenus();
-        }
+            EnterGameplayImmediately();
     }
 
     private void LateUpdate()
     {
-        // Main menu/settings and the fade-out half of Play are modal.
-        // GameSpeedController must not be able to unpause behind them.
         if (menuBlocksGameplay && Time.timeScale != 0f)
             Time.timeScale = 0f;
     }
@@ -166,10 +172,6 @@ public class MainMenuController : MonoBehaviour
         OpenSettingsInternal();
     }
 
-    /// <summary>
-    /// Opens the existing Settings panel from gameplay. Back returns either to the pause menu
-    /// or straight to gameplay depending on where the gear button was pressed.
-    /// </summary>
     public void OpenSettingsFromGameplay(bool returnToPauseMenu)
     {
         if (!gameplayStarted || playTransitionInProgress) return;
