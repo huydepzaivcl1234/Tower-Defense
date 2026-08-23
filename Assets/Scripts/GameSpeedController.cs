@@ -5,7 +5,7 @@ using TMPro;
 /// <summary>
 /// Tower-defense game speed control. Changes Time.timeScale between 1x/2x/3x without touching
 /// gameplay stats. Game over/win can still set Time.timeScale to 0 through GameManager.
-/// Selected speed is highlighted blue; inactive speeds keep the normal dark HUD color.
+/// Selected speed is highlighted blue; inactive speeds always use the dark HUD color.
 /// </summary>
 public class GameSpeedController : MonoBehaviour
 {
@@ -17,11 +17,11 @@ public class GameSpeedController : MonoBehaviour
     public Button speed3Button;
     public TMP_Text currentSpeedText;
 
-    [Header("Visual State")]
-    [Tooltip("Color used by the currently selected speed button.")]
-    public Color selectedColor = new Color(0.08f, 0.67f, 0.88f, 1f);
-    [Tooltip("Color used by speed buttons that are not selected.")]
-    public Color normalColor = new Color(0.055f, 0.105f, 0.145f, 1f);
+    // Intentionally not serialized: old scene instances had Color.white saved in the component,
+    // so changing inspector defaults did not update them. Keeping these runtime theme colors fixed
+    // guarantees the speed selector always renders correctly on existing scenes.
+    private static readonly Color SelectedThemeColor = new Color(0.08f, 0.67f, 0.88f, 1f);
+    private static readonly Color NormalThemeColor = new Color(0.055f, 0.105f, 0.145f, 1f);
 
     public int CurrentMultiplier { get; private set; } = 1;
 
@@ -64,8 +64,7 @@ public class GameSpeedController : MonoBehaviour
     {
         if (button == null) return;
 
-        // Do not let Unity's built-in Color Tint transition overwrite the explicit selected/unselected
-        // background colors. Hover/press feedback is already handled by UIPunchButton.
+        // UIPunchButton owns hover/press feedback. Unity Color Tint must not overwrite our theme.
         button.transition = Selectable.Transition.None;
     }
 
@@ -73,7 +72,7 @@ public class GameSpeedController : MonoBehaviour
     {
         if (button == null || button.targetGraphic == null) return;
 
-        Color baseColor = selected ? selectedColor : normalColor;
+        Color baseColor = selected ? SelectedThemeColor : NormalThemeColor;
         button.targetGraphic.color = baseColor;
 
         UIPunchButton feedback = button.GetComponent<UIPunchButton>();
