@@ -10,6 +10,15 @@ public enum RelicEffectType
     UpgradeCostDiscountPercent
 }
 
+public enum RelicRarity
+{
+    Common = 0,
+    Uncommon = 1,
+    Rare = 2,
+    Epic = 3,
+    Legendary = 4
+}
+
 [System.Serializable]
 public class RelicModifier
 {
@@ -30,6 +39,7 @@ public class RelicData : ScriptableObject
     public string relicName = "New Relic";
     [TextArea(2, 5)] public string description;
     public Sprite icon;
+    public RelicRarity rarity = RelicRarity.Common;
 
     [Header("Random Selection")]
     [Min(0.01f)] public float selectionWeight = 1f;
