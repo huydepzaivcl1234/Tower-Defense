@@ -3,7 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// Owns the current run's relic state. Relics are permanent until the scene/run is restarted.
-/// Every N cleared waves it rolls 3 weighted, unique choices and asks RelicChoiceUI to display them.
+/// Supports normal between-wave choices plus world-drop rewards that are queued and opened only
+/// when the player presses the Relic Available notification.
 /// </summary>
 public class RelicManager : MonoBehaviour
 {
@@ -20,9 +21,18 @@ public class RelicManager : MonoBehaviour
 
     [Header("UI")]
     public RelicChoiceUI choiceUI;
+    public RelicRewardNotificationUI rewardNotificationUI;
+
+    [Header("World Drop")]
+    [Tooltip("Optional custom prefab for relic drops. Leave empty to use the built-in glowing orb fallback.")]
+    public GameObject relicDropPrefab;
+    [Tooltip("Vertical offset above the enemy death position.")]
+    public float relicDropHeight = 0.65f;
 
     private readonly Dictionary<RelicData, int> stacks = new Dictionary<RelicData, int>();
+    private readonly Queue<QueuedRelicReward> queuedRewards = new Queue<QueuedRelicReward>();
     private bool isChoosing;
+    private bool activeChoiceCameFromQueue;
 
     private float towerDamagePercent;
     private float towerAttackSpeedPercent;
@@ -32,15 +42,33 @@ public class RelicManager : MonoBehaviour
     private float upgradeCostDiscountPercent;
 
     public bool IsChoosing => isChoosing;
+    public int PendingRewardCount => queuedRewards.Count;
     public float TowerDamageMultiplier => Mathf.Max(0f, 1f + towerDamagePercent);
     public float TowerAttackSpeedMultiplier => Mathf.Max(0.01f, 1f + towerAttackSpeedPercent);
     public float TowerRangeMultiplier => Mathf.Max(0.01f, 1f + towerRangePercent);
     public float GoldGainMultiplier => Mathf.Max(0f, 1f + goldGainPercent);
 
+    private struct QueuedRelicReward
+    {
+        public RelicRarity minimumRarity;
+        public string title;
+
+        public QueuedRelicReward(RelicRarity rarity, string rewardTitle)
+        {
+            minimumRarity = rarity;
+            title = rewardTitle;
+        }
+    }
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+    }
+
+    private void Start()
+    {
+        RefreshRewardNotification();
     }
 
     private void OnEnable()
@@ -64,14 +92,46 @@ public class RelicManager : MonoBehaviour
         OpenChoice();
     }
 
+    /// <summary>Normal scheduled relic choice. Opens immediately, preserving the existing system.</summary>
     public void OpenChoice()
     {
-        List<RelicData> rolled = RollChoices(choicesPerRoll);
-        if (rolled.Count == 0) return;
+        OpenChoiceInternal(RelicRarity.Common, "CHOOSE A RELIC", false);
+    }
+
+    /// <summary>
+    /// Called when the player hovers a world relic drop. The reward is collected instantly but the
+    /// choice panel does NOT interrupt gameplay; instead a notification button becomes available.
+    /// </summary>
+    public void QueueDroppedReward(RelicRarity minimumRarity, bool bossReward)
+    {
+        string title = bossReward ? "CHOOSE A BOSS RELIC" : "CHOOSE A RELIC";
+        queuedRewards.Enqueue(new QueuedRelicReward(minimumRarity, title));
+        RefreshRewardNotification();
+    }
+
+    public void OpenNextQueuedReward()
+    {
+        if (isChoosing || queuedRewards.Count == 0) return;
+        QueuedRelicReward reward = queuedRewards.Peek();
+        OpenChoiceInternal(reward.minimumRarity, reward.title, true);
+    }
+
+    private void OpenChoiceInternal(RelicRarity minimumRarity, string title, bool fromQueue)
+    {
+        List<RelicData> rolled = RollChoices(choicesPerRoll, minimumRarity);
+        if (rolled.Count == 0)
+        {
+            if (fromQueue && queuedRewards.Count > 0)
+                queuedRewards.Dequeue();
+            RefreshRewardNotification();
+            Debug.LogWarning($"No available relics could be rolled for minimum rarity {minimumRarity}.");
+            return;
+        }
 
         isChoosing = true;
+        activeChoiceCameFromQueue = fromQueue;
         if (choiceUI != null)
-            choiceUI.Show(rolled);
+            choiceUI.Show(rolled, title);
         else
             Debug.LogWarning("RelicManager rolled relics but no RelicChoiceUI is assigned.");
     }
@@ -83,6 +143,79 @@ public class RelicManager : MonoBehaviour
         ApplyRelic(relic);
         isChoosing = false;
         if (choiceUI != null) choiceUI.Hide();
+
+        if (activeChoiceCameFromQueue && queuedRewards.Count > 0)
+            queuedRewards.Dequeue();
+
+        activeChoiceCameFromQueue = false;
+        RefreshRewardNotification();
+    }
+
+    /// <summary>Called by Enemy on death. Handles both normal chance and guaranteed boss rewards.</summary>
+    public void TrySpawnEnemyRelicDrops(EnemyData enemyData, Vector3 deathPosition)
+    {
+        if (enemyData == null) return;
+
+        bool normalDrop = enemyData.relicDropChance > 0f && Random.value <= enemyData.relicDropChance;
+        if (normalDrop)
+            SpawnWorldReward(deathPosition, enemyData.minimumDropRarity, false);
+
+        if (enemyData.isBoss && enemyData.bossGuaranteedRelic)
+            SpawnWorldReward(deathPosition + new Vector3(0.45f, 0f, 0.15f), enemyData.bossGuaranteedMinimumRarity, true);
+    }
+
+    private void SpawnWorldReward(Vector3 position, RelicRarity minimumRarity, bool bossReward)
+    {
+        Vector3 spawnPos = position + Vector3.up * relicDropHeight;
+        GameObject go;
+
+        if (relicDropPrefab != null)
+        {
+            go = Instantiate(relicDropPrefab, spawnPos, Quaternion.identity);
+        }
+        else
+        {
+            go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = bossReward ? "BossRelicDrop" : "RelicDrop";
+            go.transform.position = spawnPos;
+            go.transform.localScale = Vector3.one * (bossReward ? 0.85f : 0.62f);
+
+            Renderer renderer = go.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                Color color = GetRarityColor(minimumRarity);
+                Material material = renderer.material;
+                if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
+                else if (material.HasProperty("_Color")) material.color = color;
+                if (material.HasProperty("_EmissionColor"))
+                {
+                    material.EnableKeyword("_EMISSION");
+                    material.SetColor("_EmissionColor", color * 1.5f);
+                }
+            }
+        }
+
+        RelicDropPickup pickup = go.GetComponent<RelicDropPickup>();
+        if (pickup == null) pickup = go.AddComponent<RelicDropPickup>();
+        pickup.Configure(minimumRarity, bossReward);
+    }
+
+    public static Color GetRarityColor(RelicRarity rarity)
+    {
+        switch (rarity)
+        {
+            case RelicRarity.Uncommon: return new Color(0.25f, 0.95f, 0.38f, 1f);
+            case RelicRarity.Rare: return new Color(0.20f, 0.55f, 1f, 1f);
+            case RelicRarity.Epic: return new Color(0.72f, 0.30f, 1f, 1f);
+            case RelicRarity.Legendary: return new Color(1f, 0.67f, 0.12f, 1f);
+            default: return new Color(0.88f, 0.92f, 1f, 1f);
+        }
+    }
+
+    private void RefreshRewardNotification()
+    {
+        if (rewardNotificationUI != null)
+            rewardNotificationUI.SetPendingCount(queuedRewards.Count);
     }
 
     private void ApplyRelic(RelicData relic)
@@ -125,15 +258,13 @@ public class RelicManager : MonoBehaviour
         return stacks.TryGetValue(relic, out int count) ? count : 0;
     }
 
-    private List<RelicData> RollChoices(int count)
+    private List<RelicData> RollChoices(int count, RelicRarity minimumRarity)
     {
-        List<RelicData> candidates = new List<RelicData>();
-        foreach (RelicData relic in relicPool)
-        {
-            if (relic == null) continue;
-            if (GetStacks(relic) >= Mathf.Max(1, relic.maxStacks)) continue;
-            candidates.Add(relic);
-        }
+        List<RelicData> candidates = BuildCandidates(minimumRarity);
+
+        // Safety fallback: if the project has not assigned rarities yet, never lose a collected reward.
+        if (candidates.Count == 0 && minimumRarity > RelicRarity.Common)
+            candidates = BuildCandidates(RelicRarity.Common);
 
         List<RelicData> result = new List<RelicData>();
         int targetCount = Mathf.Min(Mathf.Max(1, count), candidates.Count);
@@ -152,10 +283,23 @@ public class RelicManager : MonoBehaviour
             }
 
             result.Add(candidates[selectedIndex]);
-            candidates.RemoveAt(selectedIndex); // no duplicate card within the same 3-choice roll
+            candidates.RemoveAt(selectedIndex);
         }
 
         return result;
+    }
+
+    private List<RelicData> BuildCandidates(RelicRarity minimumRarity)
+    {
+        List<RelicData> candidates = new List<RelicData>();
+        foreach (RelicData relic in relicPool)
+        {
+            if (relic == null) continue;
+            if (relic.rarity < minimumRarity) continue;
+            if (GetStacks(relic) >= Mathf.Max(1, relic.maxStacks)) continue;
+            candidates.Add(relic);
+        }
+        return candidates;
     }
 
     public int GetBuildCost(int baseCost)
