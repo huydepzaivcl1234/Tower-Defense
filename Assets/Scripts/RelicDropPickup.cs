@@ -5,6 +5,7 @@ using DG.Tweening;
 /// World relic reward pickup. No click is required: moving the mouse over it collects it,
 /// queues a relic reward, then removes the world object.
 /// </summary>
+[RequireComponent(typeof(SphereCollider))]
 public class RelicDropPickup : MonoBehaviour
 {
     [Header("Visual Motion")]
@@ -24,6 +25,14 @@ public class RelicDropPickup : MonoBehaviour
         bossReward = isBossReward;
         collected = false;
         basePosition = transform.position;
+
+        SphereCollider hoverCollider = GetComponent<SphereCollider>();
+        if (hoverCollider != null)
+        {
+            hoverCollider.isTrigger = false;
+            hoverCollider.radius = Mathf.Max(0.65f, hoverCollider.radius);
+        }
+
         StartBob();
     }
 
