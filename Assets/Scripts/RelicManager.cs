@@ -230,7 +230,7 @@ public class RelicManager : MonoBehaviour
                         cannonHeroDamagePerLevel = modifier.value2;
                         cannonHeroTravelPercentPerStep = modifier.value3;
                         cannonHeroTravelBonusCap = modifier.value4;
-                        cannonHeroTravelDistancePerStep = 1f;
+                        cannonHeroTravelDistancePerStep = Mathf.Max(0.01f, modifier.value5 > 0f ? modifier.value5 : 1f);
                         RemoveExistingTargetTowers(cannonHeroTower);
                     }
                     break;
