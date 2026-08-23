@@ -7,6 +7,7 @@ using DG.Tweening;
 /// Lively visual feedback for UI Buttons.
 /// Keeps the existing tactile press punch and adds hover zoom + brightness.
 /// Visual-only: does not change button gameplay/click behaviour.
+/// External UI controllers may call SetBaseGraphicColor when they own a button's selected state.
 /// </summary>
 [RequireComponent(typeof(Button))]
 [DisallowMultipleComponent]
@@ -48,14 +49,12 @@ public class UIPunchButton : MonoBehaviour,
 
     private void OnEnable()
     {
-        // Scene/prefab scale can legitimately be something other than 1.
-        // Only recapture while not in an animated state so repeated enable/disable never compounds scale.
         if (!isHovered && !isPressed)
             baseScale = transform.localScale;
 
         if (button == null) button = GetComponent<Button>();
         targetGraphic = button != null ? button.targetGraphic : null;
-        if (targetGraphic != null)
+        if (targetGraphic != null && !isHovered)
             baseGraphicColor = targetGraphic.color;
     }
 
@@ -70,14 +69,34 @@ public class UIPunchButton : MonoBehaviour,
             targetGraphic.color = baseGraphicColor;
     }
 
+    /// <summary>
+    /// Updates the non-hover color owned by an external UI state controller (for example 1x/2x/3x speed selection).
+    /// If currently hovered, the visible color remains brightened from this new base instead of reverting to stale white.
+    /// </summary>
+    public void SetBaseGraphicColor(Color color, bool applyImmediately = true)
+    {
+        if (button == null) button = GetComponent<Button>();
+        targetGraphic = button != null ? button.targetGraphic : null;
+        baseGraphicColor = color;
+
+        if (!applyImmediately || targetGraphic == null) return;
+
+        colorTween?.Kill();
+        targetGraphic.color = isHovered ? Brightened(baseGraphicColor) : baseGraphicColor;
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (!CanAnimate()) return;
 
+        // Capture the current runtime state before hover. This is important for buttons whose base
+        // color changes dynamically, such as selected/unselected speed controls.
+        if (targetGraphic != null && !isHovered)
+            baseGraphicColor = targetGraphic.color;
+
         isHovered = true;
         AnimateBrightness(true);
 
-        // Do not fight the press tween while the mouse button is currently held.
         if (!isPressed)
             AnimateScale(GetRestScale(), hoverDuration, Ease.OutBack);
     }
@@ -87,7 +106,6 @@ public class UIPunchButton : MonoBehaviour,
         isHovered = false;
         AnimateBrightness(false);
 
-        // Mouse-out should always return smoothly to the exact original scale.
         if (!isPressed)
             AnimateScale(baseScale, hoverDuration, Ease.OutQuad);
     }
@@ -154,7 +172,6 @@ public class UIPunchButton : MonoBehaviour,
 
     private Color Brightened(Color color)
     {
-        // Keep alpha untouched; brighten RGB only and clamp to legal UI colour range.
         return new Color(
             Mathf.Clamp01(color.r * hoverBrightness),
             Mathf.Clamp01(color.g * hoverBrightness),
