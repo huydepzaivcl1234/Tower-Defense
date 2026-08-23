@@ -45,16 +45,20 @@ public class Projectile : MonoBehaviour
             destination = target.transform.position;
 
         Vector3 dir = destination - transform.position;
+        float distance = dir.magnitude;
         float step = speed * Time.deltaTime;
-        if (dir.magnitude <= step)
+        if (distance <= step)
         {
             HitTarget();
             return;
         }
 
-        transform.position += dir.normalized * step;
-        if (dir.sqrMagnitude > 0.0001f)
-            transform.rotation = Quaternion.LookRotation(dir);
+        if (distance > 0.0001f)
+        {
+            Vector3 moveDir = dir / distance;
+            transform.position += moveDir * step;
+            transform.rotation = Quaternion.LookRotation(moveDir);
+        }
     }
 
     private void HitTarget()
@@ -66,11 +70,29 @@ public class Projectile : MonoBehaviour
         }
 
         if (splashRadius > 0f) ApplySplashDamage();
-        if (impactEffectPrefab != null)
-            Instantiate(impactEffectPrefab, transform.position, Quaternion.identity);
+        SpawnImpactEffect();
 
         if (ObjectPool.Instance != null) ObjectPool.Instance.Release(gameObject);
         else Destroy(gameObject);
+    }
+
+    private void SpawnImpactEffect()
+    {
+        if (impactEffectPrefab == null) return;
+
+        if (ObjectPool.Instance == null)
+        {
+            Instantiate(impactEffectPrefab, transform.position, Quaternion.identity);
+            return;
+        }
+
+        GameObject fx = ObjectPool.Instance.Get(impactEffectPrefab, transform.position, Quaternion.identity);
+        if (fx == null) return;
+
+        PooledVFXAutoRelease autoRelease = fx.GetComponent<PooledVFXAutoRelease>();
+        if (autoRelease == null)
+            autoRelease = fx.AddComponent<PooledVFXAutoRelease>();
+        autoRelease.PlayAndSchedule();
     }
 
     private static readonly Collider[] overlapBuffer = new Collider[64];
