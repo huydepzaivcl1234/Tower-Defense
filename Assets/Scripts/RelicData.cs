@@ -9,7 +9,6 @@ public enum RelicEffectType
     BuildCostDiscountPercent,
     UpgradeCostDiscountPercent,
 
-    // Advanced fully-customizable relic effects.
     AddLivesFlat,
     RelicDropChanceFlat,
     DamagePerLives,
@@ -45,15 +44,15 @@ public class RelicModifier
     [Tooltip("Fourth customizable value used by advanced effects.")]
     public float value4 = 0f;
 
+    [Tooltip("Fifth customizable value used by advanced effects such as Cannon Hero distance-per-step.")]
+    public float value5 = 0f;
+
     [Tooltip("Optional tower target for tower-specific relics such as Cannon Hero.")]
     public TowerData targetTower;
 }
 
 /// <summary>
-/// One permanent-for-this-run roguelite buff. Create with:
-/// Assets > Create > Tower Defense > Relic Data.
-/// A relic can contain one or multiple modifiers and can be stacked up to Max Stacks.
-/// Advanced effects use value/value2/value3/value4 so their balancing stays data-driven.
+/// One permanent-for-this-run roguelite buff. All tuning stays in data.
 /// </summary>
 [CreateAssetMenu(fileName = "NewRelic", menuName = "Tower Defense/Relic Data")]
 public class RelicData : ScriptableObject
