@@ -196,6 +196,11 @@ public class EnemySpawnPortal : MonoBehaviour
 
         ParticleSystem.VelocityOverLifetimeModule velocity = ps.velocityOverLifetime;
         velocity.enabled = true;
+
+        // Unity requires orbital X/Y/Z curves to use the same MinMaxCurve mode.
+        // Keep all three in TwoConstants mode: X/Y stay at zero, Z provides the swirl.
+        velocity.orbitalX = new ParticleSystem.MinMaxCurve(0f, 0f);
+        velocity.orbitalY = new ParticleSystem.MinMaxCurve(0f, 0f);
         velocity.orbitalZ = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f);
         velocity.radial = new ParticleSystem.MinMaxCurve(-0.35f, 0.15f);
 
