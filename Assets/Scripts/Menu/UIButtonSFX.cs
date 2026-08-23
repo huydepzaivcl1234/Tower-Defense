@@ -3,9 +3,10 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
-/// Per-button UI sound feedback. Click and hover use separate AudioSources so
-/// leaving a button can stop only its hover sound without cutting off click SFX.
-/// Both sources are categorized as SFX and follow AudioSettingsManager.
+/// Per-button UI sound feedback. Click sounds are routed through an always-active
+/// global one-shot player so they keep playing even if the clicked menu is disabled
+/// in the same frame. Hover keeps a local AudioSource so pointer exit can stop it
+/// immediately. All sounds are categorized as SFX and follow AudioSettingsManager.
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
@@ -31,19 +32,16 @@ public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     public bool loopHoverWhileInside = false;
 
     private Button button;
-    private AudioSource clickSource;
     private AudioSource hoverSource;
 
     private void Awake()
     {
         button = GetComponent<Button>();
-        EnsureAudioSources();
+        EnsureHoverSource();
     }
 
     private void Start()
     {
-        // Apply the currently saved SFX volume immediately instead of waiting for
-        // AudioSettingsManager's periodic source scan.
         AudioSettingsManager.Instance?.ApplyAll();
     }
 
@@ -52,35 +50,20 @@ public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         StopHover();
     }
 
-    private void EnsureAudioSources()
+    private void EnsureHoverSource()
     {
+        if (hoverSource != null) return;
+
         AudioSource[] sources = GetComponents<AudioSource>();
+        hoverSource = sources.Length > 0 ? sources[0] : gameObject.AddComponent<AudioSource>();
 
-        if (sources.Length > 0)
-            clickSource = sources[0];
-        else
-            clickSource = gameObject.AddComponent<AudioSource>();
+        hoverSource.playOnAwake = false;
+        hoverSource.loop = false;
+        hoverSource.spatialBlend = 0f;
 
-        if (sources.Length > 1)
-            hoverSource = sources[1];
-        else
-            hoverSource = gameObject.AddComponent<AudioSource>();
-
-        ConfigureSource(clickSource, false);
-        ConfigureSource(hoverSource, false);
-    }
-
-    private static void ConfigureSource(AudioSource audioSource, bool loop)
-    {
-        if (audioSource == null) return;
-
-        audioSource.playOnAwake = false;
-        audioSource.loop = loop;
-        audioSource.spatialBlend = 0f;
-
-        GameAudioCategory category = audioSource.GetComponent<GameAudioCategory>();
+        GameAudioCategory category = hoverSource.GetComponent<GameAudioCategory>();
         if (category == null)
-            category = audioSource.gameObject.AddComponent<GameAudioCategory>();
+            category = hoverSource.gameObject.AddComponent<GameAudioCategory>();
         category.type = GameAudioType.SFX;
     }
 
@@ -104,23 +87,22 @@ public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         if (clickClip == null) return;
         if (!CanPlay()) return;
-        if (clickSource == null) EnsureAudioSources();
 
-        clickSource.pitch = Mathf.Clamp(
+        float finalPitch = Mathf.Clamp(
             pitch + Random.Range(-randomPitchRange, randomPitchRange),
             0.25f,
             3f);
-        clickSource.PlayOneShot(clickClip, Mathf.Clamp01(volume));
+
+        UIAudioOneShotPlayer.Play(clickClip, Mathf.Clamp01(volume), finalPitch);
     }
 
     public void PlayHover()
     {
         if (!enableHoverSound || hoverClip == null) return;
         if (!CanPlay()) return;
-        if (hoverSource == null) EnsureAudioSources();
+        if (hoverSource == null) EnsureHoverSource();
+        if (hoverSource == null || !hoverSource.isActiveAndEnabled) return;
 
-        // Re-entering a button restarts the hover cue from the beginning rather
-        // than stacking multiple copies of the same sound.
         hoverSource.Stop();
         hoverSource.clip = hoverClip;
         hoverSource.pitch = Mathf.Clamp(hoverPitch, 0.25f, 3f);
@@ -133,7 +115,6 @@ public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         if (hoverSource == null) return;
 
-        // Pointer exit must silence the hover cue immediately.
         hoverSource.Stop();
         hoverSource.clip = null;
         hoverSource.loop = false;
