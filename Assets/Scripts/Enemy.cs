@@ -51,6 +51,14 @@ public class Enemy : MonoBehaviour
 
     private float regenTickTimer;
 
+    // Cached visual data. Using Renderer.material/materials creates unique material instances per enemy,
+    // which increases memory and breaks batching. MaterialPropertyBlock changes tint without cloning materials.
+    private Renderer[] cachedRenderers;
+    private MaterialPropertyBlock tintPropertyBlock;
+    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorId = Shader.PropertyToID("_Color");
+    private float lastAnimatorSpeed = float.NaN;
+
     public bool IsAlive => !isDead && currentHP > 0f;
     public float CurrentHP => currentHP;
     public float HPPercent => (data != null && data.maxHP > 0f) ? currentHP / data.maxHP : 0f;
@@ -60,6 +68,18 @@ public class Enemy : MonoBehaviour
     public float CurrentShield => currentShield;
 
     public float PathProgress { get; private set; }
+
+    private void Awake()
+    {
+        CacheRenderers();
+    }
+
+    private void CacheRenderers()
+    {
+        cachedRenderers = GetComponentsInChildren<Renderer>(true);
+        if (tintPropertyBlock == null)
+            tintPropertyBlock = new MaterialPropertyBlock();
+    }
 
     /// <summary>Called by WaveManager right after Instantiate or reuse from object pool.</summary>
     public void Initialize(EnemyData enemyData, List<Transform> path)
@@ -73,7 +93,6 @@ public class Enemy : MonoBehaviour
         isDead = false;
         PathProgress = 0f;
 
-        // Every pooled spawn is a fresh enemy life. No old status may leak into the new spawn.
         bleedDamagePerTick = 0f;
         bleedTickInterval = 0f;
         bleedTimeRemaining = 0f;
@@ -91,6 +110,7 @@ public class Enemy : MonoBehaviour
         if (animator != null)
         {
             animator.Rebind();
+            lastAnimatorSpeed = data.moveSpeed;
             if (!string.IsNullOrEmpty(speedParam))
                 animator.SetFloat(speedParam, data.moveSpeed);
         }
@@ -107,13 +127,19 @@ public class Enemy : MonoBehaviour
 
     private void ApplyTintColor(Color color)
     {
-        foreach (var rend in GetComponentsInChildren<Renderer>())
+        if (cachedRenderers == null || cachedRenderers.Length == 0)
+            CacheRenderers();
+
+        tintPropertyBlock.Clear();
+        // Setting both IDs is harmless for shaders that only use one of them and avoids material inspection/allocation.
+        tintPropertyBlock.SetColor(BaseColorId, color);
+        tintPropertyBlock.SetColor(ColorId, color);
+
+        for (int i = 0; i < cachedRenderers.Length; i++)
         {
-            foreach (var mat in rend.materials)
-            {
-                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
-                else if (mat.HasProperty("_Color")) mat.color = color;
-            }
+            Renderer rend = cachedRenderers[i];
+            if (rend != null)
+                rend.SetPropertyBlock(tintPropertyBlock);
         }
     }
 
@@ -131,16 +157,10 @@ public class Enemy : MonoBehaviour
             MoveAlongPath();
     }
 
-    /// <summary>
-    /// Regeneration works like a DoT/bleed timer, but in reverse:
-    /// hpRegenPerSec is converted into a heal amount per tick using hpRegenTickInterval.
-    /// Example: 10 HP/s at 0.5s interval => +5 every 0.5 seconds.
-    /// </summary>
     private void UpdateRegeneration()
     {
         if (data.hpRegenPerSec <= 0f || currentHP >= data.maxHP)
         {
-            // Being full should not bank timer progress. After the next hit, the first heal waits a full interval.
             regenTickTimer = GetRegenInterval();
             return;
         }
@@ -153,10 +173,6 @@ public class Enemy : MonoBehaviour
         Heal(data.hpRegenPerSec * interval, true);
     }
 
-    /// <summary>
-    /// Shared healing entry point used by self regeneration and support/healer enemies.
-    /// Returns the actual HP restored after clamping to Max HP.
-    /// </summary>
     public float Heal(float amount, bool showPopup = true)
     {
         if (isDead || data == null || amount <= 0f || currentHP >= data.maxHP) return 0f;
@@ -272,14 +288,19 @@ public class Enemy : MonoBehaviour
         if (target == null) { currentWaypointIndex++; return; }
 
         Vector3 toTarget = target.position - transform.position;
+        float distance = toTarget.magnitude;
         float activeSlow = slowTimeRemaining > 0f ? slowPercent : 0f;
         float effectiveSpeed = data.moveSpeed * (1f - activeSlow);
         float step = effectiveSpeed * Time.deltaTime;
 
-        if (animator != null && !string.IsNullOrEmpty(speedParam))
+        if (animator != null && !string.IsNullOrEmpty(speedParam) &&
+            (float.IsNaN(lastAnimatorSpeed) || Mathf.Abs(lastAnimatorSpeed - effectiveSpeed) > 0.001f))
+        {
             animator.SetFloat(speedParam, effectiveSpeed);
+            lastAnimatorSpeed = effectiveSpeed;
+        }
 
-        if (toTarget.magnitude <= step)
+        if (distance <= step)
         {
             transform.position = target.position;
             currentWaypointIndex++;
@@ -289,14 +310,14 @@ public class Enemy : MonoBehaviour
         }
         else
         {
-            Vector3 moveDir = toTarget.normalized;
+            Vector3 moveDir = distance > 0.0001f ? toTarget / distance : Vector3.zero;
             transform.position += moveDir * step;
             if (moveDir.sqrMagnitude > 0.0001f)
                 transform.rotation = Quaternion.LookRotation(moveDir);
 
             Vector3 prevPos = currentWaypointIndex > 0 ? waypoints[currentWaypointIndex - 1].position : transform.position;
             float segLength = Vector3.Distance(prevPos, target.position);
-            float frac = segLength > 0f ? 1f - (toTarget.magnitude / segLength) : 0f;
+            float frac = segLength > 0f ? 1f - (distance / segLength) : 0f;
             PathProgress = currentWaypointIndex + Mathf.Clamp01(frac);
         }
     }
