@@ -2,20 +2,17 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Generic object pool: instead of Instantiate/Destroy on every shot or damage popup (which
-/// creates garbage-collection pressure and is a common cause of FPS drops when many towers
-/// fire quickly or many enemies are on screen), reuses a pool of already-created instances.
-///
-/// Usage: replace `Instantiate(prefab, pos, rot)` with `ObjectPool.Instance.Get(prefab, pos, rot)`,
-/// and replace `Destroy(gameObject)` with `ObjectPool.Instance.Release(gameObject)`.
-/// Put this on a single empty "ObjectPool" GameObject in the scene - one per scene.
-/// Everything works fine (just without the performance benefit) if this object is missing,
-/// since Projectile/DamagePopup/Tower/Enemy all fall back to normal Instantiate/Destroy
-/// when ObjectPool.Instance is null.
+/// Generic object pool used by enemies, projectiles and popups.
+/// Reuses objects to reduce Instantiate/Destroy GC spikes while also capping inactive objects
+/// so long sessions cannot grow the pool (and RAM usage) forever.
 /// </summary>
 public class ObjectPool : MonoBehaviour
 {
     public static ObjectPool Instance { get; private set; }
+
+    [Header("Memory Limits")]
+    [Tooltip("Maximum inactive instances retained per prefab. Extra released instances are destroyed instead of being kept forever.")]
+    [Min(1)] public int maxInactivePerPrefab = 96;
 
     private readonly Dictionary<GameObject, Queue<GameObject>> pools = new Dictionary<GameObject, Queue<GameObject>>();
     private readonly Dictionary<GameObject, GameObject> instanceToPrefab = new Dictionary<GameObject, GameObject>();
@@ -36,18 +33,23 @@ public class ObjectPool : MonoBehaviour
             pools[prefab] = pool;
         }
 
-        GameObject obj;
-        if (pool.Count > 0)
-        {
+        GameObject obj = null;
+
+        // A pooled object might have been destroyed externally. Skip stale queue entries safely.
+        while (pool.Count > 0 && obj == null)
             obj = pool.Dequeue();
+
+        if (obj != null)
+        {
             obj.transform.SetPositionAndRotation(position, rotation);
-            obj.SetActive(true); // re-fires OnEnable, which components use to reset their per-use state
+            obj.SetActive(true);
         }
         else
         {
             obj = Instantiate(prefab, position, rotation);
-            instanceToPrefab[obj] = prefab; // remember which pool this instance belongs to, for when it's released
+            instanceToPrefab[obj] = prefab;
         }
+
         return obj;
     }
 
@@ -57,16 +59,32 @@ public class ObjectPool : MonoBehaviour
 
         if (!instanceToPrefab.TryGetValue(obj, out GameObject prefab))
         {
-            Destroy(obj); // wasn't something Get() created (shouldn't normally happen) - just destroy it
+            Destroy(obj);
             return;
         }
 
-        obj.SetActive(false);
         if (!pools.TryGetValue(prefab, out Queue<GameObject> pool))
         {
             pool = new Queue<GameObject>();
             pools[prefab] = pool;
         }
+
+        int limit = Mathf.Max(1, maxInactivePerPrefab);
+        if (pool.Count >= limit)
+        {
+            instanceToPrefab.Remove(obj);
+            Destroy(obj);
+            return;
+        }
+
+        obj.SetActive(false);
         pool.Enqueue(obj);
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+        pools.Clear();
+        instanceToPrefab.Clear();
     }
 }
