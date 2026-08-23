@@ -57,6 +57,14 @@ public class GameManager : MonoBehaviour
         return granted;
     }
 
+    /// <summary>Adds lives during the current run (used by permanent run relics).</summary>
+    public void AddLives(int amount)
+    {
+        if (amount <= 0 || IsGameOver) return;
+        CurrentLives += amount;
+        OnLivesChanged?.Invoke(CurrentLives);
+    }
+
     public void LoseLives(int amount)
     {
         if (IsGameOver) return;
