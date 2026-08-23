@@ -4,6 +4,7 @@ using DG.Tweening;
 /// <summary>
 /// World relic reward pickup. No click is required: moving the mouse over it collects it,
 /// queues a relic reward, then removes the world object.
+/// The old sphere fallback is converted into a 3D card visual at runtime.
 /// </summary>
 [RequireComponent(typeof(SphereCollider))]
 public class RelicDropPickup : MonoBehaviour
@@ -18,6 +19,7 @@ public class RelicDropPickup : MonoBehaviour
     private bool collected;
     private Tween bobTween;
     private Vector3 basePosition;
+    private bool cardVisualBuilt;
 
     public void Configure(RelicRarity rarity, bool isBossReward)
     {
@@ -30,16 +32,47 @@ public class RelicDropPickup : MonoBehaviour
         if (hoverCollider != null)
         {
             hoverCollider.isTrigger = false;
-            hoverCollider.radius = Mathf.Max(0.65f, hoverCollider.radius);
+            hoverCollider.radius = 0.85f;
         }
 
+        BuildCardVisual();
         StartBob();
     }
 
     private void Start()
     {
         basePosition = transform.position;
+        if (!cardVisualBuilt)
+            BuildCardVisual();
         StartBob();
+    }
+
+    private void BuildCardVisual()
+    {
+        if (cardVisualBuilt) return;
+        cardVisualBuilt = true;
+
+        // Hide the primitive sphere mesh created by RelicManager but keep its collider on the root
+        // so OnMouseEnter continues to work exactly as before.
+        MeshRenderer oldRenderer = GetComponent<MeshRenderer>();
+        if (oldRenderer != null) oldRenderer.enabled = false;
+
+        MeshFilter oldFilter = GetComponent<MeshFilter>();
+        if (oldFilter != null) oldFilter.mesh = null;
+
+        // RelicManager used to scale the sphere. Reset the pickup root so the card keeps a predictable size.
+        transform.localScale = Vector3.one;
+
+        GameObject card = RelicWorldCardModel.Create(transform.position, minimumRarity, bossReward);
+        card.name = "CardVisual";
+        card.transform.SetParent(transform, true);
+        card.transform.localPosition = Vector3.zero;
+        card.transform.localRotation = Quaternion.Euler(10f, 18f, 0f);
+        card.transform.localScale = Vector3.one * (bossReward ? 1.15f : 0.95f);
+
+        // Hover detection stays on this root pickup object, not on visual children.
+        Collider visualCollider = card.GetComponent<Collider>();
+        if (visualCollider != null) visualCollider.enabled = false;
     }
 
     private void StartBob()
