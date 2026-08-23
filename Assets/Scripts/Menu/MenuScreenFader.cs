@@ -34,7 +34,7 @@ public class MenuScreenFader : MonoBehaviour
     {
         if (Instance != null) return Instance;
 
-        MenuScreenFader existing = Object.FindFirstObjectByType<MenuScreenFader>(FindObjectsInactive.Include);
+        MenuScreenFader existing = UnityEngine.Object.FindFirstObjectByType<MenuScreenFader>(FindObjectsInactive.Include);
         if (existing != null) return existing;
 
         GameObject go = new GameObject("MenuScreenFader");
