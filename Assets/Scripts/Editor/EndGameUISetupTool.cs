@@ -10,7 +10,7 @@ public static class EndGameUISetupTool
 {
     private static readonly Color Overlay = new Color(0.015f, 0.035f, 0.055f, 0.86f);
     private static readonly Color Card = new Color(0.025f, 0.085f, 0.125f, 0.98f);
-    private static readonly Color Button = new Color(0.04f, 0.16f, 0.22f, 1f);
+    private static readonly Color ButtonNormal = new Color(0.04f, 0.16f, 0.22f, 1f);
     private static readonly Color ButtonHover = new Color(0.055f, 0.28f, 0.36f, 1f);
     private static readonly Color Cyan = new Color(0.05f, 0.78f, 0.96f, 1f);
     private static readonly Color Win = new Color(0.22f, 0.92f, 0.62f, 1f);
@@ -109,7 +109,7 @@ public static class EndGameUISetupTool
     {
         RectTransform rt = CreateRect(name, parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), position - size * 0.5f, position + size * 0.5f);
         Image image = rt.gameObject.AddComponent<Image>();
-        image.color = primary ? new Color(0.025f, 0.50f, 0.67f, 1f) : Button;
+        image.color = primary ? new Color(0.025f, 0.50f, 0.67f, 1f) : ButtonNormal;
 
         Outline outline = rt.gameObject.AddComponent<Outline>();
         outline.effectColor = primary ? Cyan : new Color(Cyan.r, Cyan.g, Cyan.b, 0.42f);
