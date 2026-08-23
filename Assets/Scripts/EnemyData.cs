@@ -29,6 +29,18 @@ public class EnemyData : ScriptableObject
     [Tooltip("Lives lost by the player if this enemy reaches the end of the path")]
     public int damageToPlayer = 1;
 
+    [Header("Relic Drop (fully customizable per enemy type)")]
+    [Tooltip("Chance from 0-1 that THIS enemy drops a Relic Reward when killed. 0.01 = 1%, 0.10 = 10%.")]
+    [Range(0f, 1f)] public float relicDropChance = 0.01f;
+    [Tooltip("Minimum rarity offered when this enemy's dropped reward is opened.")]
+    public RelicRarity minimumDropRarity = RelicRarity.Common;
+    [Tooltip("Marks this enemy type as a boss. Bosses can guarantee an additional rare reward on death.")]
+    public bool isBoss = false;
+    [Tooltip("If enabled, a boss always drops a Relic Reward in addition to its normal random drop roll.")]
+    public bool bossGuaranteedRelic = true;
+    [Tooltip("Minimum rarity for the boss guaranteed reward. Rare is the intended default milestone reward.")]
+    public RelicRarity bossGuaranteedMinimumRarity = RelicRarity.Rare;
+
     [Header("Kháng khống chế (CC Resist)")]
     [Tooltip("Reduces incoming Slow duration and Knockback distance by this fraction (0-1). " +
              "1.0 = fully immune to both slow and knockback. Does NOT reduce bleed damage.")]
