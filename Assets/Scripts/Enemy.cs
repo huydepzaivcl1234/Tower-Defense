@@ -51,8 +51,6 @@ public class Enemy : MonoBehaviour
 
     private float regenTickTimer;
 
-    // Cached visual data. Using Renderer.material/materials creates unique material instances per enemy,
-    // which increases memory and breaks batching. MaterialPropertyBlock changes tint without cloning materials.
     private Renderer[] cachedRenderers;
     private MaterialPropertyBlock tintPropertyBlock;
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -69,26 +67,22 @@ public class Enemy : MonoBehaviour
 
     public float PathProgress { get; private set; }
 
-    private void Awake()
-    {
-        CacheRenderers();
-    }
+    private void Awake() => CacheRenderers();
 
     private void CacheRenderers()
     {
         cachedRenderers = GetComponentsInChildren<Renderer>(true);
-        if (tintPropertyBlock == null)
-            tintPropertyBlock = new MaterialPropertyBlock();
+        if (tintPropertyBlock == null) tintPropertyBlock = new MaterialPropertyBlock();
     }
 
-    /// <summary>Called by WaveManager right after Instantiate or reuse from object pool.</summary>
     public void Initialize(EnemyData enemyData, List<Transform> path)
     {
         CancelInvoke(nameof(ReleaseToPool));
 
         data = enemyData;
         waypoints = path;
-        currentHP = data.maxHP;
+        float spawnHpMultiplier = RelicManager.Instance != null ? RelicManager.Instance.GetSpawnHpMultiplier() : 1f;
+        currentHP = data.maxHP * spawnHpMultiplier;
         currentWaypointIndex = 0;
         isDead = false;
         PathProgress = 0f;
@@ -111,8 +105,7 @@ public class Enemy : MonoBehaviour
         {
             animator.Rebind();
             lastAnimatorSpeed = data.moveSpeed;
-            if (!string.IsNullOrEmpty(speedParam))
-                animator.SetFloat(speedParam, data.moveSpeed);
+            if (!string.IsNullOrEmpty(speedParam)) animator.SetFloat(speedParam, data.moveSpeed);
         }
 
         if (healthBar != null) healthBar.SetData(this);
@@ -127,34 +120,25 @@ public class Enemy : MonoBehaviour
 
     private void ApplyTintColor(Color color)
     {
-        if (cachedRenderers == null || cachedRenderers.Length == 0)
-            CacheRenderers();
-
+        if (cachedRenderers == null || cachedRenderers.Length == 0) CacheRenderers();
         tintPropertyBlock.Clear();
-        // Setting both IDs is harmless for shaders that only use one of them and avoids material inspection/allocation.
         tintPropertyBlock.SetColor(BaseColorId, color);
         tintPropertyBlock.SetColor(ColorId, color);
-
         for (int i = 0; i < cachedRenderers.Length; i++)
         {
             Renderer rend = cachedRenderers[i];
-            if (rend != null)
-                rend.SetPropertyBlock(tintPropertyBlock);
+            if (rend != null) rend.SetPropertyBlock(tintPropertyBlock);
         }
     }
 
     private void Update()
     {
         if (isDead || data == null || waypoints == null || waypoints.Count == 0) return;
-
         UpdateRegeneration();
         UpdateStatusEffects();
         if (isDead) return;
-
-        if (knockbackRemaining > 0f)
-            ApplyKnockbackMovement();
-        else
-            MoveAlongPath();
+        if (knockbackRemaining > 0f) ApplyKnockbackMovement();
+        else MoveAlongPath();
     }
 
     private void UpdateRegeneration()
@@ -164,11 +148,9 @@ public class Enemy : MonoBehaviour
             regenTickTimer = GetRegenInterval();
             return;
         }
-
         float interval = GetRegenInterval();
         regenTickTimer -= Time.deltaTime;
         if (regenTickTimer > 0f) return;
-
         regenTickTimer += interval;
         Heal(data.hpRegenPerSec * interval, true);
     }
@@ -176,12 +158,10 @@ public class Enemy : MonoBehaviour
     public float Heal(float amount, bool showPopup = true)
     {
         if (isDead || data == null || amount <= 0f || currentHP >= data.maxHP) return 0f;
-
         float oldHP = currentHP;
         currentHP = Mathf.Min(data.maxHP, currentHP + amount);
         float actualHeal = currentHP - oldHP;
         if (actualHeal <= 0f) return 0f;
-
         if (healthBar != null) healthBar.Refresh(true);
         if (showPopup) SpawnHealPopup(actualHeal);
         return actualHeal;
@@ -203,16 +183,9 @@ public class Enemy : MonoBehaviour
         if (slowTimeRemaining > 0f)
         {
             slowTimeRemaining -= Time.deltaTime;
-            if (slowTimeRemaining <= 0f)
-            {
-                slowTimeRemaining = 0f;
-                slowPercent = 0f;
-            }
+            if (slowTimeRemaining <= 0f) { slowTimeRemaining = 0f; slowPercent = 0f; }
         }
-        else if (slowPercent != 0f)
-        {
-            slowPercent = 0f;
-        }
+        else if (slowPercent != 0f) slowPercent = 0f;
 
         if (shieldTimeRemaining > 0f)
         {
@@ -269,7 +242,6 @@ public class Enemy : MonoBehaviour
     private void UpdateShieldVisual()
     {
         if (healthBar != null) healthBar.RefreshShield();
-
         bool shouldShow = currentShield > 0f;
         if (shouldShow == isShieldVisualActive) return;
         isShieldVisualActive = shouldShow;
@@ -278,12 +250,7 @@ public class Enemy : MonoBehaviour
 
     private void MoveAlongPath()
     {
-        if (currentWaypointIndex >= waypoints.Count)
-        {
-            ReachEnd();
-            return;
-        }
-
+        if (currentWaypointIndex >= waypoints.Count) { ReachEnd(); return; }
         Transform target = waypoints[currentWaypointIndex];
         if (target == null) { currentWaypointIndex++; return; }
 
@@ -305,16 +272,13 @@ public class Enemy : MonoBehaviour
             transform.position = target.position;
             currentWaypointIndex++;
             PathProgress = currentWaypointIndex;
-            if (currentWaypointIndex >= waypoints.Count)
-                ReachEnd();
+            if (currentWaypointIndex >= waypoints.Count) ReachEnd();
         }
         else
         {
             Vector3 moveDir = distance > 0.0001f ? toTarget / distance : Vector3.zero;
             transform.position += moveDir * step;
-            if (moveDir.sqrMagnitude > 0.0001f)
-                transform.rotation = Quaternion.LookRotation(moveDir);
-
+            if (moveDir.sqrMagnitude > 0.0001f) transform.rotation = Quaternion.LookRotation(moveDir);
             Vector3 prevPos = currentWaypointIndex > 0 ? waypoints[currentWaypointIndex - 1].position : transform.position;
             float segLength = Vector3.Distance(prevPos, target.position);
             float frac = segLength > 0f ? 1f - (distance / segLength) : 0f;
@@ -325,9 +289,7 @@ public class Enemy : MonoBehaviour
     public void TakeDamage(float amount)
     {
         if (isDead || amount <= 0f) return;
-
         SpawnDamagePopup(amount);
-
         if (currentShield > 0f)
         {
             float absorbed = Mathf.Min(currentShield, amount);
@@ -335,15 +297,12 @@ public class Enemy : MonoBehaviour
             amount -= absorbed;
             UpdateShieldVisual();
         }
-
         if (amount > 0f) currentHP -= amount;
-
         if (!hpThresholdShieldUsed && data.shieldTriggerHPPercent > 0f && currentHP <= data.maxHP * data.shieldTriggerHPPercent)
         {
             hpThresholdShieldUsed = true;
             GrantShield(data.shieldTriggerAmount, data.shieldTriggerDuration);
         }
-
         if (healthBar != null) healthBar.Refresh(false);
         if (currentHP <= 0f) Die();
     }
@@ -353,10 +312,7 @@ public class Enemy : MonoBehaviour
         if (damagePopupPrefab == null) return null;
         Vector3 jitter = new Vector3(Random.Range(-0.3f, 0.3f), 0f, Random.Range(-0.3f, 0.3f));
         Vector3 pos = transform.position + damagePopupOffset + jitter;
-
-        return ObjectPool.Instance != null
-            ? ObjectPool.Instance.Get(damagePopupPrefab, pos, Quaternion.identity)
-            : Instantiate(damagePopupPrefab, pos, Quaternion.identity);
+        return ObjectPool.Instance != null ? ObjectPool.Instance.Get(damagePopupPrefab, pos, Quaternion.identity) : Instantiate(damagePopupPrefab, pos, Quaternion.identity);
     }
 
     private void SpawnDamagePopup(float amount)
@@ -383,24 +339,18 @@ public class Enemy : MonoBehaviour
         if (deathSound != null) AudioSource.PlayClipAtPoint(deathSound, transform.position);
         if (healthBar != null) healthBar.Hide();
         OnAnyEnemyDied?.Invoke(this);
-
         if (animator != null && !string.IsNullOrEmpty(dieTrigger))
         {
             animator.SetTrigger(dieTrigger);
             Invoke(nameof(ReleaseToPool), deathAnimDuration);
         }
-        else
-        {
-            ReleaseToPool();
-        }
+        else ReleaseToPool();
     }
 
     private void ReleaseToPool()
     {
-        if (ObjectPool.Instance != null)
-            ObjectPool.Instance.Release(gameObject);
-        else
-            Destroy(gameObject);
+        if (ObjectPool.Instance != null) ObjectPool.Instance.Release(gameObject);
+        else Destroy(gameObject);
     }
 
     private void ReachEnd()
@@ -409,10 +359,7 @@ public class Enemy : MonoBehaviour
         isDead = true;
         if (GameManager.Instance != null) GameManager.Instance.LoseLives(data.damageToPlayer);
         OnAnyEnemyReachedEnd?.Invoke(this);
-
-        if (ObjectPool.Instance != null)
-            ObjectPool.Instance.Release(gameObject);
-        else
-            Destroy(gameObject);
+        if (ObjectPool.Instance != null) ObjectPool.Instance.Release(gameObject);
+        else Destroy(gameObject);
     }
 }
