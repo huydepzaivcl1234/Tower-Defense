@@ -1,229 +1,283 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Procedural red dimensional portal used as the visual source of enemy spawns.
-/// Built entirely at runtime so no texture asset is required. Intended for URP.
+/// Procedural liquid dimensional portal used as the visual source of enemy spawns.
+/// The look is generated entirely by shader + particles in Unity; no portal texture is required.
 /// </summary>
 public class EnemySpawnPortal : MonoBehaviour
 {
-    [Header("Shape")]
+    [Header("Portal Shape")]
     [Min(0.5f)] public float radius = 2.4f;
-    [Range(2, 6)] public int ringCount = 4;
-    [Range(24, 96)] public int segments = 64;
-    [Range(0f, 0.35f)] public float distortion = 0.12f;
-    [Min(0.01f)] public float ringWidth = 0.11f;
+    [Range(0.8f, 1.8f)] public float verticalScale = 1.28f;
+    [Range(-0.2f, 0.2f)] public float visualDepthOffset = 0f;
 
-    [Header("Motion")]
-    public float rotationSpeed = 35f;
-    public float pulseSpeed = 2.4f;
-    [Range(0f, 0.35f)] public float pulseAmount = 0.10f;
+    [Header("Liquid Swirl")]
+    [Min(0f)] public float swirlSpeed = 1.2f;
+    [Range(1f, 10f)] public float swirlStrength = 5.5f;
+    [Range(0f, 0.2f)] public float edgeWobble = 0.075f;
+    [Range(0.1f, 8f)] public float emissionStrength = 2.2f;
 
-    [Header("Color / Glow")]
-    [ColorUsage(true, true)] public Color outerColor = new Color(5.5f, 0.05f, 0.02f, 1f);
-    [ColorUsage(true, true)] public Color innerColor = new Color(10f, 0.15f, 0.04f, 1f);
-    [Min(0f)] public float lightIntensity = 5f;
+    [Header("Reference Green Style")]
+    [Tooltip("Keeps the portal palette close to the bright green liquid-vortex reference. Disable this to customize the four colors below.")]
+    public bool useReferenceGreenPreset = true;
+    [ColorUsage(true, true)] public Color outerColor = new Color(0.34f, 4.8f, 0.015f, 1f);
+    [ColorUsage(true, true)] public Color midColor = new Color(0.025f, 1.65f, 0.01f, 1f);
+    [ColorUsage(true, true)] public Color darkCenterColor = new Color(0.002f, 0.12f, 0.006f, 1f);
+    [ColorUsage(true, true)] public Color highlightColor = new Color(2.8f, 7.0f, 0.65f, 1f);
+
+    [Header("Glow Light")]
+    [Min(0f)] public float lightIntensity = 4.5f;
     [Min(0.1f)] public float lightRange = 8f;
 
-    [Header("Particles")]
-    [Range(0, 120)] public int particlesPerSecond = 32;
-    [Min(0.1f)] public float particleLifetime = 0.7f;
-    [Min(0.01f)] public float particleSize = 0.09f;
+    [Header("Edge Specks")]
+    [Range(0, 100)] public int particlesPerSecond = 20;
+    [Min(0.1f)] public float particleLifetime = 0.65f;
+    [Min(0.01f)] public float particleSize = 0.075f;
 
-    private readonly List<Transform> ringRoots = new List<Transform>();
-    private readonly List<LineRenderer> rings = new List<LineRenderer>();
-    private Material ringMaterial;
+    private const string GeneratedRootName = "GeneratedPortalVisual";
+    private Renderer portalRenderer;
+    private Material portalMaterial;
+    private Material particleMaterial;
     private Light portalLight;
-    private Transform core;
+    private ParticleSystem portalParticles;
 
     private void Awake()
     {
+        ApplyReferencePresetIfEnabled();
         BuildIfNeeded();
+        ApplyVisualSettings();
     }
 
     private void OnEnable()
     {
         BuildIfNeeded();
+        ApplyVisualSettings();
     }
 
     private void Update()
     {
-        if (rings.Count == 0) return;
-
-        float now = Time.unscaledTime;
-        for (int i = 0; i < ringRoots.Count; i++)
-        {
-            Transform ring = ringRoots[i];
-            if (ring == null) continue;
-            float dir = (i & 1) == 0 ? 1f : -1f;
-            ring.localRotation = Quaternion.Euler(0f, 0f, now * rotationSpeed * dir * (1f + i * 0.22f));
-
-            LineRenderer lr = rings[i];
-            if (lr != null)
-            {
-                float pulse = 1f + Mathf.Sin(now * pulseSpeed + i * 1.37f) * pulseAmount;
-                lr.widthMultiplier = ringWidth * pulse * (1f - i * 0.08f);
-            }
-        }
-
-        if (core != null)
-        {
-            float s = 1f + Mathf.Sin(now * pulseSpeed * 0.85f) * pulseAmount * 0.45f;
-            core.localScale = new Vector3(radius * 1.15f * s, radius * 1.15f * s, 1f);
-        }
-
         if (portalLight != null)
-            portalLight.intensity = lightIntensity * (0.88f + 0.12f * Mathf.Sin(now * pulseSpeed));
+        {
+            float pulse = 0.92f + Mathf.Sin(Time.unscaledTime * Mathf.Max(0.1f, swirlSpeed) * 2.2f) * 0.08f;
+            portalLight.intensity = lightIntensity * pulse;
+        }
+    }
+
+    private void OnValidate()
+    {
+        ApplyReferencePresetIfEnabled();
+        if (!Application.isPlaying)
+            ApplyVisualSettings();
+    }
+
+    [ContextMenu("Apply Green Liquid Reference Preset")]
+    public void ApplyGreenReferencePreset()
+    {
+        useReferenceGreenPreset = true;
+        ApplyReferencePresetIfEnabled();
+        ApplyVisualSettings();
     }
 
     [ContextMenu("Rebuild Portal Visual")]
     public void Rebuild()
     {
         ClearGeneratedChildren();
-        ringRoots.Clear();
-        rings.Clear();
+        portalRenderer = null;
+        portalLight = null;
+        portalParticles = null;
         BuildIfNeeded();
+        ApplyVisualSettings();
+    }
+
+    private void ApplyReferencePresetIfEnabled()
+    {
+        if (!useReferenceGreenPreset) return;
+
+        outerColor = new Color(0.34f, 4.8f, 0.015f, 1f);
+        midColor = new Color(0.025f, 1.65f, 0.01f, 1f);
+        darkCenterColor = new Color(0.002f, 0.12f, 0.006f, 1f);
+        highlightColor = new Color(2.8f, 7.0f, 0.65f, 1f);
     }
 
     private void BuildIfNeeded()
     {
-        Transform existing = transform.Find("GeneratedPortalVisual");
-        if (existing != null && rings.Count > 0) return;
-        if (existing != null) Destroy(existing.gameObject);
+        Transform existing = transform.Find(GeneratedRootName);
+        if (existing != null)
+        {
+            if (portalRenderer == null)
+                portalRenderer = existing.GetComponentInChildren<MeshRenderer>(true);
+            if (portalParticles == null)
+                portalParticles = existing.GetComponentInChildren<ParticleSystem>(true);
+            if (portalLight == null)
+                portalLight = existing.GetComponentInChildren<Light>(true);
 
-        GameObject visual = new GameObject("GeneratedPortalVisual");
+            if (portalRenderer != null)
+            {
+                portalMaterial = portalRenderer.material;
+                return;
+            }
+        }
+
+        if (existing != null)
+        {
+            if (Application.isPlaying) Destroy(existing.gameObject);
+            else DestroyImmediate(existing.gameObject);
+        }
+
+        GameObject visual = new GameObject(GeneratedRootName);
         visual.transform.SetParent(transform, false);
+        visual.transform.localPosition = new Vector3(0f, 0f, visualDepthOffset);
 
-        EnsureMaterial();
-        CreateCore(visual.transform);
-
-        int actualRings = Mathf.Clamp(ringCount, 2, 6);
-        for (int i = 0; i < actualRings; i++)
-            CreateEnergyRing(visual.transform, i, actualRings);
-
+        CreatePortalSurface(visual.transform);
         CreateParticles(visual.transform);
         CreateLight(visual.transform);
     }
 
-    private void EnsureMaterial()
-    {
-        if (ringMaterial != null) return;
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Sprites/Default");
-        ringMaterial = new Material(shader) { name = "Runtime_RedSpawnPortal" };
-        if (ringMaterial.HasProperty("_BaseColor")) ringMaterial.SetColor("_BaseColor", innerColor);
-        if (ringMaterial.HasProperty("_Color")) ringMaterial.SetColor("_Color", innerColor);
-    }
-
-    private void CreateCore(Transform parent)
+    private void CreatePortalSurface(Transform parent)
     {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        go.name = "PortalCore";
+        go.name = "LiquidSwirlSurface";
         go.transform.SetParent(parent, false);
         go.transform.localPosition = Vector3.zero;
-        go.transform.localScale = new Vector3(radius * 1.15f, radius * 1.15f, 1f);
-        Destroy(go.GetComponent<Collider>());
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale = new Vector3(radius * 2f, radius * 2f * verticalScale, 1f);
 
-        Renderer renderer = go.GetComponent<Renderer>();
-        Material mat = new Material(ringMaterial) { name = "Runtime_RedPortalCore" };
-        Color coreColor = new Color(innerColor.r * 0.16f, innerColor.g * 0.06f, innerColor.b * 0.04f, 1f);
-        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", coreColor);
-        if (mat.HasProperty("_Color")) mat.SetColor("_Color", coreColor);
-        renderer.material = mat;
-        core = go.transform;
-    }
-
-    private void CreateEnergyRing(Transform parent, int index, int total)
-    {
-        GameObject root = new GameObject("EnergyRing_" + (index + 1));
-        root.transform.SetParent(parent, false);
-        root.transform.localPosition = new Vector3(0f, 0f, -0.015f * index);
-
-        LineRenderer lr = root.AddComponent<LineRenderer>();
-        lr.useWorldSpace = false;
-        lr.loop = true;
-        lr.positionCount = Mathf.Max(24, segments);
-        lr.material = new Material(ringMaterial);
-        lr.textureMode = LineTextureMode.Stretch;
-        lr.numCornerVertices = 2;
-        lr.numCapVertices = 2;
-        lr.alignment = LineAlignment.TransformZ;
-
-        float tIndex = total <= 1 ? 0f : index / (float)(total - 1);
-        float baseRadius = radius * Mathf.Lerp(1.03f, 0.58f, tIndex);
-        lr.startColor = Color.Lerp(outerColor, innerColor, tIndex);
-        lr.endColor = lr.startColor;
-        lr.widthMultiplier = ringWidth * (1f - index * 0.08f);
-
-        int count = lr.positionCount;
-        float phase = index * 1.731f;
-        for (int i = 0; i < count; i++)
+        Collider col = go.GetComponent<Collider>();
+        if (col != null)
         {
-            float a = i / (float)count * Mathf.PI * 2f;
-            float wobble = 1f
-                + Mathf.Sin(a * (5 + index) + phase) * distortion
-                + Mathf.Sin(a * 9f - phase * 0.6f) * distortion * 0.35f;
-            float r = baseRadius * wobble;
-            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0f));
+            if (Application.isPlaying) Destroy(col);
+            else DestroyImmediate(col);
         }
 
-        ringRoots.Add(root.transform);
-        rings.Add(lr);
+        portalRenderer = go.GetComponent<MeshRenderer>();
+        Shader shader = Shader.Find("TowerDefense/EnemySpawnPortalSwirl");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Unlit/Color");
+
+        portalMaterial = new Material(shader) { name = "Runtime_LiquidSpawnPortal" };
+        portalRenderer.sharedMaterial = portalMaterial;
     }
 
     private void CreateParticles(Transform parent)
     {
-        GameObject go = new GameObject("PortalSparks");
+        GameObject go = new GameObject("PortalEdgeSpecks");
         go.transform.SetParent(parent, false);
-        ParticleSystem ps = go.AddComponent<ParticleSystem>();
-        ParticleSystem.MainModule main = ps.main;
+        go.transform.localPosition = Vector3.zero;
+
+        portalParticles = go.AddComponent<ParticleSystem>();
+        ParticleSystem.MainModule main = portalParticles.main;
         main.loop = true;
         main.playOnAwake = true;
         main.startLifetime = particleLifetime;
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.15f, 0.65f);
-        main.startSize = new ParticleSystem.MinMaxCurve(particleSize * 0.6f, particleSize * 1.4f);
-        main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.03f, 0.01f, 1f), new Color(1f, 0.32f, 0.02f, 1f));
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.04f, 0.16f);
+        main.startSize = new ParticleSystem.MinMaxCurve(particleSize * 0.55f, particleSize * 1.45f);
+        main.startColor = new ParticleSystem.MinMaxGradient(Color.white, new Color(0.72f, 1f, 0.15f, 1f));
         main.simulationSpace = ParticleSystemSimulationSpace.Local;
 
-        ParticleSystem.EmissionModule emission = ps.emission;
+        ParticleSystem.EmissionModule emission = portalParticles.emission;
         emission.rateOverTime = particlesPerSecond;
 
-        ParticleSystem.ShapeModule shape = ps.shape;
+        ParticleSystem.ShapeModule shape = portalParticles.shape;
         shape.shapeType = ParticleSystemShapeType.Circle;
-        shape.radius = radius;
+        shape.radius = radius * 0.92f;
         shape.radiusThickness = 0.15f;
-        shape.rotation = Vector3.zero;
+        shape.scale = new Vector3(1f, verticalScale, 1f);
 
-        ParticleSystem.VelocityOverLifetimeModule velocity = ps.velocityOverLifetime;
+        ParticleSystem.VelocityOverLifetimeModule velocity = portalParticles.velocityOverLifetime;
         velocity.enabled = true;
-
-        // Unity requires orbital X/Y/Z curves to use the same MinMaxCurve mode.
-        // Keep all three in TwoConstants mode: X/Y stay at zero, Z provides the swirl.
+        // Unity requires all orbital axes to use the same MinMaxCurve mode.
         velocity.orbitalX = new ParticleSystem.MinMaxCurve(0f, 0f);
         velocity.orbitalY = new ParticleSystem.MinMaxCurve(0f, 0f);
-        velocity.orbitalZ = new ParticleSystem.MinMaxCurve(-1.2f, 1.2f);
-        velocity.radial = new ParticleSystem.MinMaxCurve(-0.35f, 0.15f);
+        velocity.orbitalZ = new ParticleSystem.MinMaxCurve(-0.55f, 0.55f);
+        velocity.radial = new ParticleSystem.MinMaxCurve(-0.05f, 0.04f);
 
-        ParticleSystemRenderer renderer = ps.GetComponent<ParticleSystemRenderer>();
-        renderer.material = new Material(ringMaterial);
+        ParticleSystemRenderer renderer = portalParticles.GetComponent<ParticleSystemRenderer>();
+        renderer.renderMode = ParticleSystemRenderMode.Billboard;
+
+        Shader particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        if (particleShader == null) particleShader = Shader.Find("Particles/Standard Unlit");
+        if (particleShader == null) particleShader = Shader.Find("Sprites/Default");
+
+        particleMaterial = new Material(particleShader) { name = "Runtime_PortalSpecks" };
+        if (particleMaterial.HasProperty("_BaseColor")) particleMaterial.SetColor("_BaseColor", Color.white);
+        if (particleMaterial.HasProperty("_Color")) particleMaterial.SetColor("_Color", Color.white);
+        renderer.sharedMaterial = particleMaterial;
     }
 
     private void CreateLight(Transform parent)
     {
         GameObject go = new GameObject("PortalLight");
         go.transform.SetParent(parent, false);
-        go.transform.localPosition = new Vector3(0f, 0f, 0.45f);
+        go.transform.localPosition = new Vector3(0f, 0f, 0.5f);
+
         portalLight = go.AddComponent<Light>();
         portalLight.type = LightType.Point;
-        portalLight.color = new Color(1f, 0.035f, 0.01f);
+        portalLight.color = new Color(0.22f, 1f, 0.025f);
         portalLight.range = lightRange;
         portalLight.intensity = lightIntensity;
         portalLight.shadows = LightShadows.None;
     }
 
+    private void ApplyVisualSettings()
+    {
+        Transform generated = transform.Find(GeneratedRootName);
+        if (generated != null)
+            generated.localPosition = new Vector3(0f, 0f, visualDepthOffset);
+
+        if (portalRenderer != null)
+            portalRenderer.transform.localScale = new Vector3(radius * 2f, radius * 2f * verticalScale, 1f);
+
+        if (portalMaterial != null)
+        {
+            SetColorIfPresent(portalMaterial, "_OuterColor", outerColor);
+            SetColorIfPresent(portalMaterial, "_MidColor", midColor);
+            SetColorIfPresent(portalMaterial, "_DarkColor", darkCenterColor);
+            SetColorIfPresent(portalMaterial, "_HighlightColor", highlightColor);
+            SetFloatIfPresent(portalMaterial, "_Speed", swirlSpeed);
+            SetFloatIfPresent(portalMaterial, "_SwirlStrength", swirlStrength);
+            SetFloatIfPresent(portalMaterial, "_EdgeWobble", edgeWobble);
+            SetFloatIfPresent(portalMaterial, "_EmissionStrength", emissionStrength);
+
+            // Fallback when the custom shader has not imported yet.
+            SetColorIfPresent(portalMaterial, "_BaseColor", midColor);
+            SetColorIfPresent(portalMaterial, "_Color", midColor);
+        }
+
+        if (portalParticles != null)
+        {
+            ParticleSystem.MainModule main = portalParticles.main;
+            main.startLifetime = particleLifetime;
+            main.startSize = new ParticleSystem.MinMaxCurve(particleSize * 0.55f, particleSize * 1.45f);
+
+            ParticleSystem.EmissionModule emission = portalParticles.emission;
+            emission.rateOverTime = particlesPerSecond;
+
+            ParticleSystem.ShapeModule shape = portalParticles.shape;
+            shape.radius = radius * 0.92f;
+            shape.scale = new Vector3(1f, verticalScale, 1f);
+        }
+
+        if (portalLight != null)
+        {
+            portalLight.color = Color.Lerp(new Color(0.10f, 0.75f, 0.01f), Color.green, 0.45f);
+            portalLight.range = lightRange;
+            portalLight.intensity = lightIntensity;
+        }
+    }
+
+    private static void SetColorIfPresent(Material mat, string property, Color value)
+    {
+        if (mat != null && mat.HasProperty(property)) mat.SetColor(property, value);
+    }
+
+    private static void SetFloatIfPresent(Material mat, string property, float value)
+    {
+        if (mat != null && mat.HasProperty(property)) mat.SetFloat(property, value);
+    }
+
     private void ClearGeneratedChildren()
     {
-        Transform child = transform.Find("GeneratedPortalVisual");
+        Transform child = transform.Find(GeneratedRootName);
         if (child == null) return;
         if (Application.isPlaying) Destroy(child.gameObject);
         else DestroyImmediate(child.gameObject);
