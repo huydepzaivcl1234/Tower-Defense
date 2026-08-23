@@ -67,7 +67,11 @@ public class TowerUpgradeUI : MonoBehaviour
 
         if (towerNameText != null) towerNameText.text = selectedTower.data.towerName;
         if (levelText != null) levelText.text = $"Level {selectedTower.CurrentLevelNumber}";
-        if (strengthText != null) strengthText.text = FormatDamagePreview(selectedTower.data, curDamage);
+
+        // Current Damage must show the tower's actual launch/base hit damage for THIS level only.
+        // Cannon Hero's travel-distance bonus is a projectile mechanic, not another tower level,
+        // so never render it as "520 -> 780" in the level stat row.
+        if (strengthText != null) strengthText.text = CompactNumber.Format(curDamage);
         if (attackSpeedText != null) attackSpeedText.text = $"{CompactNumber.Format(curSpeed)}/s";
         if (rangeText != null) rangeText.text = CompactNumber.Format(curRange);
 
@@ -82,7 +86,7 @@ public class TowerUpgradeUI : MonoBehaviour
 
             if (nextLevelRoot != null) nextLevelRoot.SetActive(true);
             if (nextLevelTitleText != null) nextLevelTitleText.text = $"NEXT LEVEL ({nextIndex + 1})";
-            if (nextStrengthText != null) nextStrengthText.text = FormatNextDamage(selectedTower.data, curDamage, nextDamage);
+            if (nextStrengthText != null) nextStrengthText.text = FormatNext(nextDamage, nextDamage - curDamage);
             if (nextAttackSpeedText != null) nextAttackSpeedText.text = FormatNext(nextSpeed, nextSpeed - curSpeed, "/s");
             if (nextRangeText != null) nextRangeText.text = FormatNext(nextRange, nextRange - curRange);
 
@@ -93,7 +97,12 @@ public class TowerUpgradeUI : MonoBehaviour
         }
         else
         {
+            // Max level: completely hide all next-level stat rows so no phantom level appears.
             if (nextLevelRoot != null) nextLevelRoot.SetActive(false);
+            if (nextLevelTitleText != null) nextLevelTitleText.text = string.Empty;
+            if (nextStrengthText != null) nextStrengthText.text = string.Empty;
+            if (nextAttackSpeedText != null) nextAttackSpeedText.text = string.Empty;
+            if (nextRangeText != null) nextRangeText.text = string.Empty;
             if (upgradeButtonLabel != null) upgradeButtonLabel.text = "MAX LEVEL";
             if (upgradeCostText != null) upgradeCostText.text = "-";
             if (upgradeButton != null) upgradeButton.interactable = false;
@@ -101,36 +110,8 @@ public class TowerUpgradeUI : MonoBehaviour
 
         if (sellButtonLabel != null) sellButtonLabel.text = $"SELL  {CompactNumber.Format(selectedTower.GetSellValue())}";
 
-        // IMPORTANT: use the exact effective range used by target acquisition.
-        // Cannon Hero's +flat range now updates the visible circle immediately after the relic is chosen.
         if (rangeIndicator != null)
             rangeIndicator.Show(selectedTower.transform.position, curRange, rangeColor);
-    }
-
-    private static string FormatDamagePreview(TowerData towerData, float launchDamage)
-    {
-        if (RelicManager.Instance == null || !RelicManager.Instance.IsCannonHeroTower(towerData))
-            return CompactNumber.Format(launchDamage);
-
-        float maxDamage = RelicManager.Instance.GetMaxProjectileDamage(towerData, launchDamage);
-        if (maxDamage <= launchDamage + 0.001f)
-            return CompactNumber.Format(launchDamage);
-
-        // Hero Cannon damage depends on projectile travel distance, so showing a single number is misleading.
-        // Display near-hit damage -> maximum travel-bonus damage.
-        return $"{CompactNumber.Format(launchDamage)} <color=#55E86A>→ {CompactNumber.Format(maxDamage)}</color>";
-    }
-
-    private static string FormatNextDamage(TowerData towerData, float currentDamage, float nextDamage)
-    {
-        float delta = nextDamage - currentDamage;
-        string sign = delta > 0.0001f ? "+" : string.Empty;
-
-        if (RelicManager.Instance == null || !RelicManager.Instance.IsCannonHeroTower(towerData))
-            return $"{CompactNumber.Format(nextDamage)}   <color=#55E86A>{sign}{CompactNumber.Format(delta)}</color>";
-
-        float nextMax = RelicManager.Instance.GetMaxProjectileDamage(towerData, nextDamage);
-        return $"{CompactNumber.Format(nextDamage)}→{CompactNumber.Format(nextMax)}   <color=#55E86A>{sign}{CompactNumber.Format(delta)}</color>";
     }
 
     private static string FormatNext(float value, float delta, string suffix = "")
@@ -166,7 +147,6 @@ public class TowerUpgradeUI : MonoBehaviour
 
     private void Update()
     {
-        // Keeps an already-open panel synchronized the same frame a relic changes stats.
         if (panelRoot != null && panelRoot.activeSelf && selectedTower != null) Refresh();
     }
 }
