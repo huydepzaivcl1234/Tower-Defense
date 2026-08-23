@@ -53,7 +53,7 @@ public static class RelicSystemSetupTool
         Selection.activeGameObject = manager.gameObject;
         AssetDatabase.SaveAssets();
         EditorUtility.DisplayDialog("Relic System",
-            "Setup complete.\n\nRelic cards now include a large Icon area above Name / Description / Stack.\nAssign a Sprite to each RelicData > Icon field and it will appear automatically at runtime.\n\nExisting Relic UI was upgraded in place.", "OK");
+            "Setup complete.\n\nRelic cards include Icon + Name + Description + Stack and automatically receive UIPunchButton feedback.\nExisting Relic UI was upgraded in place.", "OK");
     }
 
     [MenuItem("Tower Defense/Relics/Upgrade Existing Relic UI")]
@@ -70,7 +70,7 @@ public static class RelicSystemSetupTool
         EditorUtility.SetDirty(ui);
         AssetDatabase.SaveAssets();
         Selection.activeGameObject = ui.gameObject;
-        EditorUtility.DisplayDialog("Relic UI", "Existing relic cards upgraded with icon slots.", "OK");
+        EditorUtility.DisplayDialog("Relic UI", "Existing relic cards upgraded with icon slots and punch feedback.", "OK");
     }
 
     private static RelicData CreateRelic(string fileName, string displayName, string description,
@@ -139,12 +139,8 @@ public static class RelicSystemSetupTool
         img.color = new Color(0.08f, 0.10f, 0.14f, 0.98f);
         Button button = cardGO.AddComponent<Button>();
         button.targetGraphic = img;
-        ColorBlock colors = button.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
-        colors.pressedColor = new Color(0.82f, 0.88f, 1f, 1f);
-        colors.selectedColor = colors.highlightedColor;
-        button.colors = colors;
+        ConfigureButtonColors(button);
+        EnsurePunchFeedback(cardGO);
 
         Image icon = CreateIconArea(cardGO.transform);
 
@@ -188,10 +184,6 @@ public static class RelicSystemSetupTool
         return icon;
     }
 
-    /// <summary>
-    /// Upgrades the already-generated scene UI instead of requiring the user to delete/recreate it.
-    /// This is intentionally name-based because the existing tool generated predictable card child names.
-    /// </summary>
     private static void UpgradeExistingUI(RelicChoiceUI ui)
     {
         if (ui == null || ui.cards == null) return;
@@ -207,6 +199,8 @@ public static class RelicSystemSetupTool
             RectTransform cardRect = cardGO.GetComponent<RectTransform>();
             if (cardRect != null)
                 cardRect.sizeDelta = new Vector2(420, 590);
+
+            EnsurePunchFeedback(cardGO);
 
             Transform frameTransform = cardGO.transform.Find("IconFrame");
             Image icon;
@@ -254,17 +248,28 @@ public static class RelicSystemSetupTool
                 SetRect(card.stackText.rectTransform, new Vector2(0.5f, 0.10f), new Vector2(0.5f, 0.10f), new Vector2(300, 42), Vector2.zero);
             }
 
-            ColorBlock colors = card.button.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
-            colors.pressedColor = new Color(0.82f, 0.88f, 1f, 1f);
-            colors.selectedColor = colors.highlightedColor;
-            card.button.colors = colors;
-
+            ConfigureButtonColors(card.button);
             EditorUtility.SetDirty(cardGO);
         }
 
         EditorUtility.SetDirty(ui);
+    }
+
+    private static void EnsurePunchFeedback(GameObject go)
+    {
+        if (go == null || go.GetComponent<UIPunchButton>() != null) return;
+        Undo.AddComponent<UIPunchButton>(go);
+    }
+
+    private static void ConfigureButtonColors(Button button)
+    {
+        if (button == null) return;
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+        colors.pressedColor = new Color(0.82f, 0.88f, 1f, 1f);
+        colors.selectedColor = colors.highlightedColor;
+        button.colors = colors;
     }
 
     private static GameObject UIObject(string name, Transform parent)
