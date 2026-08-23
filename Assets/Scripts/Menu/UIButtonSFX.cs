@@ -8,7 +8,7 @@ using UnityEngine.UI;
 /// so AudioSettingsManager's SFX slider controls it automatically.
 /// </summary>
 [RequireComponent(typeof(Button))]
-public class UIButtonSFX : MonoBehaviour, IPointerClickHandler
+public class UIButtonSFX : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler
 {
     [Header("Click SFX")]
     public AudioClip clickClip;
@@ -62,6 +62,11 @@ public class UIButtonSFX : MonoBehaviour, IPointerClickHandler
     {
         if (eventData.button != PointerEventData.InputButton.Left) return;
         PlayClick();
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        PlayHover();
     }
 
     public void PlayClick()
