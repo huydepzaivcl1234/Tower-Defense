@@ -48,9 +48,9 @@ public class Tower : MonoBehaviour
     public bool IsMaxLevel => data == null || data.levels == null || currentLevelIndex >= data.levels.Length - 1;
     public TowerLevelStats CurrentStats => data.levels[Mathf.Clamp(currentLevelIndex, 0, data.levels.Length - 1)];
 
-    public float CurrentDamage => RelicManager.Instance != null ? RelicManager.Instance.ApplyDamage(CurrentStats.strength) : CurrentStats.strength;
+    public float CurrentDamage => RelicManager.Instance != null ? RelicManager.Instance.ApplyDamage(this, CurrentStats.strength) : CurrentStats.strength;
     public float CurrentAttackSpeed => RelicManager.Instance != null ? RelicManager.Instance.ApplyAttackSpeed(CurrentStats.attackSpeed) : CurrentStats.attackSpeed;
-    public float CurrentRange => RelicManager.Instance != null ? RelicManager.Instance.ApplyRange(CurrentStats.range) : CurrentStats.range;
+    public float CurrentRange => RelicManager.Instance != null ? RelicManager.Instance.ApplyRange(this, CurrentStats.range) : CurrentStats.range;
 
     private void Awake()
     {
@@ -165,7 +165,7 @@ public class Tower : MonoBehaviour
             ? ObjectPool.Instance.Get(data.projectilePrefab, spawnPos, Quaternion.identity)
             : Instantiate(data.projectilePrefab, spawnPos, Quaternion.identity);
         Projectile proj = projGO.GetComponent<Projectile>();
-        if (proj != null) proj.Launch(currentTarget, CurrentStats, CurrentDamage);
+        if (proj != null) proj.Launch(currentTarget, CurrentStats, CurrentDamage, data);
     }
 
     public bool CanUpgrade() => !IsMaxLevel;
