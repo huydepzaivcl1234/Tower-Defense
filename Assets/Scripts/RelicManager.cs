@@ -3,8 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// Owns the current run's relic state. Relics are permanent until the scene/run is restarted.
-/// Supports normal between-wave choices plus world-drop rewards that are queued and opened only
-/// when the player presses the Relic Available notification.
+/// Supports normal between-wave choices plus world-drop rewards and advanced data-driven relic effects.
 /// </summary>
 public class RelicManager : MonoBehaviour
 {
@@ -13,7 +12,6 @@ public class RelicManager : MonoBehaviour
     [Header("Timing")]
     [Min(1)] public int wavesPerChoice = 3;
     [Range(1, 5)] public int choicesPerRoll = 3;
-    [Tooltip("Do not offer a relic after the final wave because the run is already over.")]
     public bool skipAfterFinalWave = true;
 
     [Header("Pool")]
@@ -24,9 +22,7 @@ public class RelicManager : MonoBehaviour
     public RelicRewardNotificationUI rewardNotificationUI;
 
     [Header("World Drop")]
-    [Tooltip("Optional custom prefab for relic drops. Leave empty to use the built-in glowing orb fallback.")]
     public GameObject relicDropPrefab;
-    [Tooltip("Vertical offset above the enemy death position.")]
     public float relicDropHeight = 0.65f;
 
     private readonly Dictionary<RelicData, int> stacks = new Dictionary<RelicData, int>();
@@ -40,6 +36,24 @@ public class RelicManager : MonoBehaviour
     private float goldGainPercent;
     private float buildCostDiscountPercent;
     private float upgradeCostDiscountPercent;
+    private float relicDropChanceFlat;
+    private float critChance;
+    private float critExtraDamageMultiplier;
+    private float projectileSpeedPercent;
+
+    // Cannon Hero runtime state.
+    private bool cannonHeroActive;
+    private TowerData cannonHeroTower;
+    private bool cannonHeroPurchaseUsed;
+    private float cannonHeroRangeFlat;
+    private float cannonHeroDamagePerLevel;
+    private float cannonHeroTravelPercentPerStep;
+    private float cannonHeroTravelDistancePerStep = 1f;
+    private float cannonHeroTravelBonusCap;
+
+    // New Born runtime state.
+    private float enemyWeakSpawnChance;
+    private float enemyWeakHpFraction = 1f;
 
     public bool IsChoosing => isChoosing;
     public int PendingRewardCount => queuedRewards.Count;
@@ -52,12 +66,7 @@ public class RelicManager : MonoBehaviour
     {
         public RelicRarity minimumRarity;
         public string title;
-
-        public QueuedRelicReward(RelicRarity rarity, string rewardTitle)
-        {
-            minimumRarity = rarity;
-            title = rewardTitle;
-        }
+        public QueuedRelicReward(RelicRarity rarity, string rewardTitle) { minimumRarity = rarity; title = rewardTitle; }
     }
 
     private void Awake()
@@ -66,10 +75,7 @@ public class RelicManager : MonoBehaviour
         Instance = this;
     }
 
-    private void Start()
-    {
-        RefreshRewardNotification();
-    }
+    private void Start() => RefreshRewardNotification();
 
     private void OnEnable()
     {
@@ -92,28 +98,17 @@ public class RelicManager : MonoBehaviour
     private void HandleWaveCleared()
     {
         if (isChoosing || WaveManager.Instance == null) return;
-
         int wave = WaveManager.Instance.CurrentWaveNumber;
         if (wave <= 0 || wave % Mathf.Max(1, wavesPerChoice) != 0) return;
         if (skipAfterFinalWave && wave >= WaveManager.Instance.TotalWaves) return;
-
         OpenChoice();
     }
 
-    /// <summary>Normal scheduled relic choice. Opens immediately, preserving the existing system.</summary>
-    public void OpenChoice()
-    {
-        OpenChoiceInternal(RelicRarity.Common, "CHOOSE A RELIC", false);
-    }
+    public void OpenChoice() => OpenChoiceInternal(RelicRarity.Common, "CHOOSE A RELIC", false);
 
-    /// <summary>
-    /// Called when the player hovers a world relic drop. The reward is collected instantly but the
-    /// choice panel does NOT interrupt gameplay; instead a notification button becomes available.
-    /// </summary>
     public void QueueDroppedReward(RelicRarity minimumRarity, bool bossReward)
     {
-        string title = bossReward ? "CHOOSE A BOSS RELIC" : "CHOOSE A RELIC";
-        queuedRewards.Enqueue(new QueuedRelicReward(minimumRarity, title));
+        queuedRewards.Enqueue(new QueuedRelicReward(minimumRarity, bossReward ? "CHOOSE A BOSS RELIC" : "CHOOSE A RELIC"));
         RefreshRewardNotification();
     }
 
@@ -129,8 +124,7 @@ public class RelicManager : MonoBehaviour
         List<RelicData> rolled = RollChoices(choicesPerRoll, minimumRarity);
         if (rolled.Count == 0)
         {
-            if (fromQueue && queuedRewards.Count > 0)
-                queuedRewards.Dequeue();
+            if (fromQueue && queuedRewards.Count > 0) queuedRewards.Dequeue();
             RefreshRewardNotification();
             Debug.LogWarning($"No available relics could be rolled for minimum rarity {minimumRarity}.");
             return;
@@ -138,34 +132,26 @@ public class RelicManager : MonoBehaviour
 
         isChoosing = true;
         activeChoiceCameFromQueue = fromQueue;
-        if (choiceUI != null)
-            choiceUI.Show(rolled, title);
-        else
-            Debug.LogWarning("RelicManager rolled relics but no RelicChoiceUI is assigned.");
+        if (choiceUI != null) choiceUI.Show(rolled, title);
+        else Debug.LogWarning("RelicManager rolled relics but no RelicChoiceUI is assigned.");
     }
 
     public void ChooseRelic(RelicData relic)
     {
         if (!isChoosing || relic == null) return;
-
         ApplyRelic(relic);
         isChoosing = false;
         if (choiceUI != null) choiceUI.Hide();
-
-        if (activeChoiceCameFromQueue && queuedRewards.Count > 0)
-            queuedRewards.Dequeue();
-
+        if (activeChoiceCameFromQueue && queuedRewards.Count > 0) queuedRewards.Dequeue();
         activeChoiceCameFromQueue = false;
         RefreshRewardNotification();
     }
 
-    /// <summary>Handles both each enemy's normal chance and guaranteed boss rewards.</summary>
     public void TrySpawnEnemyRelicDrops(EnemyData enemyData, Vector3 deathPosition)
     {
         if (enemyData == null) return;
-
-        bool normalDrop = enemyData.relicDropChance > 0f && Random.value <= enemyData.relicDropChance;
-        if (normalDrop)
+        float chance = Mathf.Clamp01(enemyData.relicDropChance + relicDropChanceFlat);
+        if (chance > 0f && Random.value <= chance)
             SpawnWorldReward(deathPosition, enemyData.minimumDropRarity, false);
 
         if (enemyData.isBoss && enemyData.bossGuaranteedRelic)
@@ -176,7 +162,6 @@ public class RelicManager : MonoBehaviour
     {
         Vector3 spawnPos = position + Vector3.up * relicDropHeight;
         GameObject go;
-
         if (relicDropPrefab != null)
         {
             go = Instantiate(relicDropPrefab, spawnPos, Quaternion.identity);
@@ -187,20 +172,6 @@ public class RelicManager : MonoBehaviour
             go.name = bossReward ? "BossRelicDrop" : "RelicDrop";
             go.transform.position = spawnPos;
             go.transform.localScale = Vector3.one * (bossReward ? 0.85f : 0.62f);
-
-            Renderer renderer = go.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                Color color = GetRarityColor(minimumRarity);
-                Material material = renderer.material;
-                if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
-                else if (material.HasProperty("_Color")) material.color = color;
-                if (material.HasProperty("_EmissionColor"))
-                {
-                    material.EnableKeyword("_EMISSION");
-                    material.SetColor("_EmissionColor", color * 1.5f);
-                }
-            }
         }
 
         RelicDropPickup pickup = go.GetComponent<RelicDropPickup>();
@@ -222,15 +193,16 @@ public class RelicManager : MonoBehaviour
 
     private void RefreshRewardNotification()
     {
-        if (rewardNotificationUI != null)
-            rewardNotificationUI.SetPendingCount(queuedRewards.Count);
+        if (rewardNotificationUI != null) rewardNotificationUI.SetPendingCount(queuedRewards.Count);
     }
 
     private void ApplyRelic(RelicData relic)
     {
-        int currentStacks = GetStacks(relic);
-        if (currentStacks >= Mathf.Max(1, relic.maxStacks)) return;
-        stacks[relic] = currentStacks + 1;
+        int oldStacks = GetStacks(relic);
+        int maxStacks = Mathf.Max(1, relic.maxStacks);
+        if (oldStacks >= maxStacks) return;
+        int newStacks = oldStacks + 1;
+        stacks[relic] = newStacks;
 
         if (relic.modifiers == null) return;
         foreach (RelicModifier modifier in relic.modifiers)
@@ -238,25 +210,62 @@ public class RelicManager : MonoBehaviour
             if (modifier == null) continue;
             switch (modifier.effect)
             {
-                case RelicEffectType.TowerDamagePercent:
-                    towerDamagePercent += modifier.value;
+                case RelicEffectType.TowerDamagePercent: towerDamagePercent += modifier.value; break;
+                case RelicEffectType.TowerAttackSpeedPercent: towerAttackSpeedPercent += modifier.value; break;
+                case RelicEffectType.TowerRangePercent: towerRangePercent += modifier.value; break;
+                case RelicEffectType.GoldGainPercent: goldGainPercent += modifier.value; break;
+                case RelicEffectType.BuildCostDiscountPercent: buildCostDiscountPercent += modifier.value; break;
+                case RelicEffectType.UpgradeCostDiscountPercent: upgradeCostDiscountPercent += modifier.value; break;
+
+                case RelicEffectType.AddLivesFlat:
+                    if (GameManager.Instance != null) GameManager.Instance.AddLives(Mathf.RoundToInt(modifier.value));
                     break;
-                case RelicEffectType.TowerAttackSpeedPercent:
-                    towerAttackSpeedPercent += modifier.value;
+
+                case RelicEffectType.RelicDropChanceFlat:
+                    relicDropChanceFlat += modifier.value;
                     break;
-                case RelicEffectType.TowerRangePercent:
-                    towerRangePercent += modifier.value;
+
+                case RelicEffectType.CriticalChance:
+                    critChance = Mathf.Clamp01(critChance + modifier.value);
+                    critExtraDamageMultiplier = Mathf.Max(critExtraDamageMultiplier, modifier.value2);
                     break;
-                case RelicEffectType.GoldGainPercent:
-                    goldGainPercent += modifier.value;
+
+                case RelicEffectType.ProjectileSpeedPercent:
+                    projectileSpeedPercent += modifier.value;
                     break;
-                case RelicEffectType.BuildCostDiscountPercent:
-                    buildCostDiscountPercent += modifier.value;
+
+                case RelicEffectType.CannonHero:
+                    if (!cannonHeroActive)
+                    {
+                        cannonHeroActive = true;
+                        cannonHeroTower = modifier.targetTower;
+                        cannonHeroRangeFlat = modifier.value;
+                        cannonHeroDamagePerLevel = modifier.value2;
+                        cannonHeroTravelPercentPerStep = modifier.value3;
+                        cannonHeroTravelBonusCap = modifier.value4;
+                        cannonHeroTravelDistancePerStep = 1f;
+                        RemoveExistingTargetTowers(cannonHeroTower);
+                    }
                     break;
-                case RelicEffectType.UpgradeCostDiscountPercent:
-                    upgradeCostDiscountPercent += modifier.value;
+
+                case RelicEffectType.EnemySpawnWeakness:
+                    float t = maxStacks <= 1 ? 1f : (newStacks - 1f) / (maxStacks - 1f);
+                    enemyWeakSpawnChance = Mathf.Lerp(modifier.value, modifier.value2, t);
+                    enemyWeakHpFraction = Mathf.Lerp(modifier.value3, modifier.value4, t);
                     break;
             }
+        }
+    }
+
+    private void RemoveExistingTargetTowers(TowerData target)
+    {
+        if (target == null) return;
+        for (int i = Tower.ActiveTowers.Count - 1; i >= 0; i--)
+        {
+            Tower tower = Tower.ActiveTowers[i];
+            if (tower == null || tower.data != target) continue;
+            if (tower.occupiedSpot != null) tower.occupiedSpot.isOccupied = false;
+            Destroy(tower.gameObject);
         }
     }
 
@@ -269,19 +278,13 @@ public class RelicManager : MonoBehaviour
     private List<RelicData> RollChoices(int count, RelicRarity minimumRarity)
     {
         List<RelicData> candidates = BuildCandidates(minimumRarity);
-
-        // Safety fallback: if the project has not assigned rarities yet, never lose a collected reward.
-        if (candidates.Count == 0 && minimumRarity > RelicRarity.Common)
-            candidates = BuildCandidates(RelicRarity.Common);
-
+        if (candidates.Count == 0 && minimumRarity > RelicRarity.Common) candidates = BuildCandidates(RelicRarity.Common);
         List<RelicData> result = new List<RelicData>();
         int targetCount = Mathf.Min(Mathf.Max(1, count), candidates.Count);
         while (result.Count < targetCount && candidates.Count > 0)
         {
             float totalWeight = 0f;
-            foreach (RelicData candidate in candidates)
-                totalWeight += Mathf.Max(0.01f, candidate.selectionWeight);
-
+            foreach (RelicData candidate in candidates) totalWeight += Mathf.Max(0.01f, candidate.selectionWeight);
             float roll = Random.value * totalWeight;
             int selectedIndex = candidates.Count - 1;
             for (int i = 0; i < candidates.Count; i++)
@@ -289,11 +292,9 @@ public class RelicManager : MonoBehaviour
                 roll -= Mathf.Max(0.01f, candidates[i].selectionWeight);
                 if (roll <= 0f) { selectedIndex = i; break; }
             }
-
             result.Add(candidates[selectedIndex]);
             candidates.RemoveAt(selectedIndex);
         }
-
         return result;
     }
 
@@ -302,8 +303,7 @@ public class RelicManager : MonoBehaviour
         List<RelicData> candidates = new List<RelicData>();
         foreach (RelicData relic in relicPool)
         {
-            if (relic == null) continue;
-            if (relic.rarity < minimumRarity) continue;
+            if (relic == null || relic.rarity < minimumRarity) continue;
             if (GetStacks(relic) >= Mathf.Max(1, relic.maxStacks)) continue;
             candidates.Add(relic);
         }
@@ -329,6 +329,81 @@ public class RelicManager : MonoBehaviour
     }
 
     public float ApplyDamage(float baseDamage) => baseDamage * TowerDamageMultiplier;
+
+    public float ApplyDamage(Tower tower, float baseDamage)
+    {
+        float damage = ApplyDamage(baseDamage) + GetDamageFromLives();
+        if (tower != null && cannonHeroActive && cannonHeroTower != null && tower.data == cannonHeroTower)
+            damage += cannonHeroDamagePerLevel * tower.CurrentLevelNumber;
+        return damage;
+    }
+
+    private float GetDamageFromLives()
+    {
+        if (GameManager.Instance == null) return 0f;
+        float total = 0f;
+        foreach (var pair in stacks)
+        {
+            RelicData relic = pair.Key;
+            int count = pair.Value;
+            if (relic == null || relic.modifiers == null) continue;
+            foreach (RelicModifier mod in relic.modifiers)
+            {
+                if (mod == null || mod.effect != RelicEffectType.DamagePerLives) continue;
+                float livesPerStep = Mathf.Max(1f, mod.value2);
+                total += Mathf.Floor(GameManager.Instance.CurrentLives / livesPerStep) * mod.value * count;
+            }
+        }
+        return total;
+    }
+
     public float ApplyAttackSpeed(float baseAttackSpeed) => baseAttackSpeed * TowerAttackSpeedMultiplier;
+
     public float ApplyRange(float baseRange) => baseRange * TowerRangeMultiplier;
+
+    public float ApplyRange(Tower tower, float baseRange)
+    {
+        float result = ApplyRange(baseRange);
+        if (tower != null && cannonHeroActive && cannonHeroTower != null && tower.data == cannonHeroTower)
+            result += cannonHeroRangeFlat;
+        return result;
+    }
+
+    public float ApplyProjectileSpeed(float baseSpeed)
+    {
+        return baseSpeed * Mathf.Max(0.01f, 1f + projectileSpeedPercent);
+    }
+
+    public float RollCriticalDamage(float damage)
+    {
+        if (critChance <= 0f || Random.value > Mathf.Clamp01(critChance)) return damage;
+        return damage * (1f + Mathf.Max(0f, critExtraDamageMultiplier));
+    }
+
+    public float ApplyProjectileTravelDamage(TowerData sourceTower, float damage, float distanceTravelled)
+    {
+        if (!cannonHeroActive || sourceTower == null || sourceTower != cannonHeroTower) return damage;
+        float stepDistance = Mathf.Max(0.01f, cannonHeroTravelDistancePerStep);
+        float steps = Mathf.Floor(Mathf.Max(0f, distanceTravelled) / stepDistance);
+        float bonus = Mathf.Min(cannonHeroTravelBonusCap, steps * cannonHeroTravelPercentPerStep);
+        return damage * (1f + Mathf.Max(0f, bonus));
+    }
+
+    public bool CanBuildTower(TowerData towerData)
+    {
+        if (!cannonHeroActive || cannonHeroTower == null || towerData != cannonHeroTower) return true;
+        return !cannonHeroPurchaseUsed;
+    }
+
+    public void NotifyTowerBuilt(TowerData towerData)
+    {
+        if (cannonHeroActive && cannonHeroTower != null && towerData == cannonHeroTower)
+            cannonHeroPurchaseUsed = true;
+    }
+
+    public float GetSpawnHpMultiplier()
+    {
+        if (enemyWeakSpawnChance <= 0f || Random.value > Mathf.Clamp01(enemyWeakSpawnChance)) return 1f;
+        return Mathf.Clamp(enemyWeakHpFraction, 0.01f, 1f);
+    }
 }
