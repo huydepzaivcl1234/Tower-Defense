@@ -3,11 +3,20 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Main-menu flow for the current gameplay scene. The game starts paused behind
-/// an opaque/semi-opaque menu and resumes only after Play is pressed.
+/// Main-menu flow for the current gameplay scene. Supports normal main-menu settings
+/// plus settings opened from active gameplay/pause without forcing the player back to main menu.
 /// </summary>
 public class MainMenuController : MonoBehaviour
 {
+    public static MainMenuController Instance { get; private set; }
+
+    private enum SettingsReturnTarget
+    {
+        MainMenu,
+        Gameplay,
+        PauseMenu
+    }
+
     [Header("Panels")]
     public GameObject mainPanel;
     public GameObject settingsPanel;
@@ -32,9 +41,23 @@ public class MainMenuController : MonoBehaviour
 
     private AudioSettingsManager audioSettings;
     private bool menuBlocksGameplay;
+    private bool gameplayStarted;
+    private SettingsReturnTarget settingsReturnTarget = SettingsReturnTarget.MainMenu;
+
+    public bool IsMainMenuVisible => mainPanel != null && mainPanel.activeSelf;
+    public bool IsSettingsVisible => settingsPanel != null && settingsPanel.activeSelf;
+    public bool IsAnyMenuVisible => IsMainMenuVisible || IsSettingsVisible;
+    public bool GameplayStarted => gameplayStarted;
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
         audioSettings = AudioSettingsManager.Instance;
         if (audioSettings == null)
             audioSettings = Object.FindFirstObjectByType<AudioSettingsManager>(FindObjectsInactive.Include);
@@ -56,35 +79,61 @@ public class MainMenuController : MonoBehaviour
         if (showMenuOnSceneStart)
             ShowMainMenu();
         else
+        {
+            gameplayStarted = true;
+            menuBlocksGameplay = false;
             HideAllMenus();
+        }
     }
 
     private void LateUpdate()
     {
-        // Prevent GameSpeedController or another system from unpausing gameplay
-        // while either main menu panel is still open.
+        // Main menu/settings are modal. GameSpeedController must not be able to unpause behind them.
         if (menuBlocksGameplay && Time.timeScale != 0f)
             Time.timeScale = 0f;
     }
 
     public void ShowMainMenu()
     {
+        gameplayStarted = false;
+        settingsReturnTarget = SettingsReturnTarget.MainMenu;
         menuBlocksGameplay = true;
         Time.timeScale = 0f;
-        if (mainPanel != null) mainPanel.SetActive(true);
+
         if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(true);
     }
 
     public void PlayGame()
     {
+        gameplayStarted = true;
+        settingsReturnTarget = SettingsReturnTarget.Gameplay;
         menuBlocksGameplay = false;
         HideAllMenus();
-        Time.timeScale = Mathf.Max(0.01f, gameplayTimeScale);
+        RestoreGameplaySpeed();
     }
 
     public void OpenSettings()
     {
+        settingsReturnTarget = SettingsReturnTarget.MainMenu;
+        OpenSettingsInternal();
+    }
+
+    /// <summary>
+    /// Opens the existing Settings panel from gameplay. Back returns either to the pause menu
+    /// or straight to gameplay depending on where the gear button was pressed.
+    /// </summary>
+    public void OpenSettingsFromGameplay(bool returnToPauseMenu)
+    {
+        if (!gameplayStarted) return;
+        settingsReturnTarget = returnToPauseMenu ? SettingsReturnTarget.PauseMenu : SettingsReturnTarget.Gameplay;
+        OpenSettingsInternal();
+    }
+
+    private void OpenSettingsInternal()
+    {
         menuBlocksGameplay = true;
+        Time.timeScale = 0f;
         SyncAudioUI();
         if (mainPanel != null) mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(true);
@@ -92,15 +141,54 @@ public class MainMenuController : MonoBehaviour
 
     public void CloseSettings()
     {
-        menuBlocksGameplay = true;
         if (settingsPanel != null) settingsPanel.SetActive(false);
-        if (mainPanel != null) mainPanel.SetActive(true);
+
+        switch (settingsReturnTarget)
+        {
+            case SettingsReturnTarget.PauseMenu:
+                menuBlocksGameplay = false;
+                if (PauseMenuController.Instance != null)
+                    PauseMenuController.Instance.ReturnFromSettingsToPause();
+                else
+                    ShowMainMenu();
+                break;
+
+            case SettingsReturnTarget.Gameplay:
+                menuBlocksGameplay = false;
+                if (PauseMenuController.Instance != null)
+                    PauseMenuController.Instance.ReturnFromSettingsToGameplay();
+                else
+                    RestoreGameplaySpeed();
+                break;
+
+            default:
+                menuBlocksGameplay = true;
+                if (mainPanel != null) mainPanel.SetActive(true);
+                Time.timeScale = 0f;
+                break;
+        }
+    }
+
+    public void ReturnToMainMenuFromGameplay()
+    {
+        ShowMainMenu();
     }
 
     private void HideAllMenus()
     {
         if (mainPanel != null) mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
+    }
+
+    public void RestoreGameplaySpeed()
+    {
+        if (!gameplayStarted) return;
+
+        int multiplier = GameSpeedController.Instance != null
+            ? GameSpeedController.Instance.CurrentMultiplier
+            : Mathf.Max(1, Mathf.RoundToInt(gameplayTimeScale));
+
+        Time.timeScale = Mathf.Clamp(multiplier, 1, 3);
     }
 
     private void SyncAudioUI()
