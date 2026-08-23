@@ -41,7 +41,6 @@ public class RelicManager : MonoBehaviour
     private float critExtraDamageMultiplier;
     private float projectileSpeedPercent;
 
-    // Cannon Hero runtime state.
     private bool cannonHeroActive;
     private TowerData cannonHeroTower;
     private bool cannonHeroPurchaseUsed;
@@ -51,7 +50,6 @@ public class RelicManager : MonoBehaviour
     private float cannonHeroTravelDistancePerStep = 1f;
     private float cannonHeroTravelBonusCap;
 
-    // New Born runtime state.
     private float enemyWeakSpawnChance;
     private float enemyWeakHpFraction = 1f;
 
@@ -129,7 +127,6 @@ public class RelicManager : MonoBehaviour
             Debug.LogWarning($"No available relics could be rolled for minimum rarity {minimumRarity}.");
             return;
         }
-
         isChoosing = true;
         activeChoiceCameFromQueue = fromQueue;
         if (choiceUI != null) choiceUI.Show(rolled, title);
@@ -153,7 +150,6 @@ public class RelicManager : MonoBehaviour
         float chance = Mathf.Clamp01(enemyData.relicDropChance + relicDropChanceFlat);
         if (chance > 0f && Random.value <= chance)
             SpawnWorldReward(deathPosition, enemyData.minimumDropRarity, false);
-
         if (enemyData.isBoss && enemyData.bossGuaranteedRelic)
             SpawnWorldReward(deathPosition + new Vector3(0.45f, 0f, 0.15f), enemyData.bossGuaranteedMinimumRarity, true);
     }
@@ -162,10 +158,7 @@ public class RelicManager : MonoBehaviour
     {
         Vector3 spawnPos = position + Vector3.up * relicDropHeight;
         GameObject go;
-        if (relicDropPrefab != null)
-        {
-            go = Instantiate(relicDropPrefab, spawnPos, Quaternion.identity);
-        }
+        if (relicDropPrefab != null) go = Instantiate(relicDropPrefab, spawnPos, Quaternion.identity);
         else
         {
             go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -173,7 +166,6 @@ public class RelicManager : MonoBehaviour
             go.transform.position = spawnPos;
             go.transform.localScale = Vector3.one * (bossReward ? 0.85f : 0.62f);
         }
-
         RelicDropPickup pickup = go.GetComponent<RelicDropPickup>();
         if (pickup == null) pickup = go.AddComponent<RelicDropPickup>();
         pickup.Configure(minimumRarity, bossReward);
@@ -216,24 +208,19 @@ public class RelicManager : MonoBehaviour
                 case RelicEffectType.GoldGainPercent: goldGainPercent += modifier.value; break;
                 case RelicEffectType.BuildCostDiscountPercent: buildCostDiscountPercent += modifier.value; break;
                 case RelicEffectType.UpgradeCostDiscountPercent: upgradeCostDiscountPercent += modifier.value; break;
-
                 case RelicEffectType.AddLivesFlat:
                     if (GameManager.Instance != null) GameManager.Instance.AddLives(Mathf.RoundToInt(modifier.value));
                     break;
-
                 case RelicEffectType.RelicDropChanceFlat:
                     relicDropChanceFlat += modifier.value;
                     break;
-
                 case RelicEffectType.CriticalChance:
                     critChance = Mathf.Clamp01(critChance + modifier.value);
                     critExtraDamageMultiplier = Mathf.Max(critExtraDamageMultiplier, modifier.value2);
                     break;
-
                 case RelicEffectType.ProjectileSpeedPercent:
                     projectileSpeedPercent += modifier.value;
                     break;
-
                 case RelicEffectType.CannonHero:
                     if (!cannonHeroActive)
                     {
@@ -247,7 +234,6 @@ public class RelicManager : MonoBehaviour
                         RemoveExistingTargetTowers(cannonHeroTower);
                     }
                     break;
-
                 case RelicEffectType.EnemySpawnWeakness:
                     float t = maxStacks <= 1 ? 1f : (newStacks - 1f) / (maxStacks - 1f);
                     enemyWeakSpawnChance = Mathf.Lerp(modifier.value, modifier.value2, t);
@@ -264,7 +250,7 @@ public class RelicManager : MonoBehaviour
         {
             Tower tower = Tower.ActiveTowers[i];
             if (tower == null || tower.data != target) continue;
-            if (tower.occupiedSpot != null) tower.occupiedSpot.isOccupied = false;
+            if (tower.occupiedSpot != null) tower.occupiedSpot.ClearSpot();
             Destroy(tower.gameObject);
         }
     }
@@ -358,7 +344,6 @@ public class RelicManager : MonoBehaviour
     }
 
     public float ApplyAttackSpeed(float baseAttackSpeed) => baseAttackSpeed * TowerAttackSpeedMultiplier;
-
     public float ApplyRange(float baseRange) => baseRange * TowerRangeMultiplier;
 
     public float ApplyRange(Tower tower, float baseRange)
@@ -369,10 +354,7 @@ public class RelicManager : MonoBehaviour
         return result;
     }
 
-    public float ApplyProjectileSpeed(float baseSpeed)
-    {
-        return baseSpeed * Mathf.Max(0.01f, 1f + projectileSpeedPercent);
-    }
+    public float ApplyProjectileSpeed(float baseSpeed) => baseSpeed * Mathf.Max(0.01f, 1f + projectileSpeedPercent);
 
     public float RollCriticalDamage(float damage)
     {
