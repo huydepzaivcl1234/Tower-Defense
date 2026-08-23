@@ -49,6 +49,11 @@ public class TowerPlacementManager : MonoBehaviour
     public void SelectTowerToBuild(TowerData data)
     {
         if (data == null || data.towerPrefab == null) return;
+        if (RelicManager.Instance != null && !RelicManager.Instance.CanBuildTower(data))
+        {
+            CancelPlacement();
+            return;
+        }
         CancelPlacement();
         selectedTowerData = data;
         SpawnGhost();
@@ -83,7 +88,8 @@ public class TowerPlacementManager : MonoBehaviour
             ghostInstance.transform.position = currentGhostPosition;
             ghostInstance.SetActive(true);
 
-            currentPositionValid = (path == null || !path.IsTooCloseToPath(hit.point)) && !IsTooCloseToOtherTowers(hit.point);
+            bool relicAllowsBuild = RelicManager.Instance == null || RelicManager.Instance.CanBuildTower(selectedTowerData);
+            currentPositionValid = relicAllowsBuild && (path == null || !path.IsTooCloseToPath(hit.point)) && !IsTooCloseToOtherTowers(hit.point);
             Color tint = currentPositionValid ? validColor : invalidColor;
             ApplyGhostTint(tint);
 
@@ -122,15 +128,26 @@ public class TowerPlacementManager : MonoBehaviour
 
     private void ConfirmPlacement()
     {
+        if (selectedTowerData == null) return;
+        if (RelicManager.Instance != null && !RelicManager.Instance.CanBuildTower(selectedTowerData))
+        {
+            CancelPlacement();
+            return;
+        }
+
         int cost = GetSelectedBuildCost();
         if (GameManager.Instance == null || !GameManager.Instance.SpendGold(cost)) return;
 
         GameObject go = Instantiate(selectedTowerData.towerPrefab, currentGhostPosition, Quaternion.identity);
         Tower tower = go.GetComponent<Tower>();
         if (tower != null) tower.data = selectedTowerData;
+        RelicManager.Instance?.NotifyTowerBuilt(selectedTowerData);
 
         Destroy(ghostInstance);
-        SpawnGhost();
+        if (RelicManager.Instance == null || RelicManager.Instance.CanBuildTower(selectedTowerData))
+            SpawnGhost();
+        else
+            CancelPlacement();
     }
 
     private bool IsTooCloseToOtherTowers(Vector3 point)
