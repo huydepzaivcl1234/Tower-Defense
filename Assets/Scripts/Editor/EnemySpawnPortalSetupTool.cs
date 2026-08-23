@@ -11,8 +11,14 @@ public static class EnemySpawnPortalSetupTool
         EnemySpawnPortal existing = Object.FindFirstObjectByType<EnemySpawnPortal>(FindObjectsInactive.Include);
         if (existing != null)
         {
+            existing.ApplyGreenReferencePreset();
+            existing.Rebuild();
+            EditorUtility.SetDirty(existing);
             Selection.activeGameObject = existing.gameObject;
-            EditorUtility.DisplayDialog("Enemy Spawn Portal", "An EnemySpawnPortal already exists. No duplicate was created.", "OK");
+            EditorUtility.DisplayDialog(
+                "Enemy Spawn Portal",
+                "Existing EnemySpawnPortal found and upgraded to the procedural green liquid-swirl style. No duplicate was created.",
+                "OK");
             return;
         }
 
@@ -44,18 +50,19 @@ public static class EnemySpawnPortalSetupTool
 
         EnemySpawnPortal portal = Undo.AddComponent<EnemySpawnPortal>(portalGO);
         portal.radius = 2.4f;
-        portal.ringCount = 4;
-        portal.segments = 64;
-        portal.distortion = 0.12f;
-        portal.ringWidth = 0.11f;
-        portal.rotationSpeed = 35f;
-        portal.pulseSpeed = 2.4f;
-        portal.pulseAmount = 0.10f;
-        portal.outerColor = new Color(5.5f, 0.05f, 0.02f, 1f);
-        portal.innerColor = new Color(10f, 0.15f, 0.04f, 1f);
-        portal.lightIntensity = 5f;
+        portal.verticalScale = 1.28f;
+        portal.swirlSpeed = 1.2f;
+        portal.swirlStrength = 5.5f;
+        portal.edgeWobble = 0.075f;
+        portal.emissionStrength = 2.2f;
+        portal.useReferenceGreenPreset = true;
+        portal.lightIntensity = 4.5f;
         portal.lightRange = 8f;
-        portal.particlesPerSecond = 32;
+        portal.particlesPerSecond = 20;
+        portal.particleLifetime = 0.65f;
+        portal.particleSize = 0.075f;
+        portal.ApplyGreenReferencePreset();
+        portal.Rebuild();
 
         BuildExclusionZone exclusion = Undo.AddComponent<BuildExclusionZone>(portalGO);
         exclusion.radius = 3.2f;
@@ -67,9 +74,9 @@ public static class EnemySpawnPortalSetupTool
 
         EditorUtility.DisplayDialog(
             "Enemy Spawn Portal Ready",
-            "Created a red animated dimensional portal at the first enemy waypoint.\n\n" +
-            "Enemy spawning logic is unchanged: enemies still spawn exactly at waypoint 1, while the portal is the visual source.\n\n" +
-            "A 3.2m BuildExclusionZone was also added so towers cannot be placed through the portal.",
+            "Created a procedural green liquid-vortex portal at the first enemy waypoint.\n\n" +
+            "No portal image/texture is used: the swirl, irregular rim, glow and specks are generated in Unity.\n\n" +
+            "Enemy spawning logic is unchanged and the 3.2m no-build zone is preserved.",
             "OK");
     }
 }
