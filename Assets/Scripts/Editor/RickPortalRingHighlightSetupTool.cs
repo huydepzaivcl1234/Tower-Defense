@@ -49,7 +49,6 @@ public static class RickPortalRingHighlightSetupTool
         }
         else
         {
-            // Safe fallback: still lets the material be previewed while the user assigns the Blender mesh.
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             renderer.alignment = ParticleSystemRenderSpace.Local;
         }
@@ -83,6 +82,12 @@ public static class RickPortalRingHighlightSetupTool
     private static void ConfigureParticleSystem(ParticleSystem ps)
     {
         Undo.RecordObject(ps, "Configure Ring Highlight Particle System");
+
+        bool wasPlaying = ps.isPlaying;
+
+        // Unity does not allow MainModule.duration to be changed while the system is running.
+        // Stop + clear FIRST, then edit the module values, and restore play state afterwards.
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         ParticleSystem.MainModule main = ps.main;
         main.loop = true;
@@ -125,8 +130,9 @@ public static class RickPortalRingHighlightSetupTool
         ParticleSystem.RotationOverLifetimeModule rotation = ps.rotationOverLifetime;
         rotation.enabled = false;
 
-        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        ps.Play(true);
+        // In edit mode we want an immediate preview. In play mode, preserve the previous state.
+        if (!Application.isPlaying || wasPlaying)
+            ps.Play(true);
     }
 
     private static Material FindRingMaterial()
