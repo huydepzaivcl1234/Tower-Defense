@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52e9e2226e1a4fc48822f40891d89eda, type: 3}
+  m_Name: Big Cannon Tower 1
+  m_EditorClassIdentifier: Assembly-CSharp::TowerData
+  towerName: Big Cannon Tower
+  description: this shoot big iron ball
+  towerPrefab: {fileID: 6716806430476871344, guid: 22edf06a04a07904aa9293ee8f2768aa,
+    type: 3}
+  projectilePrefab: {fileID: 532332587456997213, guid: ac0aa5f111d8d22499f58ab0e9b77658,
+    type: 3}
+  buildCost: 1500
+  isGoldGenerator: 0
+  placementYOffset: 0
+  levels:
+  - strength: 2500
+    attackSpeed: 0.2
+    range: 6
+    upgradeCost: 2000
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 2
+    goldPerRound: 0
+  - strength: 3500
+    attackSpeed: 0.3
+    range: 6.5
+    upgradeCost: 2500
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 2
+    goldPerRound: 0
+  - strength: 4000
+    attackSpeed: 0.4
+    range: 7
+    upgradeCost: 3500
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 2
+    goldPerRound: 0
+  - strength: 4500
+    attackSpeed: 0.5
+    range: 7.5
+    upgradeCost: 5000
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 2
+    goldPerRound: 0

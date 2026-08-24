@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ebab7371b0f8b8549967753fa5d711f4, type: 3}
+  m_Name: CannonHero
+  m_EditorClassIdentifier: Assembly-CSharp::RelicData
+  relicName: Cannon Hero
+  description: Destroy existing Cannon towers (Big Cannon excluded). You may buy
+    only one Cannon for the rest of the run. That Cannon gains +10 range, +100 damage
+    per level, and +10% damage per distance step travelled up to +50%.
+  icon: {fileID: -186678098, guid: ca65e7e5566bcc741acfb613904edf0d, type: 3}
+  rarity: 1
+  selectionWeight: 0.45
+  maxStacks: 1
+  modifiers:
+  - effect: 11
+    value: 10
+    value2: 100
+    value3: 0.1
+    value4: 0.5
+    value5: 1
+    targetTower: {fileID: 11400000, guid: ebfcd7444100a7a458ab2777a410bc4e, type: 2}

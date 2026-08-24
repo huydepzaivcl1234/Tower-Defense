@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ebab7371b0f8b8549967753fa5d711f4, type: 3}
+  m_Name: GuessWhat
+  m_EditorClassIdentifier: Assembly-CSharp::RelicData
+  relicName: Guess What
+  description: Each stack adds 0.5% critical chance. A critical hit deals +150% extra
+    damage.
+  icon: {fileID: 6779309, guid: e6fdf1b0414d39d45b225b37367c4c9d, type: 3}
+  rarity: 1
+  selectionWeight: 0.65
+  maxStacks: 50
+  modifiers:
+  - effect: 9
+    value: 0.005
+    value2: 1.5
+    value3: 0
+    value4: 0
+    value5: 0
+    targetTower: {fileID: 0}

@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52e9e2226e1a4fc48822f40891d89eda, type: 3}
+  m_Name: Bomb tower
+  m_EditorClassIdentifier: Assembly-CSharp::TowerData
+  towerName: Bomb tower
+  description: it throw explosive bomb
+  towerPrefab: {fileID: 2575401231326440792, guid: 9e7a14aca65d1f34fa61a8c30d47b5ee,
+    type: 3}
+  projectilePrefab: {fileID: 532332587456997213, guid: 508b3f39536b4784692152c52d9fb30c,
+    type: 3}
+  buildCost: 175
+  isGoldGenerator: 0
+  placementYOffset: 0
+  levels:
+  - strength: 13
+    attackSpeed: 1.2
+    range: 8
+    upgradeCost: 75
+    splashRadius: 1
+    bleedDamagePerTick: 0
+    bleedTickInterval: 1
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldPerRound: 0
+  - strength: 20
+    attackSpeed: 1.3
+    range: 8.3
+    upgradeCost: 150
+    splashRadius: 1.5
+    bleedDamagePerTick: 0
+    bleedTickInterval: 1
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldPerRound: 0
+  - strength: 25
+    attackSpeed: 1.5
+    range: 8.7
+    upgradeCost: 200
+    splashRadius: 2
+    bleedDamagePerTick: 0
+    bleedTickInterval: 1
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldPerRound: 0
+  - strength: 38
+    attackSpeed: 1.6
+    range: 9
+    upgradeCost: 270
+    splashRadius: 2.3
+    bleedDamagePerTick: 0
+    bleedTickInterval: 1
+    bleedDuration: 0
+    slowPercent: 0
+    slowDuration: 0
+    knockbackDistance: 0
+    goldPerRound: 0

@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ebab7371b0f8b8549967753fa5d711f4, type: 3}
+  m_Name: GoldenTouch
+  m_EditorClassIdentifier: Assembly-CSharp::RelicData
+  relicName: Golden Touch
+  description: +5% gold earned from enemies and gold towers.
+  icon: {fileID: 941950442, guid: 9a4031dd38812a740bcb3f5117ae634e, type: 3}
+  rarity: 0
+  selectionWeight: 1
+  maxStacks: 99
+  modifiers:
+  - effect: 3
+    value: 0.05

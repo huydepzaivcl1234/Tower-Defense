@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52e9e2226e1a4fc48822f40891d89eda, type: 3}
+  m_Name: Xbow Tower
+  m_EditorClassIdentifier: Assembly-CSharp::TowerData
+  towerName: Xbow Tower
+  description: super fast
+  towerPrefab: {fileID: 4042706715241245051, guid: 96e262348698ad64193eb16912e09beb,
+    type: 3}
+  projectilePrefab: {fileID: 532332587456997213, guid: 508b3f39536b4784692152c52d9fb30c,
+    type: 3}
+  buildCost: 1000
+  isGoldGenerator: 0
+  placementYOffset: 0
+  levels:
+  - strength: 5
+    attackSpeed: 30
+    range: 7
+    upgradeCost: 1500
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0.2
+    slowDuration: 5
+    knockbackDistance: 0
+    goldPerRound: 0
+  - strength: 6
+    attackSpeed: 35
+    range: 7.5
+    upgradeCost: 2000
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0.2
+    slowDuration: 5
+    knockbackDistance: 0
+    goldPerRound: 0
+  - strength: 7
+    attackSpeed: 40
+    range: 8
+    upgradeCost: 2500
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0.2
+    slowDuration: 5
+    knockbackDistance: 0
+    goldPerRound: 0
+  - strength: 8
+    attackSpeed: 45
+    range: 8
+    upgradeCost: 3500
+    splashRadius: 0
+    bleedDamagePerTick: 0
+    bleedTickInterval: 0
+    bleedDuration: 0
+    slowPercent: 0.4
+    slowDuration: 5
+    knockbackDistance: 0
+    goldPerRound: 0
