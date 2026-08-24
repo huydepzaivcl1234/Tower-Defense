@@ -34,15 +34,10 @@ public class WaveManager : MonoBehaviour
     [Header("Spawn Portal Animation")]
     [Tooltip("Root Transform of your existing Portal VFX. Leave empty to auto-find a GameObject named 'Portal'.")]
     public Transform spawnPortal;
-    [Min(0f)] public float portalOpenDuration = 0.35f;
-    [Min(0f)] public float portalCloseDuration = 0.28f;
-    [Tooltip("Open animation. Default has a small overshoot so the portal pops into existence.")]
-    public AnimationCurve portalOpenCurve = new AnimationCurve(
-        new Keyframe(0f, 0f),
-        new Keyframe(0.72f, 1.08f),
-        new Keyframe(1f, 1f));
-    [Tooltip("Close animation from full size back to zero.")]
-    public AnimationCurve portalCloseCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [Tooltip("Smooth zoom-in time before the first enemy spawns.")]
+    [Min(0.05f)] public float portalOpenDuration = 0.65f;
+    [Tooltip("Smooth zoom-out time after the final enemy has spawned.")]
+    [Min(0.05f)] public float portalCloseDuration = 0.55f;
 
     [SerializeField] private int currentWaveIndex = -1;
     private int aliveEnemies = 0;
@@ -53,7 +48,6 @@ public class WaveManager : MonoBehaviour
     private bool portalReady;
 
     // Prevents the same wave from firing OnWaveCleared more than once.
-    // Important when the last enemy dies at the same time the spawn coroutine finishes.
     private int lastClearedWaveIndex = -1;
 
     public int CurrentWaveNumber => currentWaveIndex + 1;
@@ -113,8 +107,18 @@ public class WaveManager : MonoBehaviour
             return;
 
         spawnPortal.localScale = Vector3.zero;
-        StopPortalParticles();
+        ClearPortalParticles();
         spawnPortal.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Smooth 0..1 easing with zero velocity at both ends.
+    /// This avoids the hard "pop" of a linear scale or overshoot curve.
+    /// </summary>
+    private static float SmootherStep01(float t)
+    {
+        t = Mathf.Clamp01(t);
+        return t * t * t * (t * (t * 6f - 15f) + 10f);
     }
 
     private IEnumerator OpenPortal()
@@ -124,23 +128,23 @@ public class WaveManager : MonoBehaviour
         if (!portalReady)
             yield break;
 
-        spawnPortal.gameObject.SetActive(true);
+        // Activate while still exactly scale-zero so there is no visible one-frame pop.
         spawnPortal.localScale = Vector3.zero;
+        spawnPortal.gameObject.SetActive(true);
+
+        // Give Unity one frame to initialize renderers/particles while the root is invisible.
+        yield return null;
+
         PlayPortalParticles();
 
-        if (portalOpenDuration <= 0f)
-        {
-            spawnPortal.localScale = portalBaseScale;
-            yield break;
-        }
-
+        float duration = Mathf.Max(0.05f, portalOpenDuration);
         float elapsed = 0f;
-        while (elapsed < portalOpenDuration)
+
+        while (elapsed < duration)
         {
+            float t = SmootherStep01(elapsed / duration);
+            spawnPortal.localScale = portalBaseScale * t;
             elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / portalOpenDuration);
-            float scaleFactor = portalOpenCurve != null ? portalOpenCurve.Evaluate(t) : t;
-            spawnPortal.localScale = Vector3.LerpUnclamped(Vector3.zero, portalBaseScale, scaleFactor);
             yield return null;
         }
 
@@ -152,25 +156,25 @@ public class WaveManager : MonoBehaviour
         if (!portalReady)
             yield break;
 
-        if (portalCloseDuration <= 0f)
-        {
-            HidePortalInstant();
-            yield break;
-        }
+        // Stop creating NEW particles, but do not clear existing ones yet.
+        // Existing visual layers remain visible while the whole portal smoothly shrinks.
+        StopPortalEmission();
 
+        float duration = Mathf.Max(0.05f, portalCloseDuration);
         Vector3 startScale = spawnPortal.localScale;
         float elapsed = 0f;
-        while (elapsed < portalCloseDuration)
+
+        while (elapsed < duration)
         {
+            float t = SmootherStep01(elapsed / duration);
+            spawnPortal.localScale = Vector3.LerpUnclamped(startScale, Vector3.zero, t);
             elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / portalCloseDuration);
-            float curveValue = portalCloseCurve != null ? portalCloseCurve.Evaluate(t) : t;
-            spawnPortal.localScale = Vector3.LerpUnclamped(startScale, Vector3.zero, curveValue);
             yield return null;
         }
 
+        // Only after the zoom-out visually reaches zero do we clear and disable it.
         spawnPortal.localScale = Vector3.zero;
-        StopPortalParticles();
+        ClearPortalParticles();
         spawnPortal.gameObject.SetActive(false);
     }
 
@@ -182,12 +186,29 @@ public class WaveManager : MonoBehaviour
         foreach (ParticleSystem ps in portalParticles)
         {
             if (ps == null) continue;
+
+            // Hierarchy scaling makes authored particle sizes follow the root portal zoom.
+            ParticleSystem.MainModule main = ps.main;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             ps.Play(true);
         }
     }
 
-    private void StopPortalParticles()
+    private void StopPortalEmission()
+    {
+        if (portalParticles == null)
+            return;
+
+        foreach (ParticleSystem ps in portalParticles)
+        {
+            if (ps == null) continue;
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        }
+    }
+
+    private void ClearPortalParticles()
     {
         if (portalParticles == null)
             return;
@@ -206,11 +227,6 @@ public class WaveManager : MonoBehaviour
         CheckForWin();
     }
 
-    /// <summary>
-    /// Completes the current wave only after every configured spawn has finished and no enemy remains.
-    /// Safe when the final enemy is killed immediately after spawning: HandleEnemyRemoved may run while
-    /// waveInProgress is still true, then SpawnWave calls this again as soon as spawning finishes.
-    /// </summary>
     private void TryCompleteCurrentWave()
     {
         if (waveInProgress) return;
@@ -240,7 +256,7 @@ public class WaveManager : MonoBehaviour
         waveInProgress = true;
         yield return new WaitForSeconds(wave.startDelay);
 
-        // Portal appears immediately before enemies begin spawning.
+        // Portal smoothly opens completely before the first enemy appears.
         yield return OpenPortal();
 
         foreach (var entry in wave.entries)
@@ -251,20 +267,15 @@ public class WaveManager : MonoBehaviour
             {
                 SpawnEnemy(entry.enemyData);
 
-                // Do not add an unnecessary vulnerable delay after the very last spawn in this entry.
-                // The next entry can still begin immediately, while its own interval controls its spawns.
                 if (i < entry.count - 1 && entry.spawnInterval > 0f)
                     yield return new WaitForSeconds(entry.spawnInterval);
             }
         }
 
-        // Every enemy configured for this wave has now appeared, so close and hide the portal.
+        // Final enemy is now out of the portal; smoothly close it.
         yield return ClosePortal();
 
         waveInProgress = false;
-
-        // Critical race-condition fix: the last enemy may already have died while spawning was active.
-        // Re-check completion now that no more enemies can spawn for this wave.
         TryCompleteCurrentWave();
         CheckForWin();
     }
@@ -287,8 +298,6 @@ public class WaveManager : MonoBehaviour
         Enemy e = go.GetComponent<Enemy>();
         if (e != null)
         {
-            // Count the enemy before initialization so even an enemy that can die immediately during
-            // initialization/runtime callbacks can never make the alive count go negative or miss clear.
             aliveEnemies++;
             e.Initialize(data, path.GetWaypoints());
         }
