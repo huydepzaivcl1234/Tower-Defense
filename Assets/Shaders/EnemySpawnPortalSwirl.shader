@@ -129,7 +129,7 @@ Shader "TowerDefense/EnemySpawnPortalSwirl"
                 wobble += sin(angle * 13.0 - time * 1.35 + 1.7) * 0.3;
                 wobble += sin(angle * 19.0 + time * 0.55 + 4.1) * 0.2;
                 float edgeLimit = 0.985 + wobble * _EdgeWobble;
-                float edgeAlpha = smoothstep(edgeLimit, edgeLimit - 0.045, radius01);
+                float edgeAlpha = 1.0 - smoothstep(edgeLimit - 0.045, edgeLimit, radius01);
 
                 float3 color = lerp(_ColorA.rgb, _ColorB.rgb, eroded);
                 float alpha = eroded * centerMask * edgeAlpha * _Alpha * i.color.a;
@@ -137,7 +137,7 @@ Shader "TowerDefense/EnemySpawnPortalSwirl"
                 // Dark background/core.
                 if (_LayerMode < 0.5)
                 {
-                    float core = smoothstep(1.0, 0.15, radius01);
+                    float core = 1.0 - smoothstep(0.15, 1.0, radius01);
                     color = _DarkColor.rgb * (0.85 + 0.15 * bands);
                     alpha = saturate(core * 0.96) * edgeAlpha * _Alpha;
                 }
