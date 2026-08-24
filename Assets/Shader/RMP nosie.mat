@@ -70,8 +70,8 @@ Material:
     - _Cull: 0
     - _DstBlend: 10
     - _DstBlendAlpha: 10
-    - _Erosion: 1.58
-    - _Maskerosion: 1
+    - _Erosion: 1.53
+    - _Maskerosion: 0.41
     - _QueueControl: 0
     - _QueueOffset: 0
     - _SrcBlend: 5
