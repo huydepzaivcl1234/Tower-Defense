@@ -1,4 +1,4 @@
-﻿# === ChatGPT Unity generated-cache ignore ===
+# === Unity generated-cache ignore ===
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -19,4 +19,33 @@ UserSettings/
 
 Assets/**/*.cs.backup
 Assets/**/*.backup
-# === End ChatGPT Unity generated-cache ignore ===
+
+# === Sensitive files / credentials ===
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.pfx
+*.p12
+*.key
+*.keystore
+*.jks
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+**/credentials.json
+**/client_secret*.json
+**/client-secret*.json
+**/service-account*.json
+**/service_account*.json
+**/private_key*
+**/private-key*
+
+# Local editor/config extras
+.vsconfig
+
+# Common temporary editor backups
+*~
+*.tmp
