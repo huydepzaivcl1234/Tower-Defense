@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Displays owned relics as a compact HUD plus an expandable full inventory panel.
-/// All visual/layout tuning is exposed in the Inspector; this class owns no gameplay data.
+/// All useful visual/layout tuning is exposed in the Inspector; this class owns no gameplay data.
 /// </summary>
 public class RelicOwnedHUD : MonoBehaviour
 {
@@ -13,15 +13,24 @@ public class RelicOwnedHUD : MonoBehaviour
     [Min(1)] public int maxCompactRelics = 5;
     [Min(0.05f)] public float refreshInterval = 0.15f;
 
-    [Header("HUD Position / Size")]
-    public Vector2 hudAnchor = new Vector2(0f, 0f);
-    public Vector2 hudPivot = new Vector2(0f, 0f);
+    [Header("HUD Root Transform")]
+    public Vector2 hudAnchor = Vector2.zero;
+    public Vector2 hudPivot = Vector2.zero;
     public Vector2 hudPosition = new Vector2(12f, 12f);
     public Vector2 hudSize = new Vector2(220f, 132f);
 
+    [Header("Compact Bar Transform")]
+    [Tooltip("Anchor of CompactBar relative to RelicOwnedHUD. (0,0)=bottom-left, (1,1)=top-right.")]
+    public Vector2 compactBarAnchor = Vector2.zero;
+    [Tooltip("Pivot of CompactBar itself.")]
+    public Vector2 compactBarPivot = Vector2.zero;
+    [Tooltip("CompactBar position relative to its anchor. Change this to move only the compact relic bar.")]
+    public Vector2 compactBarPosition = Vector2.zero;
+    [Tooltip("Total width/height of CompactBar.")]
+    public Vector2 compactBarSize = new Vector2(220f, 132f);
+
     [Header("Compact Grid")]
     [Min(1)] public int compactColumns = 3;
-    public Vector2 compactSize = new Vector2(220f, 132f);
     public Vector2 compactCellSize = new Vector2(64f, 55f);
     public Vector2 compactSpacing = new Vector2(6f, 6f);
     [Min(0)] public int compactPaddingLeft = 7;
@@ -46,9 +55,13 @@ public class RelicOwnedHUD : MonoBehaviour
     public Vector2 expandButtonSize = new Vector2(64f, 55f);
     [Min(1f)] public float expandButtonFontSize = 28f;
 
-    [Header("Full Relic Panel")]
+    [Header("Full Relic Panel Transform")]
+    public Vector2 fullPanelAnchor = Vector2.zero;
+    public Vector2 fullPanelPivot = Vector2.zero;
     public Vector2 fullPanelPosition = new Vector2(0f, 142f);
     public Vector2 fullPanelSize = new Vector2(390f, 420f);
+
+    [Header("Full Relic Panel Content")]
     public string fullPanelTitle = "OWNED RELICS";
     [Min(1f)] public float fullPanelTitleFontSize = 23f;
     public Vector2 closeButtonSize = new Vector2(42f, 42f);
@@ -86,15 +99,9 @@ public class RelicOwnedHUD : MonoBehaviour
         public int stacks;
     }
 
-    private void Awake()
-    {
-        BuildIfNeeded();
-    }
+    private void Awake() => BuildIfNeeded();
 
-    private void Start()
-    {
-        Refresh(true);
-    }
+    private void Start() => Refresh(true);
 
     private void Update()
     {
@@ -107,14 +114,17 @@ public class RelicOwnedHUD : MonoBehaviour
     {
         maxCompactRelics = Mathf.Max(1, maxCompactRelics);
         compactColumns = Mathf.Max(1, compactColumns);
-        compactCellSize.x = Mathf.Max(1f, compactCellSize.x);
-        compactCellSize.y = Mathf.Max(1f, compactCellSize.y);
-        compactIconSize.x = Mathf.Max(1f, compactIconSize.x);
-        compactIconSize.y = Mathf.Max(1f, compactIconSize.y);
-        stackBadgeSize.x = Mathf.Max(1f, stackBadgeSize.x);
-        stackBadgeSize.y = Mathf.Max(1f, stackBadgeSize.y);
+        compactBarSize = ClampSize(compactBarSize);
+        compactCellSize = ClampSize(compactCellSize);
+        compactIconSize = ClampSize(compactIconSize);
+        stackBadgeSize = ClampSize(stackBadgeSize);
+        expandButtonSize = ClampSize(expandButtonSize);
+        fullPanelSize = ClampSize(fullPanelSize);
+        fullPanelIconSize = ClampSize(fullPanelIconSize);
         fullPanelRowHeight = Mathf.Max(1f, fullPanelRowHeight);
 
+        // Runtime-created children exist only while playing. Inspector values remain serialized
+        // and are applied immediately whenever the runtime HUD already exists.
         if (Application.isPlaying && built)
         {
             ApplyRootLayout();
@@ -123,6 +133,13 @@ public class RelicOwnedHUD : MonoBehaviour
             lastSignature = int.MinValue;
             Refresh(true);
         }
+    }
+
+    private static Vector2 ClampSize(Vector2 size)
+    {
+        size.x = Mathf.Max(1f, size.x);
+        size.y = Mathf.Max(1f, size.y);
+        return size;
     }
 
     private void BuildIfNeeded()
@@ -165,11 +182,11 @@ public class RelicOwnedHUD : MonoBehaviour
     {
         if (compactBar == null) return;
 
-        compactBar.anchorMin = Vector2.zero;
-        compactBar.anchorMax = Vector2.zero;
-        compactBar.pivot = Vector2.zero;
-        compactBar.anchoredPosition = Vector2.zero;
-        compactBar.sizeDelta = compactSize;
+        compactBar.anchorMin = compactBarAnchor;
+        compactBar.anchorMax = compactBarAnchor;
+        compactBar.pivot = compactBarPivot;
+        compactBar.anchoredPosition = compactBarPosition;
+        compactBar.sizeDelta = compactBarSize;
 
         Image bg = compactBar.GetComponent<Image>();
         if (bg != null) bg.color = panelColor;
@@ -177,11 +194,7 @@ public class RelicOwnedHUD : MonoBehaviour
         GridLayoutGroup grid = compactBar.GetComponent<GridLayoutGroup>();
         if (grid != null)
         {
-            grid.padding = new RectOffset(
-                compactPaddingLeft,
-                compactPaddingRight,
-                compactPaddingTop,
-                compactPaddingBottom);
+            grid.padding = new RectOffset(compactPaddingLeft, compactPaddingRight, compactPaddingTop, compactPaddingBottom);
             grid.spacing = compactSpacing;
             grid.cellSize = compactCellSize;
             grid.startCorner = compactStartCorner;
@@ -208,7 +221,7 @@ public class RelicOwnedHUD : MonoBehaviour
     {
         allRelicsPanel = CreateRect("AllRelicsPanel", transform).gameObject;
         RectTransform panelRect = allRelicsPanel.GetComponent<RectTransform>();
-        Image panelBg = allRelicsPanel.AddComponent<Image>();
+        allRelicsPanel.AddComponent<Image>();
 
         RectTransform title = CreateRect("Title", panelRect);
         TextMeshProUGUI titleText = title.gameObject.AddComponent<TextMeshProUGUI>();
@@ -220,7 +233,7 @@ public class RelicOwnedHUD : MonoBehaviour
         close.GetComponent<Button>().onClick.AddListener(() => allRelicsPanel.SetActive(false));
 
         RectTransform viewport = CreateRect("Viewport", panelRect);
-        Image viewportImage = viewport.gameObject.AddComponent<Image>();
+        viewport.gameObject.AddComponent<Image>();
         Mask mask = viewport.gameObject.AddComponent<Mask>();
         mask.showMaskGraphic = false;
 
@@ -251,9 +264,9 @@ public class RelicOwnedHUD : MonoBehaviour
         if (allRelicsPanel == null) return;
 
         RectTransform panelRect = allRelicsPanel.GetComponent<RectTransform>();
-        panelRect.anchorMin = Vector2.zero;
-        panelRect.anchorMax = Vector2.zero;
-        panelRect.pivot = Vector2.zero;
+        panelRect.anchorMin = fullPanelAnchor;
+        panelRect.anchorMax = fullPanelAnchor;
+        panelRect.pivot = fullPanelPivot;
         panelRect.anchoredPosition = fullPanelPosition;
         panelRect.sizeDelta = fullPanelSize;
 
@@ -270,9 +283,12 @@ public class RelicOwnedHUD : MonoBehaviour
             title.offsetMin = new Vector2(14f, -52f);
             title.offsetMax = new Vector2(-58f, -7f);
             TMP_Text titleText = title.GetComponent<TMP_Text>();
-            titleText.text = fullPanelTitle;
-            titleText.fontSize = fullPanelTitleFontSize;
-            titleText.color = textColor;
+            if (titleText != null)
+            {
+                titleText.text = fullPanelTitle;
+                titleText.fontSize = fullPanelTitleFontSize;
+                titleText.color = textColor;
+            }
         }
 
         Transform closeTransform = panelRect.Find("CloseButton");
@@ -377,10 +393,13 @@ public class RelicOwnedHUD : MonoBehaviour
             compactEntries.Add(CreateCompactEntry(owned[i]));
 
         bool hasOverflow = owned.Count > maxCompactRelics;
-        expandButton.gameObject.SetActive(hasOverflow);
-        expandButton.transform.SetAsLastSibling();
+        if (expandButton != null)
+        {
+            expandButton.gameObject.SetActive(hasOverflow);
+            expandButton.transform.SetAsLastSibling();
+        }
 
-        if (!hasOverflow && allRelicsPanel.activeSelf)
+        if (!hasOverflow && allRelicsPanel != null && allRelicsPanel.activeSelf)
             allRelicsPanel.SetActive(false);
     }
 
@@ -504,8 +523,8 @@ public class RelicOwnedHUD : MonoBehaviour
 
     private void ToggleAllRelicsPanel()
     {
-        if (allRelicsPanel == null) return;
-        allRelicsPanel.SetActive(!allRelicsPanel.activeSelf);
+        if (allRelicsPanel != null)
+            allRelicsPanel.SetActive(!allRelicsPanel.activeSelf);
     }
 
     private GameObject CreateButton(string name, Transform parent, string text, Vector2 size)
@@ -555,9 +574,7 @@ public class RelicOwnedHUD : MonoBehaviour
     private static void ClearEntries(List<GameObject> entries)
     {
         for (int i = 0; i < entries.Count; i++)
-        {
             if (entries[i] != null) Destroy(entries[i]);
-        }
         entries.Clear();
     }
 
