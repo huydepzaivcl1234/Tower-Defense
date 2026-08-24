@@ -63,7 +63,7 @@ public static class SecureQuickPushTool
         new Regex(@"\bgithub_pat_[A-Za-z0-9_]{40,}\b", RegexOptions.Compiled),
         new Regex(@"\bsk-[A-Za-z0-9_-]{20,}\b", RegexOptions.Compiled),
         new Regex(@"\bAKIA[0-9A-Z]{16}\b", RegexOptions.Compiled),
-        new Regex(@"(?i)\b(?:api[_-]?key|secret|access[_-]?token|auth[_-]?token|password)\b\s*[:=]\s*[\"'](?!YOUR_|PLACEHOLDER|EXAMPLE|CHANGE_ME|REPLACE_ME)[^\"'\r\n]{12,}[\"']", RegexOptions.Compiled)
+        new Regex("(?i)\\b(?:api[_-]?key|secret|access[_-]?token|auth[_-]?token|password)\\b\\s*[:=]\\s*[\"'](?!YOUR_|PLACEHOLDER|EXAMPLE|CHANGE_ME|REPLACE_ME)[^\"'\\r\\n]{12,}[\"']", RegexOptions.Compiled)
     };
 
     private static readonly HashSet<string> TextExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
