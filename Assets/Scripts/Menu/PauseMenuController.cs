@@ -36,7 +36,7 @@ public class PauseMenuController : MonoBehaviour
     private void Start()
     {
         if (mainMenu == null)
-            mainMenu = MainMenuController.Instance ?? Object.FindFirstObjectByType<MainMenuController>(FindObjectsInactive.Include);
+            mainMenu = MainMenuController.Instance ?? Object.FindAnyObjectByType<MainMenuController>(FindObjectsInactive.Include);
 
         if (continueButton != null) continueButton.onClick.AddListener(ContinueGame);
         if (mainMenuButton != null) mainMenuButton.onClick.AddListener(ReturnToMainMenu);
@@ -56,7 +56,6 @@ public class PauseMenuController : MonoBehaviour
         if (!Input.GetKeyDown(pauseKey)) return;
         if (mainMenu == null || !mainMenu.GameplayStarted) return;
 
-        // ESC inside Settings acts like Back and returns to the exact previous gameplay state.
         if (mainMenu.IsSettingsVisible)
         {
             mainMenu.CloseSettings();
@@ -69,7 +68,6 @@ public class PauseMenuController : MonoBehaviour
 
     private void LateUpdate()
     {
-        // Other systems such as GameSpeedController must not unpause the game behind this panel.
         if (isPaused && (mainMenu == null || !mainMenu.IsSettingsVisible) && Time.timeScale != 0f)
             Time.timeScale = 0f;
     }
