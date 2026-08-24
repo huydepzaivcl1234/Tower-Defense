@@ -214,7 +214,7 @@ public class RelicOwnedHUD : MonoBehaviour
             int hash = 17;
             for (int i = 0; i < owned.Count; i++)
             {
-                hash = hash * 31 + (owned[i].data != null ? owned[i].data.GetInstanceID() : 0);
+                hash = hash * 31 + (owned[i].data != null ? owned[i].data.GetEntityId().GetHashCode() : 0);
                 hash = hash * 31 + owned[i].stacks;
             }
             return hash;
