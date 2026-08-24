@@ -4,9 +4,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Shows owned relics in the bottom-left corner as [icon] x stack.
-/// The compact bar displays at most five unique relics. If more are owned,
-/// a + button opens a scrollable panel containing every owned relic and stack count.
+/// Shows owned relics in a compact bottom-left grid as [icon] x stack.
+/// Up to five unique relics are shown. If more are owned, a + button opens
+/// a scrollable panel containing every owned relic and stack count.
 /// Reads the existing RelicManager/RelicData state only; it owns no gameplay data.
 /// </summary>
 public class RelicOwnedHUD : MonoBehaviour
@@ -65,45 +65,47 @@ public class RelicOwnedHUD : MonoBehaviour
         root.anchorMin = new Vector2(0f, 0f);
         root.anchorMax = new Vector2(0f, 0f);
         root.pivot = new Vector2(0f, 0f);
-        root.anchoredPosition = new Vector2(24f, 24f);
-        root.sizeDelta = new Vector2(580f, 76f);
+        root.anchoredPosition = new Vector2(12f, 12f);
+        root.sizeDelta = new Vector2(174f, 102f);
 
         compactBar = CreateRect("CompactBar", transform);
         compactBar.anchorMin = new Vector2(0f, 0f);
         compactBar.anchorMax = new Vector2(0f, 0f);
         compactBar.pivot = new Vector2(0f, 0f);
         compactBar.anchoredPosition = Vector2.zero;
-        compactBar.sizeDelta = new Vector2(568f, 68f);
+        compactBar.sizeDelta = new Vector2(174f, 102f);
 
         Image compactBg = compactBar.gameObject.AddComponent<Image>();
         compactBg.color = PanelColor;
+        compactBg.raycastTarget = false;
 
-        HorizontalLayoutGroup horizontal = compactBar.gameObject.AddComponent<HorizontalLayoutGroup>();
-        horizontal.padding = new RectOffset(8, 8, 7, 7);
-        horizontal.spacing = 7f;
-        horizontal.childAlignment = TextAnchor.MiddleLeft;
-        horizontal.childControlWidth = false;
-        horizontal.childControlHeight = false;
-        horizontal.childForceExpandWidth = false;
-        horizontal.childForceExpandHeight = false;
+        GridLayoutGroup grid = compactBar.gameObject.AddComponent<GridLayoutGroup>();
+        grid.padding = new RectOffset(7, 7, 7, 7);
+        grid.spacing = new Vector2(5f, 5f);
+        grid.cellSize = new Vector2(50f, 41.5f);
+        grid.startCorner = GridLayoutGroup.Corner.LowerLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.LowerLeft;
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 3;
 
-        GameObject plus = CreateButton("ExpandButton", compactBar, "+", new Vector2(54f, 54f));
+        GameObject plus = CreateButton("ExpandButton", compactBar, "+", new Vector2(50f, 41.5f));
         expandButton = plus.GetComponent<Button>();
         expandButton.onClick.AddListener(ToggleAllRelicsPanel);
         plus.SetActive(false);
 
-        BuildAllRelicsPanel(root);
+        BuildAllRelicsPanel();
     }
 
-    private void BuildAllRelicsPanel(RectTransform root)
+    private void BuildAllRelicsPanel()
     {
         allRelicsPanel = CreateRect("AllRelicsPanel", transform).gameObject;
         RectTransform panelRect = allRelicsPanel.GetComponent<RectTransform>();
         panelRect.anchorMin = new Vector2(0f, 0f);
         panelRect.anchorMax = new Vector2(0f, 0f);
         panelRect.pivot = new Vector2(0f, 0f);
-        panelRect.anchoredPosition = new Vector2(0f, 82f);
-        panelRect.sizeDelta = new Vector2(470f, 430f);
+        panelRect.anchoredPosition = new Vector2(0f, 112f);
+        panelRect.sizeDelta = new Vector2(350f, 360f);
 
         Image panelBg = allRelicsPanel.AddComponent<Image>();
         panelBg.color = PanelColor;
@@ -112,29 +114,29 @@ public class RelicOwnedHUD : MonoBehaviour
         title.anchorMin = new Vector2(0f, 1f);
         title.anchorMax = new Vector2(1f, 1f);
         title.pivot = new Vector2(0.5f, 1f);
-        title.offsetMin = new Vector2(16f, -54f);
-        title.offsetMax = new Vector2(-62f, -8f);
+        title.offsetMin = new Vector2(14f, -48f);
+        title.offsetMax = new Vector2(-54f, -7f);
         TextMeshProUGUI titleText = title.gameObject.AddComponent<TextMeshProUGUI>();
         titleText.text = "OWNED RELICS";
-        titleText.fontSize = 24f;
+        titleText.fontSize = 21f;
         titleText.fontStyle = FontStyles.Bold;
         titleText.alignment = TextAlignmentOptions.MidlineLeft;
         titleText.color = TextColor;
         titleText.raycastTarget = false;
 
-        GameObject close = CreateButton("CloseButton", panelRect, "×", new Vector2(44f, 44f));
+        GameObject close = CreateButton("CloseButton", panelRect, "×", new Vector2(38f, 38f));
         RectTransform closeRect = close.GetComponent<RectTransform>();
         closeRect.anchorMin = new Vector2(1f, 1f);
         closeRect.anchorMax = new Vector2(1f, 1f);
         closeRect.pivot = new Vector2(1f, 1f);
-        closeRect.anchoredPosition = new Vector2(-9f, -9f);
+        closeRect.anchoredPosition = new Vector2(-7f, -7f);
         close.GetComponent<Button>().onClick.AddListener(() => allRelicsPanel.SetActive(false));
 
         RectTransform viewport = CreateRect("Viewport", panelRect);
         viewport.anchorMin = new Vector2(0f, 0f);
         viewport.anchorMax = new Vector2(1f, 1f);
-        viewport.offsetMin = new Vector2(12f, 12f);
-        viewport.offsetMax = new Vector2(-12f, -62f);
+        viewport.offsetMin = new Vector2(10f, 10f);
+        viewport.offsetMax = new Vector2(-10f, -54f);
         Image viewportImage = viewport.gameObject.AddComponent<Image>();
         viewportImage.color = new Color(0f, 0f, 0f, 0.12f);
         Mask mask = viewport.gameObject.AddComponent<Mask>();
@@ -148,8 +150,8 @@ public class RelicOwnedHUD : MonoBehaviour
         allRelicsContent.sizeDelta = Vector2.zero;
 
         VerticalLayoutGroup vertical = allRelicsContent.gameObject.AddComponent<VerticalLayoutGroup>();
-        vertical.padding = new RectOffset(8, 8, 8, 8);
-        vertical.spacing = 7f;
+        vertical.padding = new RectOffset(7, 7, 7, 7);
+        vertical.spacing = 6f;
         vertical.childAlignment = TextAnchor.UpperLeft;
         vertical.childControlWidth = true;
         vertical.childControlHeight = false;
@@ -225,19 +227,17 @@ public class RelicOwnedHUD : MonoBehaviour
     {
         ClearEntries(compactEntries);
 
-        // Keep the expand button last in the horizontal layout.
-        expandButton.transform.SetAsLastSibling();
-
         int visible = Mathf.Min(Mathf.Max(1, maxCompactRelics), owned.Count);
         for (int i = 0; i < visible; i++)
         {
             GameObject entry = CreateCompactEntry(owned[i]);
-            entry.transform.SetSiblingIndex(i);
             compactEntries.Add(entry);
         }
 
         bool hasOverflow = owned.Count > maxCompactRelics;
         expandButton.gameObject.SetActive(hasOverflow);
+        expandButton.transform.SetAsLastSibling();
+
         if (!hasOverflow && allRelicsPanel.activeSelf)
             allRelicsPanel.SetActive(false);
     }
@@ -245,44 +245,52 @@ public class RelicOwnedHUD : MonoBehaviour
     private GameObject CreateCompactEntry(OwnedRelic owned)
     {
         RectTransform entry = CreateRect("Relic_" + SafeName(owned.data.relicName), compactBar);
-        entry.sizeDelta = new Vector2(94f, 54f);
-        LayoutElement layout = entry.gameObject.AddComponent<LayoutElement>();
-        layout.preferredWidth = 94f;
-        layout.preferredHeight = 54f;
+        entry.sizeDelta = new Vector2(50f, 41.5f);
 
         Image bg = entry.gameObject.AddComponent<Image>();
         bg.color = EntryColor;
+        bg.raycastTarget = false;
 
         RectTransform rarityLine = CreateRect("Rarity", entry);
         rarityLine.anchorMin = new Vector2(0f, 0f);
         rarityLine.anchorMax = new Vector2(1f, 0f);
         rarityLine.pivot = new Vector2(0.5f, 0f);
         rarityLine.anchoredPosition = Vector2.zero;
-        rarityLine.sizeDelta = new Vector2(0f, 3f);
+        rarityLine.sizeDelta = new Vector2(0f, 2f);
         Image rarityImage = rarityLine.gameObject.AddComponent<Image>();
         rarityImage.color = RelicManager.GetRarityColor(owned.data.rarity);
         rarityImage.raycastTarget = false;
 
         RectTransform iconRect = CreateRect("Icon", entry);
-        iconRect.anchorMin = new Vector2(0f, 0.5f);
-        iconRect.anchorMax = new Vector2(0f, 0.5f);
-        iconRect.pivot = new Vector2(0f, 0.5f);
-        iconRect.anchoredPosition = new Vector2(6f, 0f);
-        iconRect.sizeDelta = new Vector2(42f, 42f);
+        iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+        iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+        iconRect.pivot = new Vector2(0.5f, 0.5f);
+        iconRect.anchoredPosition = new Vector2(-5f, 0f);
+        iconRect.sizeDelta = new Vector2(32f, 32f);
         Image icon = iconRect.gameObject.AddComponent<Image>();
         icon.sprite = owned.data.icon;
         icon.preserveAspect = true;
         icon.color = owned.data.icon != null ? Color.white : RelicManager.GetRarityColor(owned.data.rarity);
         icon.raycastTarget = false;
 
-        RectTransform stackRect = CreateRect("Stack", entry);
-        stackRect.anchorMin = new Vector2(0f, 0f);
-        stackRect.anchorMax = new Vector2(1f, 1f);
-        stackRect.offsetMin = new Vector2(50f, 2f);
-        stackRect.offsetMax = new Vector2(-4f, -2f);
+        RectTransform badge = CreateRect("StackBadge", entry);
+        badge.anchorMin = new Vector2(1f, 0f);
+        badge.anchorMax = new Vector2(1f, 0f);
+        badge.pivot = new Vector2(1f, 0f);
+        badge.anchoredPosition = new Vector2(-2f, 3f);
+        badge.sizeDelta = new Vector2(25f, 18f);
+        Image badgeBg = badge.gameObject.AddComponent<Image>();
+        badgeBg.color = new Color(0.015f, 0.025f, 0.04f, 0.94f);
+        badgeBg.raycastTarget = false;
+
+        RectTransform stackRect = CreateRect("Stack", badge);
+        stackRect.anchorMin = Vector2.zero;
+        stackRect.anchorMax = Vector2.one;
+        stackRect.offsetMin = Vector2.zero;
+        stackRect.offsetMax = Vector2.zero;
         TextMeshProUGUI stack = stackRect.gameObject.AddComponent<TextMeshProUGUI>();
         stack.text = "x" + owned.stacks;
-        stack.fontSize = 19f;
+        stack.fontSize = 11f;
         stack.fontStyle = FontStyles.Bold;
         stack.alignment = TextAlignmentOptions.Center;
         stack.color = TextColor;
@@ -298,9 +306,9 @@ public class RelicOwnedHUD : MonoBehaviour
         foreach (OwnedRelic relic in owned)
         {
             RectTransform row = CreateRect("Relic_" + SafeName(relic.data.relicName), allRelicsContent);
-            row.sizeDelta = new Vector2(0f, 66f);
+            row.sizeDelta = new Vector2(0f, 58f);
             LayoutElement layout = row.gameObject.AddComponent<LayoutElement>();
-            layout.preferredHeight = 66f;
+            layout.preferredHeight = 58f;
 
             Image bg = row.gameObject.AddComponent<Image>();
             bg.color = EntryColor;
@@ -309,8 +317,8 @@ public class RelicOwnedHUD : MonoBehaviour
             iconRect.anchorMin = new Vector2(0f, 0.5f);
             iconRect.anchorMax = new Vector2(0f, 0.5f);
             iconRect.pivot = new Vector2(0f, 0.5f);
-            iconRect.anchoredPosition = new Vector2(8f, 0f);
-            iconRect.sizeDelta = new Vector2(50f, 50f);
+            iconRect.anchoredPosition = new Vector2(7f, 0f);
+            iconRect.sizeDelta = new Vector2(44f, 44f);
             Image icon = iconRect.gameObject.AddComponent<Image>();
             icon.sprite = relic.data.icon;
             icon.preserveAspect = true;
@@ -320,28 +328,28 @@ public class RelicOwnedHUD : MonoBehaviour
             RectTransform nameRect = CreateRect("Name", row);
             nameRect.anchorMin = new Vector2(0f, 0f);
             nameRect.anchorMax = new Vector2(1f, 1f);
-            nameRect.offsetMin = new Vector2(68f, 4f);
-            nameRect.offsetMax = new Vector2(-100f, -4f);
+            nameRect.offsetMin = new Vector2(60f, 3f);
+            nameRect.offsetMax = new Vector2(-75f, -3f);
             TextMeshProUGUI name = nameRect.gameObject.AddComponent<TextMeshProUGUI>();
             name.text = relic.data.relicName;
-            name.fontSize = 18f;
+            name.fontSize = 16f;
             name.fontStyle = FontStyles.Bold;
             name.alignment = TextAlignmentOptions.MidlineLeft;
             name.color = RelicManager.GetRarityColor(relic.data.rarity);
             name.enableAutoSizing = true;
-            name.fontSizeMin = 12f;
-            name.fontSizeMax = 18f;
+            name.fontSizeMin = 11f;
+            name.fontSizeMax = 16f;
             name.raycastTarget = false;
 
             RectTransform stackRect = CreateRect("Stack", row);
             stackRect.anchorMin = new Vector2(1f, 0f);
             stackRect.anchorMax = new Vector2(1f, 1f);
             stackRect.pivot = new Vector2(1f, 0.5f);
-            stackRect.anchoredPosition = new Vector2(-10f, 0f);
-            stackRect.sizeDelta = new Vector2(82f, 0f);
+            stackRect.anchoredPosition = new Vector2(-8f, 0f);
+            stackRect.sizeDelta = new Vector2(62f, 0f);
             TextMeshProUGUI stack = stackRect.gameObject.AddComponent<TextMeshProUGUI>();
             stack.text = "x" + relic.stacks;
-            stack.fontSize = 21f;
+            stack.fontSize = 19f;
             stack.fontStyle = FontStyles.Bold;
             stack.alignment = TextAlignmentOptions.Center;
             stack.color = TextColor;
@@ -369,10 +377,6 @@ public class RelicOwnedHUD : MonoBehaviour
         RectTransform rect = CreateRect(name, parent);
         rect.sizeDelta = size;
 
-        LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
-        layout.preferredWidth = size.x;
-        layout.preferredHeight = size.y;
-
         Image image = rect.gameObject.AddComponent<Image>();
         image.color = EntryColor;
 
@@ -396,7 +400,7 @@ public class RelicOwnedHUD : MonoBehaviour
         labelRect.offsetMax = Vector2.zero;
         TextMeshProUGUI label = labelRect.gameObject.AddComponent<TextMeshProUGUI>();
         label.text = text;
-        label.fontSize = 28f;
+        label.fontSize = 24f;
         label.fontStyle = FontStyles.Bold;
         label.alignment = TextAlignmentOptions.Center;
         label.color = AccentColor;
