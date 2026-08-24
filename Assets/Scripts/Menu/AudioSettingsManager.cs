@@ -88,7 +88,7 @@ public class AudioSettingsManager : MonoBehaviour
 
     private void RefreshSources()
     {
-        AudioSource[] sources = Object.FindObjectsByType<AudioSource>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        AudioSource[] sources = Object.FindObjectsByType<AudioSource>(FindObjectsInactive.Include);
         HashSet<AudioSource> alive = new HashSet<AudioSource>();
 
         foreach (AudioSource source in sources)
