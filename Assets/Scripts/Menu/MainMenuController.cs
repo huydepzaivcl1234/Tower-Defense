@@ -75,7 +75,7 @@ public class MainMenuController : MonoBehaviour
 
         audioSettings = AudioSettingsManager.Instance;
         if (audioSettings == null)
-            audioSettings = Object.FindFirstObjectByType<AudioSettingsManager>(FindObjectsInactive.Include);
+            audioSettings = Object.FindAnyObjectByType<AudioSettingsManager>(FindObjectsInactive.Include);
     }
 
     private void Start()
@@ -243,7 +243,7 @@ public class MainMenuController : MonoBehaviour
     private void SyncAudioUI()
     {
         if (audioSettings == null)
-            audioSettings = AudioSettingsManager.Instance ?? Object.FindFirstObjectByType<AudioSettingsManager>(FindObjectsInactive.Include);
+            audioSettings = AudioSettingsManager.Instance ?? Object.FindAnyObjectByType<AudioSettingsManager>(FindObjectsInactive.Include);
 
         float master = audioSettings != null ? audioSettings.MasterVolume : 1f;
         float music = audioSettings != null ? audioSettings.MusicVolume : 0.8f;
