@@ -2,58 +2,66 @@ Shader "TowerDefense/EnemySpawnPortalSwirl"
 {
     Properties
     {
-        [HDR]_OuterColor ("Outer Color", Color) = (0.45, 6.0, 0.02, 1)
-        [HDR]_MidColor ("Mid Color", Color) = (0.05, 2.4, 0.01, 1)
-        [HDR]_DarkColor ("Dark Center", Color) = (0.005, 0.18, 0.01, 1)
+        [HDR]_ColorA ("Color A", Color) = (0.03, 2.2, 0.01, 1)
+        [HDR]_ColorB ("Color B", Color) = (0.35, 6.5, 0.02, 1)
         [HDR]_HighlightColor ("Highlight", Color) = (3.5, 8.0, 1.0, 1)
-        _Speed ("Swirl Speed", Float) = 1.2
+        [HDR]_DarkColor ("Dark", Color) = (0.002, 0.12, 0.006, 1)
+        _Speed ("Speed", Float) = 1.0
         _SwirlStrength ("Swirl Strength", Float) = 5.5
-        _EdgeWobble ("Edge Wobble", Range(0,0.2)) = 0.075
-        _EmissionStrength ("Emission Strength", Range(0,8)) = 2.2
+        _Erosion ("Erosion", Range(0.2,10)) = 2.0
+        _MaskErosion ("Mask Erosion", Range(0.2,8)) = 1.2
+        _EdgeWobble ("Edge Wobble", Range(0,0.2)) = 0.08
+        _EmissionStrength ("Emission", Range(0,10)) = 2.5
+        _Alpha ("Alpha", Range(0,1)) = 1
+        _LayerMode ("Layer Mode", Float) = 2
+        _Scroll ("Scroll", Vector) = (0,-0.6,0,0)
     }
 
     SubShader
     {
-        Tags { "Queue"="Transparent" "RenderType"="Transparent" "IgnoreProjector"="True" }
+        Tags { "RenderPipeline"="UniversalPipeline" "Queue"="Transparent" "RenderType"="Transparent" }
         Cull Off
         ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
         {
-            CGPROGRAM
+            Name "Portal"
+            HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            struct appdata
+            struct Attributes
             {
-                float4 vertex : POSITION;
+                float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
+                float4 color : COLOR;
             };
 
-            struct v2f
+            struct Varyings
             {
-                float4 pos : SV_POSITION;
+                float4 positionHCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+                float2 localPos : TEXCOORD1;
             };
 
-            float4 _OuterColor;
-            float4 _MidColor;
-            float4 _DarkColor;
-            float4 _HighlightColor;
-            float _Speed;
-            float _SwirlStrength;
-            float _EdgeWobble;
-            float _EmissionStrength;
-
-            v2f vert(appdata v)
-            {
-                v2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
-                o.uv = v.uv;
-                return o;
-            }
+            CBUFFER_START(UnityPerMaterial)
+                float4 _ColorA;
+                float4 _ColorB;
+                float4 _HighlightColor;
+                float4 _DarkColor;
+                float4 _Scroll;
+                float _Speed;
+                float _SwirlStrength;
+                float _Erosion;
+                float _MaskErosion;
+                float _EdgeWobble;
+                float _EmissionStrength;
+                float _Alpha;
+                float _LayerMode;
+            CBUFFER_END
 
             float hash21(float2 p)
             {
@@ -62,62 +70,122 @@ Shader "TowerDefense/EnemySpawnPortalSwirl"
                 return frac(p.x * p.y);
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            float noise2(float2 p)
             {
-                float2 p = (i.uv - 0.5) * 2.0;
-                float r = length(p);
-                float a = atan2(p.y, p.x);
-                float time = _Time.y * _Speed;
-
-                // Irregular liquid rim. Several frequencies keep the silhouette organic.
-                float rimNoise = sin(a * 7.0 + time * 0.85) * 0.50;
-                rimNoise += sin(a * 13.0 - time * 1.15 + 1.7) * 0.28;
-                rimNoise += sin(a * 19.0 + time * 0.55 + 4.1) * 0.16;
-                float edge = 0.965 + rimNoise * _EdgeWobble;
-                float alpha = smoothstep(edge, edge - 0.055, r);
-                clip(alpha - 0.01);
-
-                // Deep rotating vortex. Radius is folded into the angle so bands spiral inward.
-                float spiralCoord = a * _SwirlStrength - r * 23.0 + time * 3.0;
-                float s1 = sin(spiralCoord);
-                float s2 = sin(a * (_SwirlStrength + 3.0) - r * 37.0 - time * 2.1 + 1.8);
-                float s3 = sin(a * 3.0 - r * 14.0 + time * 1.35 + sin(a * 5.0) * 0.8);
-                float swirl = saturate(0.5 + s1 * 0.28 + s2 * 0.15 + s3 * 0.09);
-
-                // Outer slime is bright, center falls into a dark tunnel.
-                float radial = saturate(r);
-                float centerDepth = smoothstep(0.08, 0.78, r);
-                float3 baseCol = lerp(_DarkColor.rgb, _MidColor.rgb, centerDepth);
-                baseCol = lerp(baseCol, _OuterColor.rgb, saturate((radial - 0.55) * 1.9));
-                baseCol *= lerp(0.58, 1.28, swirl);
-
-                // Long glossy streaks running along the spiral.
-                float streak = smoothstep(0.72, 0.985, swirl);
-                streak *= smoothstep(0.10, 0.35, r);
-                baseCol += _HighlightColor.rgb * streak * 0.34;
-
-                // Wet luminous rim.
-                float rim = smoothstep(0.70, 0.98, r) * smoothstep(edge, edge - 0.16, r);
-                baseCol += _OuterColor.rgb * rim * 0.42;
-
-                // Procedural white/lime glints concentrated around the rim like the reference.
-                float2 cell = floor((p + 1.0) * 16.0);
-                float rnd = hash21(cell);
-                float2 f = frac((p + 1.0) * 16.0) - 0.5;
-                float dotMask = 1.0 - smoothstep(0.08, 0.28, length(f));
-                float speckleBand = smoothstep(0.62, 0.78, r) * (1.0 - smoothstep(0.96, 1.04, r));
-                float speck = step(0.83, rnd) * dotMask * speckleBand;
-                baseCol += _HighlightColor.rgb * speck * 0.95;
-
-                // Small breathing pulse prevents the portal from looking like a static decal.
-                float pulse = 0.94 + 0.06 * sin(time * 2.4 + r * 8.0);
-                baseCol *= pulse * _EmissionStrength;
-
-                return float4(baseCol, alpha);
+                float2 i = floor(p);
+                float2 f = frac(p);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = hash21(i);
+                float b = hash21(i + float2(1,0));
+                float c = hash21(i + float2(0,1));
+                float d = hash21(i + float2(1,1));
+                return lerp(lerp(a,b,f.x), lerp(c,d,f.x), f.y);
             }
-            ENDCG
+
+            float fbm(float2 p)
+            {
+                float v = 0.0;
+                float amp = 0.55;
+                [unroll] for (int k = 0; k < 4; k++)
+                {
+                    v += noise2(p) * amp;
+                    p = p * 2.03 + 17.17;
+                    amp *= 0.5;
+                }
+                return v;
+            }
+
+            Varyings vert(Attributes v)
+            {
+                Varyings o;
+                o.positionHCS = TransformObjectToHClip(v.positionOS.xyz);
+                o.uv = v.uv;
+                o.color = v.color;
+                o.localPos = v.positionOS.xy;
+                return o;
+            }
+
+            half4 frag(Varyings i) : SV_Target
+            {
+                // UV convention from the procedural spiral mesh:
+                // U = around the portal, V = 0 outer edge -> 1 center.
+                float2 uv = i.uv;
+                float time = _Time.y * _Speed;
+                float outerToCenter = saturate(uv.y);
+                float radius01 = 1.0 - outerToCenter;
+
+                float warpedU = uv.x + outerToCenter * _SwirlStrength * 0.115 + time * 0.075;
+                float2 flowUV = float2(warpedU * 5.0, outerToCenter * 6.0) + _Scroll.xy * _Time.y;
+                float n1 = fbm(flowUV);
+                float n2 = fbm(flowUV * 1.73 + float2(time * 0.37, -time * 0.21));
+                float bands = saturate(n1 * 0.72 + n2 * 0.45);
+
+                float eroded = pow(saturate(bands), max(0.2, _Erosion));
+                float centerMask = pow(saturate(radius01), max(0.2, _MaskErosion));
+
+                // Irregular liquid outer edge.
+                float angle = uv.x * 6.2831853;
+                float wobble = sin(angle * 7.0 + time) * 0.5;
+                wobble += sin(angle * 13.0 - time * 1.35 + 1.7) * 0.3;
+                wobble += sin(angle * 19.0 + time * 0.55 + 4.1) * 0.2;
+                float edgeLimit = 0.985 + wobble * _EdgeWobble;
+                float edgeAlpha = smoothstep(edgeLimit, edgeLimit - 0.045, radius01);
+
+                float3 color = lerp(_ColorA.rgb, _ColorB.rgb, eroded);
+                float alpha = eroded * centerMask * edgeAlpha * _Alpha * i.color.a;
+
+                // Dark background/core.
+                if (_LayerMode < 0.5)
+                {
+                    float core = smoothstep(1.0, 0.15, radius01);
+                    color = _DarkColor.rgb * (0.85 + 0.15 * bands);
+                    alpha = saturate(core * 0.96) * edgeAlpha * _Alpha;
+                }
+                // Hollow outer ring.
+                else if (_LayerMode < 1.5)
+                {
+                    float ring = smoothstep(0.68, 0.86, radius01) * (1.0 - smoothstep(0.94, 1.0, radius01));
+                    float ripple = 0.72 + 0.28 * sin(angle * 9.0 + time * 1.8 + n1 * 4.0);
+                    color = lerp(_ColorA.rgb, _ColorB.rgb, ripple);
+                    alpha = ring * edgeAlpha * _Alpha;
+                }
+                // Main green spiral.
+                else if (_LayerMode < 2.5)
+                {
+                    float tunnelFade = smoothstep(0.08, 0.34, radius01);
+                    color = lerp(_DarkColor.rgb, color, tunnelFade);
+                    alpha *= tunnelFade;
+                }
+                // Bright eroded streaks.
+                else if (_LayerMode < 3.5)
+                {
+                    float streak = pow(saturate(bands), max(2.0, _Erosion + 2.0));
+                    streak *= smoothstep(0.08, 0.30, radius01);
+                    color = _HighlightColor.rgb * (0.55 + streak * 1.3);
+                    alpha = streak * centerMask * edgeAlpha * _Alpha;
+                }
+                // Edge wave/highlight only.
+                else
+                {
+                    float rim = smoothstep(0.72, 0.90, radius01) * (1.0 - smoothstep(0.94, 1.0, radius01));
+                    float wave = pow(saturate(0.5 + 0.5 * sin(angle * 11.0 - time * 2.1 + n1 * 5.0)), 2.5);
+                    color = lerp(_ColorB.rgb, _HighlightColor.rgb, wave);
+                    alpha = rim * wave * edgeAlpha * _Alpha;
+                }
+
+                // Tiny glossy glints concentrated toward the rim.
+                float2 cells = floor(float2(uv.x * 48.0, radius01 * 10.0));
+                float rnd = hash21(cells);
+                float glintBand = smoothstep(0.65, 0.78, radius01) * (1.0 - smoothstep(0.96, 1.0, radius01));
+                float glint = step(0.94, rnd) * glintBand;
+                color += _HighlightColor.rgb * glint * 0.65;
+
+                color *= _EmissionStrength * i.color.rgb;
+                clip(alpha - 0.004);
+                return half4(color, saturate(alpha));
+            }
+            ENDHLSL
         }
     }
-
     FallBack Off
 }
