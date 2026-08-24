@@ -1,13 +1,11 @@
 #if UNITY_EDITOR
-using System;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Configures ONLY the RingHighlight layer of the user's hand-built Rick-style portal.
-/// It does not create or modify the rest of the portal hierarchy.
-/// Uses the user's existing RMP_ring material and, when found, an existing custom portal/circle mesh.
+/// Safely configures ONLY the Particle System behaviour of the selected RingHighlight.
+/// IMPORTANT: this tool deliberately preserves the user's existing hierarchy, Transform,
+/// Renderer render mode, Renderer mesh, Renderer material, sorting settings, and local asset setup.
 /// </summary>
 public static class RickPortalRingHighlightSetupTool
 {
@@ -17,76 +15,67 @@ public static class RickPortalRingHighlightSetupTool
         GameObject go = Selection.activeGameObject;
         if (go == null)
         {
-            EditorUtility.DisplayDialog("Ring Highlight", "Select your RingHighlight GameObject in the Hierarchy first.", "OK");
+            EditorUtility.DisplayDialog("Ring Highlight", "Select your existing RingHighlight GameObject first.", "OK");
             return;
         }
 
         ParticleSystem ps = go.GetComponent<ParticleSystem>();
         if (ps == null)
-            ps = Undo.AddComponent<ParticleSystem>(go);
-
-        Undo.RecordObject(go.transform, "Setup Ring Highlight Transform");
-        go.transform.localScale = Vector3.one;
-
-        ConfigureParticleSystem(ps);
+        {
+            EditorUtility.DisplayDialog(
+                "Ring Highlight",
+                "The selected object has no ParticleSystem. Nothing was changed so your existing structure stays untouched.",
+                "OK");
+            return;
+        }
 
         ParticleSystemRenderer renderer = ps.GetComponent<ParticleSystemRenderer>();
-        Material ringMaterial = FindRingMaterial();
-        if (ringMaterial != null)
-        {
-            Undo.RecordObject(renderer, "Assign Ring Highlight Material");
-            renderer.sharedMaterial = ringMaterial;
-        }
+        Mesh preservedMesh = renderer != null ? renderer.mesh : null;
+        Material preservedMaterial = renderer != null ? renderer.sharedMaterial : null;
+        ParticleSystemRenderMode preservedRenderMode = renderer != null ? renderer.renderMode : ParticleSystemRenderMode.Billboard;
+        Vector3 preservedLocalPosition = go.transform.localPosition;
+        Quaternion preservedLocalRotation = go.transform.localRotation;
+        Vector3 preservedLocalScale = go.transform.localScale;
 
-        Mesh portalMesh = FindPortalMesh();
-        bool usingMesh = portalMesh != null;
-        if (usingMesh)
-        {
-            Undo.RecordObject(renderer, "Assign Ring Highlight Mesh");
-            renderer.renderMode = ParticleSystemRenderMode.Mesh;
-            renderer.mesh = portalMesh;
-            renderer.alignment = ParticleSystemRenderSpace.Local;
-        }
-        else
-        {
-            renderer.renderMode = ParticleSystemRenderMode.Billboard;
-            renderer.alignment = ParticleSystemRenderSpace.Local;
-        }
+        ConfigureParticleSystemOnly(ps);
 
-        renderer.sortingOrder = 1;
-        renderer.minParticleSize = 0f;
-        renderer.maxParticleSize = 3f;
+        // Explicitly restore the user's existing setup. The tool must never choose a mesh/material for them.
+        go.transform.localPosition = preservedLocalPosition;
+        go.transform.localRotation = preservedLocalRotation;
+        go.transform.localScale = preservedLocalScale;
+
+        if (renderer != null)
+        {
+            renderer.renderMode = preservedRenderMode;
+            renderer.sharedMaterial = preservedMaterial;
+            if (preservedRenderMode == ParticleSystemRenderMode.Mesh)
+                renderer.mesh = preservedMesh;
+            EditorUtility.SetDirty(renderer);
+        }
 
         EditorUtility.SetDirty(ps);
-        EditorUtility.SetDirty(renderer);
         EditorUtility.SetDirty(go);
         SceneView.RepaintAll();
 
-        string matMessage = ringMaterial != null
-            ? $"Material: {ringMaterial.name}"
-            : "RMP_ring material was not found automatically. Drag your RMP_ring material into Particle System > Renderer > Material.";
-
-        string meshMessage = usingMesh
-            ? $"Mesh: {portalMesh.name}"
-            : "No custom portal/circle mesh was found automatically. In Particle System > Renderer choose Render Mode = Mesh and assign the flat ring/portal mesh you exported from Blender.";
+        string rendererInfo = renderer == null
+            ? "No ParticleSystemRenderer was found."
+            : "Preserved Renderer: " + renderer.renderMode +
+              "\nMaterial: " + (preservedMaterial != null ? preservedMaterial.name : "<unchanged / none>") +
+              "\nMesh: " + (preservedMesh != null ? preservedMesh.name : "<unchanged / none>");
 
         EditorUtility.DisplayDialog(
-            "Ring Highlight Configured",
-            "RingHighlight is now configured as ONE stationary particle.\n\n" +
-            "Important: Shape is disabled. The giant orange ellipse you were seeing was the Shape gizmo, not the rendered ring.\n\n" +
-            matMessage + "\n" + meshMessage + "\n\n" +
-            "If the ring is still too large/small, adjust ONLY Main > Start Size first (recommended 0.8-1.5), not the GameObject scale.",
+            "RingHighlight Particle Settings Updated",
+            "Only Particle System timing/emission was changed.\n\n" +
+            "NOT changed:\n- Hierarchy\n- Transform\n- Renderer mode\n- Mesh\n- Material\n- Your Blender / Material Maker / Krita assets\n\n" +
+            rendererInfo,
             "OK");
     }
 
-    private static void ConfigureParticleSystem(ParticleSystem ps)
+    private static void ConfigureParticleSystemOnly(ParticleSystem ps)
     {
         Undo.RecordObject(ps, "Configure Ring Highlight Particle System");
 
         bool wasPlaying = ps.isPlaying;
-
-        // Unity does not allow MainModule.duration to be changed while the system is running.
-        // Stop + clear FIRST, then edit the module values, and restore play state afterwards.
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         ParticleSystem.MainModule main = ps.main;
@@ -96,12 +85,10 @@ public static class RickPortalRingHighlightSetupTool
         main.startDelay = 0f;
         main.startLifetime = 999f;
         main.startSpeed = 0f;
-        main.startSize3D = false;
-        main.startSize = 1f;
-        main.startRotation = 0f;
-        main.startColor = Color.white;
         main.simulationSpace = ParticleSystemSimulationSpace.Local;
         main.maxParticles = 1;
+
+        // Preserve the user's Start Size / Rotation / Color because those control the visual scale/orientation.
 
         ParticleSystem.EmissionModule emission = ps.emission;
         emission.enabled = true;
@@ -112,89 +99,16 @@ public static class RickPortalRingHighlightSetupTool
             new ParticleSystem.Burst(0f, 1, 1, 0, 0.01f)
         });
 
+        // The reference RingHighlight is one stationary rendered particle.
+        // Disable Shape so its large scene gizmo does not affect spawning.
         ParticleSystem.ShapeModule shape = ps.shape;
         shape.enabled = false;
 
-        ParticleSystem.VelocityOverLifetimeModule velocity = ps.velocityOverLifetime;
-        velocity.enabled = false;
+        // Do NOT alter Renderer, mesh, material, Transform, SizeOverLifetime,
+        // ColorOverLifetime, RotationOverLifetime, Noise, or other authored modules.
 
-        ParticleSystem.NoiseModule noise = ps.noise;
-        noise.enabled = false;
-
-        ParticleSystem.SizeOverLifetimeModule size = ps.sizeOverLifetime;
-        size.enabled = false;
-
-        ParticleSystem.ColorOverLifetimeModule color = ps.colorOverLifetime;
-        color.enabled = false;
-
-        ParticleSystem.RotationOverLifetimeModule rotation = ps.rotationOverLifetime;
-        rotation.enabled = false;
-
-        // In edit mode we want an immediate preview. In play mode, preserve the previous state.
         if (!Application.isPlaying || wasPlaying)
             ps.Play(true);
-    }
-
-    private static Material FindRingMaterial()
-    {
-        string[] guids = AssetDatabase.FindAssets("t:Material");
-        Material best = null;
-        int bestScore = int.MinValue;
-
-        foreach (string guid in guids)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (mat == null) continue;
-
-            string n = mat.name.ToLowerInvariant();
-            int score = 0;
-            if (n == "rmp_ring") score += 100;
-            if (n.Contains("rmp") && n.Contains("ring")) score += 80;
-            if (n.Contains("ring")) score += 20;
-            if (n.Contains("highlight")) score += 10;
-
-            if (score > bestScore)
-            {
-                bestScore = score;
-                best = mat;
-            }
-        }
-
-        return bestScore >= 20 ? best : null;
-    }
-
-    private static Mesh FindPortalMesh()
-    {
-        string[] guids = AssetDatabase.FindAssets("t:Mesh");
-        Mesh best = null;
-        int bestScore = int.MinValue;
-
-        foreach (string guid in guids)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath(path);
-            foreach (Mesh mesh in assets.OfType<Mesh>())
-            {
-                string n = mesh.name.ToLowerInvariant();
-                int score = 0;
-                if (n.Contains("rick") && n.Contains("portal")) score += 100;
-                if (n.Contains("portal") && n.Contains("circle")) score += 90;
-                if (n.Contains("circle02")) score += 80;
-                if (n.Contains("circle01")) score += 70;
-                if (n.Contains("portal")) score += 50;
-                if (n.Contains("circle")) score += 25;
-                if (n.Contains("ring")) score += 20;
-
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    best = mesh;
-                }
-            }
-        }
-
-        return bestScore >= 25 ? best : null;
     }
 }
 #endif
