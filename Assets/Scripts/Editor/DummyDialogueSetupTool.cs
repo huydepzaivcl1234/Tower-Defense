@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using DialogueEditor;
 using UnityEditor;
 using UnityEngine;
@@ -41,6 +42,13 @@ public static class DummyDialogueSetupTool
             manager.ScrollText = true;
             manager.AllowMouseInteraction = true;
             EditorUtility.SetDirty(manager);
+
+            SetupPresentation(manager);
+
+            if (manager.DialoguePanel != null)
+                manager.DialoguePanel.gameObject.SetActive(false);
+            if (manager.OptionsPanel != null)
+                manager.OptionsPanel.gameObject.SetActive(false);
         }
 
         EditorUtility.SetDirty(selected);
@@ -53,11 +61,12 @@ public static class DummyDialogueSetupTool
         EditorUtility.DisplayDialog(
             "NPC Dialogue Setup",
             "Setup complete for '" + selected.name + "'.\n\n" +
-            "1. Use the NPCConversation component / Dialogue Editor to write your own dialogue.\n" +
-            "2. Assign one or more SHORT blip clips to NPCDialogueInteractable > Voice Clips.\n" +
-            "3. Tune Voice Volume, Pitch Min/Max and Play Every N Characters.\n" +
-            "4. DialogueEditor Scroll Text + mouse interaction were enabled automatically.\n\n" +
-            "Click the NPC in Play Mode to start talking.",
+            "- Click NPC to start dialogue.\n" +
+            "- Gameplay HUD smoothly slides off-screen while talking.\n" +
+            "- ESC instantly cancels the dialogue.\n" +
+            "- HUD smoothly returns after dialogue.\n" +
+            "- Dialogue UI stays hidden while idle.\n\n" +
+            "All slide offsets/timing are editable on ConversationManager > DialogueHUDPresentationController.",
             "OK");
     }
 
@@ -87,6 +96,53 @@ public static class DummyDialogueSetupTool
         Undo.RegisterCreatedObjectUndo(instance, "Create DialogueEditor ConversationManager");
         instance.name = "ConversationManager";
         return instance.GetComponent<ConversationManager>();
+    }
+
+    private static void SetupPresentation(ConversationManager manager)
+    {
+        DialogueHUDPresentationController controller = manager.GetComponent<DialogueHUDPresentationController>();
+        if (controller == null)
+            controller = Undo.AddComponent<DialogueHUDPresentationController>(manager.gameObject);
+
+        Undo.RecordObject(controller, "Configure Dialogue HUD Presentation");
+        controller.conversationManager = manager;
+        controller.slideOutDuration = 0.35f;
+        controller.slideInDuration = 0.35f;
+        controller.allowEscapeCancel = true;
+        controller.hideDialogueUIWhenIdle = true;
+
+        controller.hudTargets = new List<DialogueHUDPresentationController.HUDSlideTarget>();
+        AddTarget(controller, "ResourceHUD", new Vector2(-520f, 0f));
+        AddTarget(controller, "WaveHUD", new Vector2(0f, 320f));
+        AddTarget(controller, "BuildDock", new Vector2(0f, -320f));
+        AddTarget(controller, "UpgradePanelClean", new Vector2(560f, 0f));
+        AddTarget(controller, "QoLTopRight", new Vector2(520f, 0f));
+        AddTarget(controller, "RelicOwnedHUD", new Vector2(-520f, 0f));
+
+        EditorUtility.SetDirty(controller);
+    }
+
+    private static void AddTarget(DialogueHUDPresentationController controller, string objectName, Vector2 hiddenOffset)
+    {
+        RectTransform target = FindRectTransformByName(objectName);
+        if (target == null) return;
+
+        controller.hudTargets.Add(new DialogueHUDPresentationController.HUDSlideTarget
+        {
+            target = target,
+            hiddenOffset = hiddenOffset
+        });
+    }
+
+    private static RectTransform FindRectTransformByName(string objectName)
+    {
+        RectTransform[] all = Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include);
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i] != null && all[i].name == objectName)
+                return all[i];
+        }
+        return null;
     }
 
     private static void EnsureRootCollider(GameObject npc)
