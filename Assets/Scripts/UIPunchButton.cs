@@ -29,7 +29,7 @@ public class UIPunchButton : MonoBehaviour,
     [Range(1f, 1.50f)] public float hoverBrightness = 1.12f;
 
     [Header("Dynamic UI Safety")]
-    [Tooltip("Prevents a button that appears underneath the current mouse position from instantly playing its hover animation. Hover is armed after the pointer exits once.")]
+    [Tooltip("Prevents a button that appears underneath the current mouse position from instantly playing its hover animation. If the mouse is outside when it appears, hover works immediately.")]
     public bool suppressHoverUntilPointerExitAfterEnable = true;
 
     private Button button;
@@ -42,16 +42,19 @@ public class UIPunchButton : MonoBehaviour,
     private bool isHovered;
     private bool isPressed;
     private bool hoverArmed;
+    private bool isDialogueOption;
+    private bool dialogueTransitionPrepared;
 
     private void Awake()
     {
         button = GetComponent<Button>();
         targetGraphic = button != null ? button.targetGraphic : null;
         baseScale = transform.localScale;
-        if (targetGraphic != null)
-            baseGraphicColor = targetGraphic.color;
 
-        hoverArmed = !suppressHoverUntilPointerExitAfterEnable;
+        DetectDialogueOption();
+        PrepareDialogueOptionTransition();
+        CaptureBaseGraphicColor();
+        RefreshHoverArmedState();
     }
 
     private void OnEnable()
@@ -59,15 +62,16 @@ public class UIPunchButton : MonoBehaviour,
         if (!isHovered && !isPressed)
             baseScale = transform.localScale;
 
-        if (button == null) button = GetComponent<Button>();
-        targetGraphic = button != null ? button.targetGraphic : null;
-        if (targetGraphic != null && !isHovered)
-            baseGraphicColor = targetGraphic.color;
+        if (button == null)
+            button = GetComponent<Button>();
 
-        // Dynamic dialogue/options panels can appear directly below a stationary cursor.
-        // Unity then sends PointerEnter immediately, which used to make an option look selected.
-        // Start neutral and require one real pointer exit before hover feedback is allowed.
-        hoverArmed = !suppressHoverUntilPointerExitAfterEnable;
+        targetGraphic = button != null ? button.targetGraphic : null;
+
+        DetectDialogueOption();
+        PrepareDialogueOptionTransition();
+        CaptureBaseGraphicColor();
+
+        RefreshHoverArmedState();
         ResetVisualImmediate();
     }
 
@@ -77,41 +81,53 @@ public class UIPunchButton : MonoBehaviour,
         colorTween?.Kill();
         isHovered = false;
         isPressed = false;
-        hoverArmed = !suppressHoverUntilPointerExitAfterEnable;
+        hoverArmed = false;
         transform.localScale = baseScale;
         if (targetGraphic != null)
             targetGraphic.color = baseGraphicColor;
     }
 
     /// <summary>
-    /// Updates the non-hover color owned by an external UI state controller (for example 1x/2x/3x speed selection).
-    /// If currently hovered, the visible color remains brightened from this new base instead of reverting to stale white.
+    /// Updates the non-hover color owned by an external UI state controller.
     /// </summary>
     public void SetBaseGraphicColor(Color color, bool applyImmediately = true)
     {
-        if (button == null) button = GetComponent<Button>();
+        if (button == null)
+            button = GetComponent<Button>();
+
         targetGraphic = button != null ? button.targetGraphic : null;
         baseGraphicColor = color;
 
-        if (!applyImmediately || targetGraphic == null) return;
+        if (!applyImmediately || targetGraphic == null)
+            return;
 
         colorTween?.Kill();
         targetGraphic.color = isHovered ? Brightened(baseGraphicColor) : baseGraphicColor;
     }
 
     /// <summary>
-    /// Forces a freshly spawned/reused button back to a neutral state and requires the pointer
-    /// to leave it before a future PointerEnter can animate it.
+    /// Forces a freshly spawned/reused button back to neutral. Hover is only blocked when the
+    /// pointer is already inside this button at that moment.
+    /// </summary>
+    public void PrepareDynamicSpawnHover()
+    {
+        RefreshHoverArmedState();
+        ResetVisualImmediate();
+    }
+
+    /// <summary>
+    /// Backwards-compatible helper. This now uses actual pointer position instead of always
+    /// forcing the next real hover to be ignored.
     /// </summary>
     public void SuppressHoverUntilPointerExit()
     {
-        hoverArmed = false;
-        ResetVisualImmediate();
+        PrepareDynamicSpawnHover();
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (!CanAnimate()) return;
+        if (!CanAnimate())
+            return;
 
         if (!hoverArmed)
         {
@@ -119,8 +135,6 @@ public class UIPunchButton : MonoBehaviour,
             return;
         }
 
-        // Capture the current runtime state before hover. This is important for buttons whose base
-        // color changes dynamically, such as selected/unselected speed controls.
         if (targetGraphic != null && !isHovered)
             baseGraphicColor = targetGraphic.color;
 
@@ -133,7 +147,6 @@ public class UIPunchButton : MonoBehaviour,
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        // A genuine exit arms hover for the next time the pointer enters.
         hoverArmed = true;
         isHovered = false;
         AnimateBrightness(false);
@@ -144,10 +157,9 @@ public class UIPunchButton : MonoBehaviour,
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        if (!CanAnimate()) return;
+        if (!CanAnimate())
+            return;
 
-        // Do not allow a synthetic initial hover state to transition into a press animation.
-        // A direct click is still valid; pressing itself explicitly arms the control.
         hoverArmed = true;
         isPressed = true;
         scaleTween?.Kill();
@@ -158,7 +170,8 @@ public class UIPunchButton : MonoBehaviour,
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        if (!CanAnimate()) return;
+        if (!CanAnimate())
+            return;
 
         isPressed = false;
         PunchBack();
@@ -167,6 +180,64 @@ public class UIPunchButton : MonoBehaviour,
     private bool CanAnimate()
     {
         return button != null && button.interactable;
+    }
+
+    private void DetectDialogueOption()
+    {
+        string objectName = gameObject.name;
+        isDialogueOption = !string.IsNullOrEmpty(objectName) &&
+            objectName.StartsWith("ConversationButton", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void PrepareDialogueOptionTransition()
+    {
+        if (!isDialogueOption || button == null || dialogueTransitionPrepared)
+            return;
+
+        // DialogueEditor's prefab already uses Button Color Tint. Running that together with
+        // UIPunchButton causes the target Image to be tinted/faded while our tween is also
+        // changing it. Keep one visual system only for dialogue choices.
+        Color normal = button.colors.normalColor;
+        button.transition = Selectable.Transition.None;
+
+        targetGraphic = button.targetGraphic;
+        if (targetGraphic != null)
+            targetGraphic.color = normal;
+
+        dialogueTransitionPrepared = true;
+    }
+
+    private void CaptureBaseGraphicColor()
+    {
+        if (targetGraphic != null && !isHovered)
+            baseGraphicColor = targetGraphic.color;
+    }
+
+    private void RefreshHoverArmedState()
+    {
+        if (!suppressHoverUntilPointerExitAfterEnable)
+        {
+            hoverArmed = true;
+            return;
+        }
+
+        // Only suppress the synthetic PointerEnter case: the control spawned directly under a
+        // stationary pointer. If the pointer is outside, the very first real hover should work.
+        hoverArmed = !IsPointerCurrentlyInside();
+    }
+
+    private bool IsPointerCurrentlyInside()
+    {
+        RectTransform rect = transform as RectTransform;
+        if (rect == null)
+            return false;
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        Camera eventCamera = null;
+        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            eventCamera = canvas.worldCamera;
+
+        return RectTransformUtility.RectangleContainsScreenPoint(rect, Input.mousePosition, eventCamera);
     }
 
     private Vector3 GetRestScale()
@@ -196,7 +267,8 @@ public class UIPunchButton : MonoBehaviour,
 
     private void AnimateBrightness(bool bright)
     {
-        if (targetGraphic == null) return;
+        if (targetGraphic == null)
+            return;
 
         colorTween?.Kill();
         Color target = bright ? Brightened(baseGraphicColor) : baseGraphicColor;
