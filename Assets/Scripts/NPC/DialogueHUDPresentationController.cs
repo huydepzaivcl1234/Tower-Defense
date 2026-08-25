@@ -24,15 +24,16 @@ public class DialogueHUDPresentationController : MonoBehaviour
     public bool hideDialogueUIWhenIdle = true;
 
     [Header("Option Layout")]
-    [Tooltip("If enabled, dialogue choices are arranged left-to-right under the speech box.")]
+    [Tooltip("If enabled, dialogue choices are arranged left-to-right under the speech box without adding another LayoutGroup component.")]
     public bool horizontalOptions = true;
     [Min(0f)] public float optionSpacing = 12f;
     public RectOffset optionPadding;
     public TextAnchor optionChildAlignment = TextAnchor.MiddleCenter;
+    [Tooltip("Automatically give every visible option an equal width inside Panel_Options.")]
     public bool controlOptionWidth = true;
+    [Tooltip("Automatically apply Option Height to visible choices.")]
     public bool controlOptionHeight = true;
-    public bool expandOptionWidth = true;
-    public bool expandOptionHeight = false;
+    [Min(1f)] public float optionHeight = 50f;
     [Tooltip("Optional explicit size for Panel_Options. X/Y <= 0 keeps its existing size.")]
     public Vector2 optionPanelSize = Vector2.zero;
     [Tooltip("Optional anchored-position offset added to Panel_Options while horizontal layout is active.")]
@@ -99,6 +100,7 @@ public class DialogueHUDPresentationController : MonoBehaviour
     private void OnValidate()
     {
         optionSpacing = Mathf.Max(0f, optionSpacing);
+        optionHeight = Mathf.Max(1f, optionHeight);
         slideOutDuration = Mathf.Max(0f, slideOutDuration);
         slideInDuration = Mathf.Max(0f, slideInDuration);
 
@@ -112,6 +114,9 @@ public class DialogueHUDPresentationController : MonoBehaviour
 
     private void Update()
     {
+        if (conversationManager != null && conversationManager.IsConversationActive && horizontalOptions)
+            ArrangeOptionsHorizontally();
+
         if (!allowEscapeCancel || conversationManager == null || !conversationManager.IsConversationActive)
             return;
 
@@ -143,38 +148,101 @@ public class DialogueHUDPresentationController : MonoBehaviour
         CaptureOptionPanelTransform();
 
         VerticalLayoutGroup vertical = panel.GetComponent<VerticalLayoutGroup>();
-        HorizontalLayoutGroup horizontal = panel.GetComponent<HorizontalLayoutGroup>();
+        if (vertical != null)
+            vertical.enabled = !horizontalOptions;
 
-        if (horizontalOptions)
-        {
-            if (vertical != null)
-                vertical.enabled = false;
-
-            if (horizontal == null)
-                horizontal = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
-
-            horizontal.enabled = true;
-            horizontal.spacing = optionSpacing;
-            horizontal.padding = CopyRectOffset(optionPadding);
-            horizontal.childAlignment = optionChildAlignment;
-            horizontal.childControlWidth = controlOptionWidth;
-            horizontal.childControlHeight = controlOptionHeight;
-            horizontal.childForceExpandWidth = expandOptionWidth;
-            horizontal.childForceExpandHeight = expandOptionHeight;
-        }
-        else
-        {
-            if (horizontal != null)
-                horizontal.enabled = false;
-            if (vertical != null)
-                vertical.enabled = true;
-        }
+        // Remove a HorizontalLayoutGroup left behind by an older version of this script.
+        // Unity does not permit both HorizontalLayoutGroup and VerticalLayoutGroup on the same object.
+        HorizontalLayoutGroup oldHorizontal = panel.GetComponent<HorizontalLayoutGroup>();
+        if (oldHorizontal != null)
+            oldHorizontal.enabled = false;
 
         Vector2 size = optionPanelBaseSize;
         if (optionPanelSize.x > 0f) size.x = optionPanelSize.x;
         if (optionPanelSize.y > 0f) size.y = optionPanelSize.y;
         panel.sizeDelta = size;
         panel.anchoredPosition = optionPanelBasePosition + optionPanelPositionOffset;
+
+        if (horizontalOptions)
+            ArrangeOptionsHorizontally();
+    }
+
+    private void ArrangeOptionsHorizontally()
+    {
+        if (conversationManager == null || conversationManager.OptionsPanel == null)
+            return;
+
+        RectTransform panel = conversationManager.OptionsPanel;
+        EnsureOptionPadding();
+
+        List<RectTransform> visibleOptions = new List<RectTransform>();
+        for (int i = 0; i < panel.childCount; i++)
+        {
+            Transform child = panel.GetChild(i);
+            if (child == null || !child.gameObject.activeSelf)
+                continue;
+
+            RectTransform rect = child as RectTransform;
+            if (rect != null)
+                visibleOptions.Add(rect);
+        }
+
+        int count = visibleOptions.Count;
+        if (count == 0)
+            return;
+
+        float left = optionPadding != null ? optionPadding.left : 0f;
+        float right = optionPadding != null ? optionPadding.right : 0f;
+        float top = optionPadding != null ? optionPadding.top : 0f;
+        float bottom = optionPadding != null ? optionPadding.bottom : 0f;
+
+        float panelWidth = panel.rect.width;
+        float panelHeight = panel.rect.height;
+        if (panelWidth <= 0f) panelWidth = panel.sizeDelta.x;
+        if (panelHeight <= 0f) panelHeight = panel.sizeDelta.y;
+
+        float availableWidth = Mathf.Max(1f, panelWidth - left - right - optionSpacing * (count - 1));
+        float equalWidth = availableWidth / count;
+        float y = GetAlignedY(panelHeight, optionHeight, top, bottom);
+        float cursorX = left;
+
+        for (int i = 0; i < count; i++)
+        {
+            RectTransform rect = visibleOptions[i];
+
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+
+            Vector2 size = rect.sizeDelta;
+            if (controlOptionWidth)
+                size.x = equalWidth;
+            if (controlOptionHeight)
+                size.y = optionHeight;
+            rect.sizeDelta = size;
+
+            rect.anchoredPosition = new Vector2(cursorX, y);
+            cursorX += size.x + optionSpacing;
+        }
+    }
+
+    private float GetAlignedY(float panelHeight, float childHeight, float top, float bottom)
+    {
+        switch (optionChildAlignment)
+        {
+            case TextAnchor.UpperLeft:
+            case TextAnchor.UpperCenter:
+            case TextAnchor.UpperRight:
+                return panelHeight * 0.5f - top - childHeight * 0.5f;
+
+            case TextAnchor.LowerLeft:
+            case TextAnchor.LowerCenter:
+            case TextAnchor.LowerRight:
+                return -panelHeight * 0.5f + bottom + childHeight * 0.5f;
+
+            default:
+                return (bottom - top) * 0.5f;
+        }
     }
 
     public void CancelConversationImmediately()
@@ -324,19 +392,6 @@ public class DialogueHUDPresentationController : MonoBehaviour
         optionPadding.right = 8;
         optionPadding.top = 4;
         optionPadding.bottom = 4;
-    }
-
-    private static RectOffset CopyRectOffset(RectOffset source)
-    {
-        RectOffset copy = new RectOffset();
-        if (source == null)
-            return copy;
-
-        copy.left = source.left;
-        copy.right = source.right;
-        copy.top = source.top;
-        copy.bottom = source.bottom;
-        return copy;
     }
 
     private void HideDialoguePanelsImmediately()
