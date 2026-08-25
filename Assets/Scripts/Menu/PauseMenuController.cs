@@ -54,6 +54,11 @@ public class PauseMenuController : MonoBehaviour
         RefreshGearVisibility();
 
         if (!Input.GetKeyDown(pauseKey)) return;
+
+        if (DialogueEditor.ConversationManager.Instance != null &&
+            DialogueEditor.ConversationManager.Instance.IsConversationActive)
+            return;
+
         if (mainMenu == null || !mainMenu.GameplayStarted) return;
 
         if (mainMenu.IsSettingsVisible)
