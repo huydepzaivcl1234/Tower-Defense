@@ -27,7 +27,7 @@ public class DialogueHUDPresentationController : MonoBehaviour
     [Tooltip("If enabled, dialogue choices are arranged left-to-right under the speech box.")]
     public bool horizontalOptions = true;
     [Min(0f)] public float optionSpacing = 12f;
-    public RectOffset optionPadding = new RectOffset(8, 8, 4, 4);
+    public RectOffset optionPadding;
     public TextAnchor optionChildAlignment = TextAnchor.MiddleCenter;
     public bool controlOptionWidth = true;
     public bool controlOptionHeight = true;
@@ -58,8 +58,15 @@ public class DialogueHUDPresentationController : MonoBehaviour
     private Vector2 optionPanelBaseSize;
     private bool optionPanelTransformCaptured;
 
+    private void Reset()
+    {
+        EnsureOptionPadding();
+    }
+
     private void Awake()
     {
+        EnsureOptionPadding();
+
         if (conversationManager == null)
             conversationManager = GetComponent<ConversationManager>();
 
@@ -70,6 +77,7 @@ public class DialogueHUDPresentationController : MonoBehaviour
 
     private void Start()
     {
+        EnsureOptionPadding();
         ApplyOptionLayout();
 
         if (hideDialogueUIWhenIdle && (conversationManager == null || !conversationManager.IsConversationActive))
@@ -97,6 +105,7 @@ public class DialogueHUDPresentationController : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
+        EnsureOptionPadding();
         CaptureOptionPanelTransform();
         ApplyOptionLayout();
     }
@@ -127,6 +136,8 @@ public class DialogueHUDPresentationController : MonoBehaviour
     {
         if (conversationManager == null || conversationManager.OptionsPanel == null)
             return;
+
+        EnsureOptionPadding();
 
         RectTransform panel = conversationManager.OptionsPanel;
         CaptureOptionPanelTransform();
@@ -303,11 +314,29 @@ public class DialogueHUDPresentationController : MonoBehaviour
         optionPanelTransformCaptured = true;
     }
 
+    private void EnsureOptionPadding()
+    {
+        if (optionPadding != null)
+            return;
+
+        optionPadding = new RectOffset();
+        optionPadding.left = 8;
+        optionPadding.right = 8;
+        optionPadding.top = 4;
+        optionPadding.bottom = 4;
+    }
+
     private static RectOffset CopyRectOffset(RectOffset source)
     {
+        RectOffset copy = new RectOffset();
         if (source == null)
-            return new RectOffset();
-        return new RectOffset(source.left, source.right, source.top, source.bottom);
+            return copy;
+
+        copy.left = source.left;
+        copy.right = source.right;
+        copy.top = source.top;
+        copy.bottom = source.bottom;
+        return copy;
     }
 
     private void HideDialoguePanelsImmediately()
