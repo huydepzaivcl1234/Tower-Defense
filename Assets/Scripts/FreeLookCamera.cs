@@ -7,9 +7,6 @@ using UnityEngine;
 ///
 /// Cursor locking is only allowed during active gameplay. Any menu/pause/end-game/relic-choice
 /// or DialogueEditor conversation state automatically releases the cursor.
-///
-/// Attach to Main Camera INSTEAD OF RTSCameraController - if both are enabled at once their
-/// WASD handling will fight each other. Disable/remove RTSCameraController first.
 /// </summary>
 [RequireComponent(typeof(Camera))]
 public class FreeLookCamera : MonoBehaviour
@@ -38,7 +35,7 @@ public class FreeLookCamera : MonoBehaviour
     public bool blockWhileEndGameVisible = true;
     [Tooltip("Block/unlock free-look while the relic choice screen is active.")]
     public bool blockWhileRelicChoiceVisible = true;
-    [Tooltip("Block/unlock free-look while a DialogueEditor conversation is active.")]
+    [Tooltip("Block/unlock free-look while a DialogueEditor conversation/UI is active.")]
     public bool blockWhileDialogueVisible = true;
 
     private float yaw;
@@ -77,11 +74,8 @@ public class FreeLookCamera : MonoBehaviour
     {
         MainMenuController mainMenu = MainMenuController.Instance;
 
-        if (requireGameplayStarted)
-        {
-            if (mainMenu != null && !mainMenu.GameplayStarted)
-                return false;
-        }
+        if (requireGameplayStarted && mainMenu != null && !mainMenu.GameplayStarted)
+            return false;
 
         if (blockWhileMenuVisible && mainMenu != null && mainMenu.IsAnyMenuVisible)
             return false;
@@ -99,14 +93,31 @@ public class FreeLookCamera : MonoBehaviour
         if (blockWhileRelicChoiceVisible && RelicChoiceUI.Instance != null && RelicChoiceUI.Instance.IsVisible)
             return false;
 
-        if (blockWhileDialogueVisible && DialogueEditor.ConversationManager.Instance != null &&
-            DialogueEditor.ConversationManager.Instance.IsConversationActive)
+        if (blockWhileDialogueVisible && IsDialogueUIActive())
             return false;
 
         if (blockWhilePaused && Time.timeScale <= 0f)
             return false;
 
         return true;
+    }
+
+    private static bool IsDialogueUIActive()
+    {
+        DialogueEditor.ConversationManager manager = DialogueEditor.ConversationManager.Instance;
+        if (manager == null)
+            return false;
+
+        if (manager.IsConversationActive)
+            return true;
+
+        if (manager.DialoguePanel != null && manager.DialoguePanel.gameObject.activeInHierarchy)
+            return true;
+
+        if (manager.OptionsPanel != null && manager.OptionsPanel.gameObject.activeInHierarchy)
+            return true;
+
+        return false;
     }
 
     private void SetLocked(bool value)
