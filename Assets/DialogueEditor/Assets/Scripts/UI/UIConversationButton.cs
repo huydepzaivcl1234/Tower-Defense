@@ -24,62 +24,22 @@ namespace DialogueEditor
 
         [SerializeField] private TMPro.TextMeshProUGUI TextMesh = null;
         [SerializeField] private Image OptionBackgroundImage = null;
-        private RectTransform m_rect;
 
         private eButtonType m_buttonType;
         private ConversationNode m_node;
-
-        private float m_hoverT = 0.0f;
-        private eHoverState m_hoverState;
-        private bool Hovering { get { return (m_hoverState == eHoverState.animatingOn || m_hoverState == eHoverState.animatingOff); } }
-        private Vector3 BigSize { get { return Vector3.one * 1.2f; } }
+        private eHoverState m_hoverState = eHoverState.idleOff;
 
         private void Awake()
         {
-            m_rect = GetComponent<RectTransform>();
+            // Visual hover/press animation is intentionally handled by DialogueOptionButtonAnimator.
+            // Keep the pack button at neutral scale from its first frame so SetSelectedOption(0)
+            // cannot visually auto-punch the first option.
+            transform.localScale = Vector3.one;
         }
 
-        private void Update()
+        private void OnEnable()
         {
-            // When our custom dialogue option animator is present it owns ALL visual hover/press
-            // feedback. Keep this legacy animation path disabled to avoid two systems fighting over
-            // localScale. Input/selection behaviour from DialogueEditor is preserved.
-            if (GetComponent<DialogueOptionButtonAnimator>() != null)
-            {
-                if (m_rect != null && m_rect.localScale != Vector3.one)
-                    m_rect.localScale = Vector3.one;
-                return;
-            }
-
-            if (Hovering)
-            {
-                m_hoverT += Time.deltaTime;
-                float normalised = m_hoverT / 0.2f;
-                bool done = false;
-                if (normalised >= 1)
-                {
-                    normalised = 1;
-                    done = true;
-                }
-
-                Vector3 size = Vector3.one;
-                float ease = EaseOutQuart(normalised);
-
-                switch (m_hoverState)
-                {
-                    case eHoverState.animatingOn:
-                        size = Vector3.Lerp(Vector3.one, BigSize, ease);
-                        break;
-                    case eHoverState.animatingOff:
-                        size = Vector3.Lerp(BigSize, Vector3.one, ease);
-                        break;
-                }
-
-                m_rect.localScale = size;
-
-                if (done)
-                    m_hoverState = (m_hoverState == eHoverState.animatingOn) ? eHoverState.idleOn : eHoverState.idleOff;
-            }
+            transform.localScale = Vector3.one;
         }
 
         public void OnHover(bool hovering)
@@ -105,29 +65,16 @@ namespace DialogueEditor
 
         public void SetHovering(bool selected)
         {
-            // Selection remains functional for DialogueEditor's mouse/keyboard navigation, but when
-            // our custom animator exists we do not run the pack's legacy 1.2x scale animation.
-            if (GetComponent<DialogueOptionButtonAnimator>() != null)
-            {
-                m_hoverState = selected ? eHoverState.idleOn : eHoverState.idleOff;
-                m_hoverT = 0f;
-                return;
-            }
-
-            if (selected && (m_hoverState == eHoverState.animatingOn || m_hoverState == eHoverState.idleOn)) { return; }
-            if (!selected && (m_hoverState == eHoverState.animatingOff || m_hoverState == eHoverState.idleOff)) { return; }
-
-            m_hoverState = selected ? eHoverState.animatingOn : eHoverState.animatingOff;
-            m_hoverT = 0f;
+            // Keep DialogueEditor's logical selection state, but never touch scale/color here.
+            // This prevents its built-in 1.2x hover animation from fighting the custom game UI animator.
+            m_hoverState = selected ? eHoverState.idleOn : eHoverState.idleOff;
         }
 
         public void SetImage(Sprite sprite, bool sliced)
         {
-            if (sprite != null)
-            {
-                OptionBackgroundImage.sprite = sprite;
-                OptionBackgroundImage.type = sliced ? Image.Type.Sliced : Image.Type.Simple;
-            }
+            if (sprite == null) return;
+            OptionBackgroundImage.sprite = sprite;
+            OptionBackgroundImage.type = sliced ? Image.Type.Sliced : Image.Type.Simple;
         }
 
         public void InitButton(OptionNode option)
@@ -137,12 +84,12 @@ namespace DialogueEditor
 
         public void SetAlpha(float a)
         {
-            Color c_image = OptionBackgroundImage.color;
-            Color c_text = TextMesh.color;
-            c_image.a = a;
-            c_text.a = a;
-            OptionBackgroundImage.color = c_image;
-            TextMesh.color = c_text;
+            Color imageColor = OptionBackgroundImage.color;
+            Color textColor = TextMesh.color;
+            imageColor.a = a;
+            textColor.a = a;
+            OptionBackgroundImage.color = imageColor;
+            TextMesh.color = textColor;
         }
 
         public void SetupButton(eButtonType buttonType, ConversationNode node, TMPro.TMP_FontAsset continueFont = null, TMPro.TMP_FontAsset endFont = null)
@@ -181,11 +128,6 @@ namespace DialogueEditor
                     ConversationManager.Instance.EndButtonSelected();
                     break;
             }
-        }
-
-        private static float EaseOutQuart(float normalized)
-        {
-            return 1 - Mathf.Pow(1 - normalized, 4);
         }
     }
 }
