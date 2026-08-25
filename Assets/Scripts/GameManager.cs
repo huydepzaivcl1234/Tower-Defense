@@ -17,6 +17,7 @@ public class GameManager : MonoBehaviour
 
     public static event System.Action<int> OnGoldChanged;
     public static event System.Action<int> OnLivesChanged;
+    public static event System.Action<int> OnGoldSpent;
     public static event System.Action OnGameOver;
     public static event System.Action OnGameWon;
 
@@ -36,9 +37,11 @@ public class GameManager : MonoBehaviour
 
     public bool SpendGold(int amount)
     {
+        if (amount <= 0) return true;
         if (amount > CurrentGold) return false;
         CurrentGold -= amount;
         OnGoldChanged?.Invoke(CurrentGold);
+        OnGoldSpent?.Invoke(amount);
         return true;
     }
 
