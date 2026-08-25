@@ -11,9 +11,19 @@ public class QuestDialogueBridge : MonoBehaviour
     [Tooltip("Optional explicit manager. If empty, QuestManager.Instance is used.")]
     public QuestManager questManager;
 
+    [Header("NPC Lifecycle")]
+    [Tooltip("Optional. If assigned, this NPC disappears after giving a quest and respawns when that quest is completed.")]
+    public NPCQuestLifecycle npcLifecycle;
+
     [Header("Feedback")]
     public bool logAcceptedQuest = true;
     public bool logWhenNoQuestAvailable = true;
+
+    private void Awake()
+    {
+        if (npcLifecycle == null)
+            npcLifecycle = GetComponent<NPCQuestLifecycle>();
+    }
 
     public void AcceptEasyQuest() => AcceptDifficulty(QuestDifficulty.Easy);
     public void AcceptMediumQuest() => AcceptDifficulty(QuestDifficulty.Medium);
@@ -42,6 +52,10 @@ public class QuestDialogueBridge : MonoBehaviour
                 Debug.LogWarning($"QuestDialogueBridge: quest '{quest.questTitle}' could not be accepted.", this);
             return;
         }
+
+        if (npcLifecycle == null)
+            npcLifecycle = GetComponent<NPCQuestLifecycle>();
+        npcLifecycle?.TrackAcceptedQuest(quest);
 
         if (logAcceptedQuest)
             Debug.Log($"Quest accepted [{difficulty}]: {quest.questTitle} ({quest.objectiveType} 0/{Mathf.Max(1, quest.targetAmount)})", this);
