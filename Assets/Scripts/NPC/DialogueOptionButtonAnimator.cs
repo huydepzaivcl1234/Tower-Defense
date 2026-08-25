@@ -4,8 +4,8 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Deterministic visual feedback for runtime-created DialogueEditor option buttons.
-/// This component intentionally ignores EventSystem hover callbacks and polls the actual pointer
-/// position instead. It owns scale + RGB only; DialogueEditor remains the sole owner of alpha/fades.
+/// It ignores EventSystem hover callbacks and polls the actual pointer position instead.
+/// This component owns scale + RGB brightness only. DialogueEditor remains the sole owner of alpha/fades.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Button))]
@@ -18,6 +18,7 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
 
     private readonly Vector3 baseScale = Vector3.one;
     private Color baseRgb = Color.white;
+    private float brightnessFactor = 1f;
 
     private float pressedScale = 0.93f;
     private float pressDuration = 0.07f;
@@ -30,11 +31,10 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
     private bool configured;
     private bool pointerWasInside;
     private bool mustExitBeforeHover;
-    private bool hovered;
     private bool pressed;
 
     private Tween scaleTween;
-    private Tween colorTween;
+    private Tween brightnessTween;
 
     private void Awake()
     {
@@ -51,14 +51,14 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
     private void OnDisable()
     {
         KillTweens();
-        hovered = false;
         pressed = false;
         pointerWasInside = false;
         mustExitBeforeHover = false;
+        brightnessFactor = 1f;
 
         if (rectTransform != null)
             rectTransform.localScale = baseScale;
-        ApplyRgbImmediate(baseRgb);
+        ApplyBrightnessImmediate();
     }
 
     public void Configure(
@@ -82,15 +82,14 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
         hoverDuration = Mathf.Max(0.01f, newHoverDuration);
         hoverBrightness = Mathf.Max(1f, newHoverBrightness);
 
-        // Exactly one transition system owns the option visuals.
+        // One visual transition owner only.
         button.transition = Selectable.Transition.None;
-
         rectTransform.localScale = baseScale;
 
         if (targetGraphic != null)
         {
-            Color source = targetGraphic.color;
-            baseRgb = new Color(source.r, source.g, source.b, 1f);
+            Color c = targetGraphic.color;
+            baseRgb = new Color(c.r, c.g, c.b, 1f);
         }
 
         configured = true;
@@ -104,7 +103,7 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
 
         bool inside = IsPointerInside();
 
-        // Spawned under the cursor: remain strictly neutral until a real exit occurs.
+        // A freshly-created option underneath a stationary cursor stays neutral until the cursor exits.
         if (mustExitBeforeHover)
         {
             if (inside)
@@ -135,11 +134,12 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
     private void ResetSpawnState()
     {
         KillTweens();
-        hovered = false;
         pressed = false;
+        brightnessFactor = 1f;
+
         if (rectTransform != null)
             rectTransform.localScale = baseScale;
-        ApplyRgbImmediate(baseRgb);
+        ApplyBrightnessImmediate();
 
         bool inside = IsPointerInside();
         pointerWasInside = inside;
@@ -148,17 +148,15 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
 
     private void BeginHover()
     {
-        hovered = true;
         AnimateScale(baseScale * hoverScale, hoverDuration, Ease.OutBack);
-        AnimateRgb(Brightened(baseRgb), hoverDuration);
+        AnimateBrightness(hoverBrightness, hoverDuration);
     }
 
     private void EndHover()
     {
-        hovered = false;
         if (!pressed)
             AnimateScale(baseScale, hoverDuration, Ease.OutQuad);
-        AnimateRgb(baseRgb, hoverDuration);
+        AnimateBrightness(1f, hoverDuration);
     }
 
     private void BeginPress()
@@ -170,28 +168,27 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
     private void EndPress(bool pointerStillInside)
     {
         pressed = false;
-        hovered = pointerStillInside;
-
         Vector3 rest = pointerStillInside ? baseScale * hoverScale : baseScale;
-        scaleTween?.Kill();
 
+        scaleTween?.Kill();
         Sequence sequence = DOTween.Sequence().SetUpdate(true);
         if (overshoot > 0f)
             sequence.Append(rectTransform.DOScale(rest * (1f + overshoot), releaseDuration * 0.45f).SetEase(Ease.OutQuad));
         sequence.Append(rectTransform.DOScale(rest, releaseDuration * 0.55f).SetEase(Ease.OutBack));
         scaleTween = sequence;
 
-        AnimateRgb(pointerStillInside ? Brightened(baseRgb) : baseRgb, hoverDuration);
+        AnimateBrightness(pointerStillInside ? hoverBrightness : 1f, hoverDuration);
     }
 
     private void ForceNeutral()
     {
         KillTweens();
-        hovered = false;
         pressed = false;
+        brightnessFactor = 1f;
+
         if (rectTransform != null)
             rectTransform.localScale = baseScale;
-        ApplyRgbImmediate(baseRgb);
+        ApplyBrightnessImmediate();
     }
 
     private bool IsPointerInside()
@@ -229,56 +226,41 @@ public class DialogueOptionButtonAnimator : MonoBehaviour
             .SetUpdate(true);
     }
 
-    private void AnimateRgb(Color rgb, float duration)
+    private void AnimateBrightness(float targetFactor, float duration)
     {
-        if (targetGraphic == null)
-            return;
-
-        colorTween?.Kill();
-        Color current = targetGraphic.color;
-        Color target = new Color(rgb.r, rgb.g, rgb.b, current.a);
-        colorTween = targetGraphic.DOColor(target, duration)
+        brightnessTween?.Kill();
+        brightnessTween = DOTween.To(
+                () => brightnessFactor,
+                value =>
+                {
+                    brightnessFactor = value;
+                    ApplyBrightnessImmediate();
+                },
+                targetFactor,
+                duration)
             .SetEase(Ease.OutQuad)
-            .SetUpdate(true)
-            .OnUpdate(PreserveCurrentAlpha);
+            .SetUpdate(true);
     }
 
-    private void ApplyRgbImmediate(Color rgb)
+    private void ApplyBrightnessImmediate()
     {
         if (targetGraphic == null)
             return;
 
+        // Preserve live alpha exactly as DialogueEditor currently owns it during fade-in/fade-out.
         Color current = targetGraphic.color;
-        targetGraphic.color = new Color(rgb.r, rgb.g, rgb.b, current.a);
-    }
-
-    private void PreserveCurrentAlpha()
-    {
-        // DialogueEditor's SetAlpha() owns alpha during fade transitions. DOTween may have captured
-        // an older alpha when the tween started, so overwrite only RGB while preserving live alpha.
-        if (targetGraphic == null)
-            return;
-
-        Color current = targetGraphic.color;
-        // Nothing else required here: Apply/target methods always preserve current alpha. This hook
-        // keeps the tween updated in unscaled time without introducing an alpha owner.
-        targetGraphic.color = current;
+        targetGraphic.color = new Color(
+            Mathf.Clamp01(baseRgb.r * brightnessFactor),
+            Mathf.Clamp01(baseRgb.g * brightnessFactor),
+            Mathf.Clamp01(baseRgb.b * brightnessFactor),
+            current.a);
     }
 
     private void KillTweens()
     {
         scaleTween?.Kill();
-        colorTween?.Kill();
+        brightnessTween?.Kill();
         scaleTween = null;
-        colorTween = null;
-    }
-
-    private Color Brightened(Color color)
-    {
-        return new Color(
-            Mathf.Clamp01(color.r * hoverBrightness),
-            Mathf.Clamp01(color.g * hoverBrightness),
-            Mathf.Clamp01(color.b * hoverBrightness),
-            1f);
+        brightnessTween = null;
     }
 }
