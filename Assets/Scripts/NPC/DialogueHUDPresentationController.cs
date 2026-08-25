@@ -24,13 +24,19 @@ public class DialogueHUDPresentationController : MonoBehaviour
     public bool hideDialogueUIWhenIdle = true;
 
     [Header("Option Layout")]
-    [Tooltip("If enabled, dialogue choices are arranged left-to-right under the speech box without adding another LayoutGroup component.")]
+    [Tooltip("Arrange dialogue choices left-to-right under the speech box.")]
     public bool horizontalOptions = true;
+    [Tooltip("Automatically distribute all visible choices symmetrically around the center of the panel.")]
+    public bool autoDistributeOptions = true;
     [Min(0f)] public float optionSpacing = 12f;
     public RectOffset optionPadding;
     public TextAnchor optionChildAlignment = TextAnchor.MiddleCenter;
-    [Tooltip("Automatically give every visible option an equal width inside Panel_Options.")]
+    [Tooltip("Automatically control option width.")]
     public bool controlOptionWidth = true;
+    [Tooltip("Maximum width of a single option. This keeps one choice centered instead of stretching across the whole panel.")]
+    [Min(1f)] public float maxSingleOptionWidth = 350f;
+    [Tooltip("Minimum width used when the panel has enough room.")]
+    [Min(1f)] public float minOptionWidth = 120f;
     [Tooltip("Automatically apply Option Height to visible choices.")]
     public bool controlOptionHeight = true;
     [Min(1f)] public float optionHeight = 50f;
@@ -38,6 +44,17 @@ public class DialogueHUDPresentationController : MonoBehaviour
     public Vector2 optionPanelSize = Vector2.zero;
     [Tooltip("Optional anchored-position offset added to Panel_Options while horizontal layout is active.")]
     public Vector2 optionPanelPositionOffset = Vector2.zero;
+
+    [Header("Option Hover / Punch")]
+    [Tooltip("Automatically add the same UIPunchButton feedback used by the rest of the game UI.")]
+    public bool useGameButtonAnimation = true;
+    [Range(0.82f, 0.98f)] public float optionPressedScale = 0.93f;
+    [Min(0.03f)] public float optionPressDuration = 0.07f;
+    [Min(0.03f)] public float optionReleaseDuration = 0.11f;
+    [Range(0f, 0.25f)] public float optionReleaseOvershoot = 0.06f;
+    [Range(1f, 1.20f)] public float optionHoverScale = 1.06f;
+    [Min(0.03f)] public float optionHoverDuration = 0.12f;
+    [Range(1f, 1.50f)] public float optionHoverBrightness = 1.12f;
 
     [Header("ESC Cancel")]
     public bool allowEscapeCancel = true;
@@ -101,6 +118,8 @@ public class DialogueHUDPresentationController : MonoBehaviour
     {
         optionSpacing = Mathf.Max(0f, optionSpacing);
         optionHeight = Mathf.Max(1f, optionHeight);
+        maxSingleOptionWidth = Mathf.Max(1f, maxSingleOptionWidth);
+        minOptionWidth = Mathf.Clamp(minOptionWidth, 1f, maxSingleOptionWidth);
         slideOutDuration = Mathf.Max(0f, slideOutDuration);
         slideInDuration = Mathf.Max(0f, slideInDuration);
 
@@ -151,8 +170,6 @@ public class DialogueHUDPresentationController : MonoBehaviour
         if (vertical != null)
             vertical.enabled = !horizontalOptions;
 
-        // Remove a HorizontalLayoutGroup left behind by an older version of this script.
-        // Unity does not permit both HorizontalLayoutGroup and VerticalLayoutGroup on the same object.
         HorizontalLayoutGroup oldHorizontal = panel.GetComponent<HorizontalLayoutGroup>();
         if (oldHorizontal != null)
             oldHorizontal.enabled = false;
@@ -201,29 +218,82 @@ public class DialogueHUDPresentationController : MonoBehaviour
         if (panelWidth <= 0f) panelWidth = panel.sizeDelta.x;
         if (panelHeight <= 0f) panelHeight = panel.sizeDelta.y;
 
-        float availableWidth = Mathf.Max(1f, panelWidth - left - right - optionSpacing * (count - 1));
-        float equalWidth = availableWidth / count;
+        float usableWidth = Mathf.Max(1f, panelWidth - left - right);
+        float width;
+
+        if (!controlOptionWidth)
+        {
+            width = visibleOptions[0].sizeDelta.x;
+        }
+        else if (count == 1)
+        {
+            width = Mathf.Min(maxSingleOptionWidth, usableWidth);
+        }
+        else
+        {
+            float equalWidth = (usableWidth - optionSpacing * (count - 1)) / count;
+            width = Mathf.Max(1f, equalWidth);
+
+            // When there is plenty of room, keep buttons readable without making them absurdly wide,
+            // then distribute the complete group symmetrically around the panel center.
+            if (autoDistributeOptions)
+                width = Mathf.Clamp(width, Mathf.Min(minOptionWidth, usableWidth / count), maxSingleOptionWidth);
+        }
+
+        float totalWidth = width * count + optionSpacing * (count - 1);
+        if (totalWidth > usableWidth && count > 0)
+        {
+            width = Mathf.Max(1f, (usableWidth - optionSpacing * (count - 1)) / count);
+            totalWidth = width * count + optionSpacing * (count - 1);
+        }
+
+        float startCenterX = -totalWidth * 0.5f + width * 0.5f + (left - right) * 0.5f;
         float y = GetAlignedY(panelHeight, optionHeight, top, bottom);
-        float cursorX = left;
 
         for (int i = 0; i < count; i++)
         {
             RectTransform rect = visibleOptions[i];
 
-            rect.anchorMin = new Vector2(0f, 0.5f);
-            rect.anchorMax = new Vector2(0f, 0.5f);
-            rect.pivot = new Vector2(0f, 0.5f);
+            // Center pivot is critical: UIPunchButton now grows/shrinks equally in every direction
+            // instead of appearing to zoom toward the right side.
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
 
             Vector2 size = rect.sizeDelta;
             if (controlOptionWidth)
-                size.x = equalWidth;
+                size.x = width;
             if (controlOptionHeight)
                 size.y = optionHeight;
             rect.sizeDelta = size;
 
-            rect.anchoredPosition = new Vector2(cursorX, y);
-            cursorX += size.x + optionSpacing;
+            float x = startCenterX + i * (width + optionSpacing);
+            rect.anchoredPosition = new Vector2(x, y);
+
+            ConfigureOptionAnimation(rect.gameObject);
         }
+    }
+
+    private void ConfigureOptionAnimation(GameObject optionObject)
+    {
+        if (!useGameButtonAnimation || optionObject == null)
+            return;
+
+        Button button = optionObject.GetComponent<Button>();
+        if (button == null)
+            return;
+
+        UIPunchButton punch = optionObject.GetComponent<UIPunchButton>();
+        if (punch == null)
+            punch = optionObject.AddComponent<UIPunchButton>();
+
+        punch.pressedScale = optionPressedScale;
+        punch.pressDuration = optionPressDuration;
+        punch.releaseDuration = optionReleaseDuration;
+        punch.overshoot = optionReleaseOvershoot;
+        punch.hoverScale = optionHoverScale;
+        punch.hoverDuration = optionHoverDuration;
+        punch.hoverBrightness = optionHoverBrightness;
     }
 
     private float GetAlignedY(float panelHeight, float childHeight, float top, float bottom)
