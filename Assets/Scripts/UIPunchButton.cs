@@ -28,6 +28,10 @@ public class UIPunchButton : MonoBehaviour,
     [Tooltip("How much brighter the button graphic becomes while hovered.")]
     [Range(1f, 1.50f)] public float hoverBrightness = 1.12f;
 
+    [Header("Dynamic UI Safety")]
+    [Tooltip("Prevents a button that appears underneath the current mouse position from instantly playing its hover animation. Hover is armed after the pointer exits once.")]
+    public bool suppressHoverUntilPointerExitAfterEnable = true;
+
     private Button button;
     private Graphic targetGraphic;
     private Vector3 baseScale;
@@ -37,6 +41,7 @@ public class UIPunchButton : MonoBehaviour,
     private Tween colorTween;
     private bool isHovered;
     private bool isPressed;
+    private bool hoverArmed;
 
     private void Awake()
     {
@@ -45,6 +50,8 @@ public class UIPunchButton : MonoBehaviour,
         baseScale = transform.localScale;
         if (targetGraphic != null)
             baseGraphicColor = targetGraphic.color;
+
+        hoverArmed = !suppressHoverUntilPointerExitAfterEnable;
     }
 
     private void OnEnable()
@@ -56,6 +63,12 @@ public class UIPunchButton : MonoBehaviour,
         targetGraphic = button != null ? button.targetGraphic : null;
         if (targetGraphic != null && !isHovered)
             baseGraphicColor = targetGraphic.color;
+
+        // Dynamic dialogue/options panels can appear directly below a stationary cursor.
+        // Unity then sends PointerEnter immediately, which used to make an option look selected.
+        // Start neutral and require one real pointer exit before hover feedback is allowed.
+        hoverArmed = !suppressHoverUntilPointerExitAfterEnable;
+        ResetVisualImmediate();
     }
 
     private void OnDisable()
@@ -64,6 +77,7 @@ public class UIPunchButton : MonoBehaviour,
         colorTween?.Kill();
         isHovered = false;
         isPressed = false;
+        hoverArmed = !suppressHoverUntilPointerExitAfterEnable;
         transform.localScale = baseScale;
         if (targetGraphic != null)
             targetGraphic.color = baseGraphicColor;
@@ -85,9 +99,25 @@ public class UIPunchButton : MonoBehaviour,
         targetGraphic.color = isHovered ? Brightened(baseGraphicColor) : baseGraphicColor;
     }
 
+    /// <summary>
+    /// Forces a freshly spawned/reused button back to a neutral state and requires the pointer
+    /// to leave it before a future PointerEnter can animate it.
+    /// </summary>
+    public void SuppressHoverUntilPointerExit()
+    {
+        hoverArmed = false;
+        ResetVisualImmediate();
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (!CanAnimate()) return;
+
+        if (!hoverArmed)
+        {
+            ResetVisualImmediate();
+            return;
+        }
 
         // Capture the current runtime state before hover. This is important for buttons whose base
         // color changes dynamically, such as selected/unselected speed controls.
@@ -103,6 +133,8 @@ public class UIPunchButton : MonoBehaviour,
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        // A genuine exit arms hover for the next time the pointer enters.
+        hoverArmed = true;
         isHovered = false;
         AnimateBrightness(false);
 
@@ -114,6 +146,9 @@ public class UIPunchButton : MonoBehaviour,
     {
         if (!CanAnimate()) return;
 
+        // Do not allow a synthetic initial hover state to transition into a press animation.
+        // A direct click is still valid; pressing itself explicitly arms the control.
+        hoverArmed = true;
         isPressed = true;
         scaleTween?.Kill();
         scaleTween = transform.DOScale(baseScale * pressedScale, pressDuration)
@@ -168,6 +203,17 @@ public class UIPunchButton : MonoBehaviour,
         colorTween = targetGraphic.DOColor(target, hoverDuration)
             .SetEase(Ease.OutQuad)
             .SetUpdate(true);
+    }
+
+    private void ResetVisualImmediate()
+    {
+        scaleTween?.Kill();
+        colorTween?.Kill();
+        isHovered = false;
+        isPressed = false;
+        transform.localScale = baseScale;
+        if (targetGraphic != null)
+            targetGraphic.color = baseGraphicColor;
     }
 
     private Color Brightened(Color color)
