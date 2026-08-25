@@ -68,9 +68,6 @@ public class TowerUpgradeUI : MonoBehaviour
         if (towerNameText != null) towerNameText.text = selectedTower.data.towerName;
         if (levelText != null) levelText.text = $"Level {selectedTower.CurrentLevelNumber}";
 
-        // Current Damage must show the tower's actual launch/base hit damage for THIS level only.
-        // Cannon Hero's travel-distance bonus is a projectile mechanic, not another tower level,
-        // so never render it as "520 -> 780" in the level stat row.
         if (strengthText != null) strengthText.text = CompactNumber.Format(curDamage);
         if (attackSpeedText != null) attackSpeedText.text = $"{CompactNumber.Format(curSpeed)}/s";
         if (rangeText != null) rangeText.text = CompactNumber.Format(curRange);
@@ -97,7 +94,6 @@ public class TowerUpgradeUI : MonoBehaviour
         }
         else
         {
-            // Max level: completely hide all next-level stat rows so no phantom level appears.
             if (nextLevelRoot != null) nextLevelRoot.SetActive(false);
             if (nextLevelTitleText != null) nextLevelTitleText.text = string.Empty;
             if (nextStrengthText != null) nextStrengthText.text = string.Empty;
@@ -126,6 +122,7 @@ public class TowerUpgradeUI : MonoBehaviour
         int cost = selectedTower.GetNextUpgradeCost();
         if (GameManager.Instance == null || !GameManager.Instance.SpendGold(cost)) return;
         selectedTower.Upgrade();
+        QuestManager.Instance?.NotifyTowerUpgraded(selectedTower);
         Refresh();
     }
 
