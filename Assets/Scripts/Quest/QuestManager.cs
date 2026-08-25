@@ -67,10 +67,8 @@ public class QuestManager : MonoBehaviour
         return selected != null && AcceptQuest(selected);
     }
 
-    public bool AcceptQuest(QuestData quest)
+    public bool CanAcceptMoreQuests()
     {
-        if (quest == null) return false;
-
         int activeCount = 0;
         for (int i = 0; i < activeQuests.Count; i++)
         {
@@ -78,16 +76,59 @@ public class QuestManager : MonoBehaviour
             if (existing != null && !existing.completed)
                 activeCount++;
         }
-        if (activeCount >= Mathf.Max(1, maxActiveQuests)) return false;
 
-        if (preventDuplicateActiveQuest)
+        return activeCount < Mathf.Max(1, maxActiveQuests);
+    }
+
+    /// <summary>
+    /// Returns true if at least one quest of the requested difficulty can currently be accepted.
+    /// This is objective-type agnostic, so future quest objective types work automatically.
+    /// </summary>
+    public bool HasAvailableQuest(QuestDifficulty difficulty)
+    {
+        if (!CanAcceptMoreQuests()) return false;
+
+        for (int i = 0; i < questPool.Count; i++)
         {
-            for (int i = 0; i < activeQuests.Count; i++)
-            {
-                if (activeQuests[i] != null && activeQuests[i].data == quest && !activeQuests[i].completed)
-                    return false;
-            }
+            QuestData quest = questPool[i];
+            if (quest == null || quest.difficulty != difficulty) continue;
+            if (Mathf.Max(0f, quest.selectionWeight) <= 0f) continue;
+            if (!quest.repeatable && completedNonRepeatable.Contains(quest)) continue;
+            if (preventDuplicateActiveQuest && IsQuestCurrentlyActive(quest)) continue;
+            return true;
         }
+
+        return false;
+    }
+
+    public bool HasAnyAvailableQuest()
+    {
+        return HasAvailableQuest(QuestDifficulty.Easy) ||
+               HasAvailableQuest(QuestDifficulty.Medium) ||
+               HasAvailableQuest(QuestDifficulty.Hard);
+    }
+
+    private bool IsQuestCurrentlyActive(QuestData quest)
+    {
+        if (quest == null) return false;
+
+        for (int i = 0; i < activeQuests.Count; i++)
+        {
+            ActiveQuest active = activeQuests[i];
+            if (active != null && !active.completed && active.data == quest)
+                return true;
+        }
+
+        return false;
+    }
+
+    public bool AcceptQuest(QuestData quest)
+    {
+        if (quest == null) return false;
+        if (!CanAcceptMoreQuests()) return false;
+
+        if (preventDuplicateActiveQuest && IsQuestCurrentlyActive(quest))
+            return false;
 
         if (!quest.repeatable && completedNonRepeatable.Contains(quest))
             return false;
@@ -107,6 +148,8 @@ public class QuestManager : MonoBehaviour
 
     public QuestData RollQuest(QuestDifficulty difficulty)
     {
+        if (!CanAcceptMoreQuests()) return null;
+
         List<QuestData> candidates = new List<QuestData>();
         float totalWeight = 0f;
 
@@ -115,20 +158,7 @@ public class QuestManager : MonoBehaviour
             QuestData quest = questPool[i];
             if (quest == null || quest.difficulty != difficulty) continue;
             if (!quest.repeatable && completedNonRepeatable.Contains(quest)) continue;
-
-            if (preventDuplicateActiveQuest)
-            {
-                bool alreadyActive = false;
-                for (int j = 0; j < activeQuests.Count; j++)
-                {
-                    if (activeQuests[j] != null && activeQuests[j].data == quest && !activeQuests[j].completed)
-                    {
-                        alreadyActive = true;
-                        break;
-                    }
-                }
-                if (alreadyActive) continue;
-            }
+            if (preventDuplicateActiveQuest && IsQuestCurrentlyActive(quest)) continue;
 
             float weight = Mathf.Max(0f, quest.selectionWeight);
             if (weight <= 0f) continue;
@@ -196,10 +226,6 @@ public class QuestManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Called by QuestLiveHUD after the green completion card has finished its exit animation.
-    /// Rewards are granted here only when Auto Grant Rewards On Complete is enabled.
-    /// </summary>
     public void FinalizeQuestPresentation(ActiveQuest quest)
     {
         if (quest == null || !quest.completed) return;
