@@ -121,7 +121,7 @@ public class FreeLookCamera : MonoBehaviour
         if (Input.GetKey(KeyCode.W)) move += transform.forward;
         if (Input.GetKey(KeyCode.S)) move -= transform.forward;
         if (Input.GetKey(KeyCode.D)) move += transform.right;
-        if (Input.GetKey(KeyCode.A)) move -= transform.left;
+        if (Input.GetKey(KeyCode.A)) move -= transform.right;
         if (Input.GetKey(upKey)) move += Vector3.up;
         if (Input.GetKey(downKey)) move += Vector3.down;
 
