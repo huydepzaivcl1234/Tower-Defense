@@ -23,7 +23,7 @@ public class NPCDialogueInteractable : MonoBehaviour
     public bool ignoreClicksOverUI = true;
 
     [Header("Click")]
-    public int mouseButton = 0;
+    [Range(0, 2)] public int mouseButton = 0;
 
     [Header("Undertale-style Voice Blip")]
     public bool enableVoiceBlip = true;
@@ -75,6 +75,7 @@ public class NPCDialogueInteractable : MonoBehaviour
 
     private void OnValidate()
     {
+        mouseButton = Mathf.Clamp(mouseButton, 0, 2);
         playEveryNCharacters = Mathf.Max(1, playEveryNCharacters);
         maxPitch = Mathf.Max(minPitch, maxPitch);
 
@@ -85,12 +86,10 @@ public class NPCDialogueInteractable : MonoBehaviour
             ApplyAudioSettings();
     }
 
-    private void OnMouseDown()
+    private void OnMouseOver()
     {
-        if (mouseButton != 0 || !Input.GetMouseButtonDown(mouseButton))
-            return;
-
-        TryStartConversation();
+        if (Input.GetMouseButtonDown(mouseButton))
+            TryStartConversation();
     }
 
     public void TryStartConversation()
