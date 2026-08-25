@@ -1,3 +1,4 @@
+using System.Collections;
 using DialogueEditor;
 using TMPro;
 using UnityEngine;
@@ -33,6 +34,24 @@ public class NPCDialogueInteractable : MonoBehaviour
     [Tooltip("Do not try to start a conversation while the cursor is currently locked.")]
     public bool requireUnlockedCursor = true;
 
+    [Header("Dialogue Camera Focus")]
+    public bool enableCameraFocus = true;
+    [Tooltip("Camera animated during dialogue. If empty, Interaction Camera then Camera.main is used.")]
+    public Camera dialogueCamera;
+    [Tooltip("Reference transform for the focus offsets. Leave empty to use this NPC root. You can assign a Head/Face transform for precise framing.")]
+    public Transform cameraFocusReference;
+    [Tooltip("Local point the camera looks at. With NPC root as reference, Y is usually head height.")]
+    public Vector3 focusPointLocalOffset = new Vector3(0f, 1.6f, 0f);
+    [Tooltip("Local camera position relative to Camera Focus Reference. Positive Z normally places the camera in front of a correctly oriented NPC.")]
+    public Vector3 cameraLocalOffset = new Vector3(0f, 1.6f, 2.7f);
+    [Min(0f)] public float focusDuration = 0.55f;
+    [Min(0f)] public float restoreDuration = 0.45f;
+    public AnimationCurve focusCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    public AnimationCurve restoreCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    public bool animateFieldOfView = true;
+    [Range(10f, 100f)] public float focusedFieldOfView = 42f;
+    public bool useUnscaledCameraTime = true;
+
     [Header("Undertale-style Voice Blip")]
     public bool enableVoiceBlip = true;
     [Tooltip("One or more short voice/blip clips. A random clip is chosen each time.")]
@@ -58,10 +77,18 @@ public class NPCDialogueInteractable : MonoBehaviour
     private int lastVisibleCharacters;
     private int eligibleCharacterCounter;
 
+    private Coroutine cameraRoutine;
+    private Camera activeDialogueCamera;
+    private bool cameraStateCaptured;
+    private Vector3 savedCameraPosition;
+    private Quaternion savedCameraRotation;
+    private float savedCameraFov;
+
     private void Reset()
     {
         conversation = GetComponent<NPCConversation>();
         interactionCamera = Camera.main;
+        dialogueCamera = Camera.main;
         EnsureAudioSource();
     }
 
@@ -72,6 +99,9 @@ public class NPCDialogueInteractable : MonoBehaviour
 
         if (interactionCamera == null)
             interactionCamera = Camera.main;
+
+        if (dialogueCamera == null)
+            dialogueCamera = interactionCamera != null ? interactionCamera : Camera.main;
 
         EnsureAudioSource();
         ApplyAudioSettings();
@@ -86,6 +116,7 @@ public class NPCDialogueInteractable : MonoBehaviour
     {
         ConversationManager.OnConversationEnded -= HandleConversationEnded;
         ownsConversation = false;
+        RestoreCameraImmediately();
     }
 
     private void OnValidate()
@@ -94,6 +125,8 @@ public class NPCDialogueInteractable : MonoBehaviour
         maxClickDistance = Mathf.Max(0.1f, maxClickDistance);
         playEveryNCharacters = Mathf.Max(1, playEveryNCharacters);
         maxPitch = Mathf.Max(minPitch, maxPitch);
+        focusDuration = Mathf.Max(0f, focusDuration);
+        restoreDuration = Mathf.Max(0f, restoreDuration);
 
         if (conversation == null)
             conversation = GetComponent<NPCConversation>();
@@ -162,7 +195,6 @@ public class NPCDialogueInteractable : MonoBehaviour
         if (blockIfConversationActive && manager.IsConversationActive)
             return;
 
-        // Immediately release the mouse before the conversation UI appears.
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
@@ -171,6 +203,7 @@ public class NPCDialogueInteractable : MonoBehaviour
         lastVisibleCharacters = 0;
         eligibleCharacterCounter = 0;
 
+        BeginCameraFocus();
         manager.StartConversation(conversation);
     }
 
@@ -274,6 +307,129 @@ public class NPCDialogueInteractable : MonoBehaviour
         voiceSource.PlayOneShot(clip, voiceVolume);
     }
 
+    private void BeginCameraFocus()
+    {
+        if (!enableCameraFocus)
+            return;
+
+        Camera cam = dialogueCamera != null ? dialogueCamera : (interactionCamera != null ? interactionCamera : Camera.main);
+        if (cam == null)
+            return;
+
+        activeDialogueCamera = cam;
+        savedCameraPosition = cam.transform.position;
+        savedCameraRotation = cam.transform.rotation;
+        savedCameraFov = cam.fieldOfView;
+        cameraStateCaptured = true;
+
+        Transform reference = cameraFocusReference != null ? cameraFocusReference : transform;
+        Vector3 targetPoint = reference.TransformPoint(focusPointLocalOffset);
+        Vector3 targetPosition = reference.TransformPoint(cameraLocalOffset);
+        Vector3 lookDirection = targetPoint - targetPosition;
+        Quaternion targetRotation = lookDirection.sqrMagnitude > 0.000001f
+            ? Quaternion.LookRotation(lookDirection.normalized, Vector3.up)
+            : cam.transform.rotation;
+        float targetFov = animateFieldOfView ? focusedFieldOfView : cam.fieldOfView;
+
+        StartCameraRoutine(targetPosition, targetRotation, targetFov, focusDuration, focusCurve, false);
+    }
+
+    private void RestoreCameraSmooth()
+    {
+        if (!cameraStateCaptured || activeDialogueCamera == null)
+            return;
+
+        StartCameraRoutine(savedCameraPosition, savedCameraRotation, savedCameraFov, restoreDuration, restoreCurve, true);
+    }
+
+    private void RestoreCameraImmediately()
+    {
+        if (!cameraStateCaptured || activeDialogueCamera == null)
+            return;
+
+        if (cameraRoutine != null)
+        {
+            StopCoroutine(cameraRoutine);
+            cameraRoutine = null;
+        }
+
+        activeDialogueCamera.transform.position = savedCameraPosition;
+        activeDialogueCamera.transform.rotation = savedCameraRotation;
+        if (animateFieldOfView)
+            activeDialogueCamera.fieldOfView = savedCameraFov;
+
+        cameraStateCaptured = false;
+        activeDialogueCamera = null;
+    }
+
+    private void StartCameraRoutine(Vector3 targetPosition, Quaternion targetRotation, float targetFov,
+        float duration, AnimationCurve curve, bool clearCaptureWhenDone)
+    {
+        if (cameraRoutine != null)
+            StopCoroutine(cameraRoutine);
+
+        cameraRoutine = StartCoroutine(CameraTweenRoutine(targetPosition, targetRotation, targetFov,
+            duration, curve, clearCaptureWhenDone));
+    }
+
+    private IEnumerator CameraTweenRoutine(Vector3 targetPosition, Quaternion targetRotation, float targetFov,
+        float duration, AnimationCurve curve, bool clearCaptureWhenDone)
+    {
+        Camera cam = activeDialogueCamera;
+        if (cam == null)
+            yield break;
+
+        Vector3 startPosition = cam.transform.position;
+        Quaternion startRotation = cam.transform.rotation;
+        float startFov = cam.fieldOfView;
+
+        if (duration <= 0f)
+        {
+            cam.transform.position = targetPosition;
+            cam.transform.rotation = targetRotation;
+            if (animateFieldOfView)
+                cam.fieldOfView = targetFov;
+
+            FinishCameraTween(clearCaptureWhenDone);
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration && cam != null)
+        {
+            elapsed += useUnscaledCameraTime ? Time.unscaledDeltaTime : Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float eased = curve != null ? curve.Evaluate(t) : t;
+
+            cam.transform.position = Vector3.LerpUnclamped(startPosition, targetPosition, eased);
+            cam.transform.rotation = Quaternion.SlerpUnclamped(startRotation, targetRotation, eased);
+            if (animateFieldOfView)
+                cam.fieldOfView = Mathf.LerpUnclamped(startFov, targetFov, eased);
+
+            yield return null;
+        }
+
+        if (cam != null)
+        {
+            cam.transform.position = targetPosition;
+            cam.transform.rotation = targetRotation;
+            if (animateFieldOfView)
+                cam.fieldOfView = targetFov;
+        }
+
+        FinishCameraTween(clearCaptureWhenDone);
+    }
+
+    private void FinishCameraTween(bool clearCaptureWhenDone)
+    {
+        cameraRoutine = null;
+        if (!clearCaptureWhenDone)
+            return;
+
+        cameraStateCaptured = false;
+        activeDialogueCamera = null;
+    }
+
     private void EnsureAudioSource()
     {
         if (voiceSource != null)
@@ -304,5 +460,7 @@ public class NPCDialogueInteractable : MonoBehaviour
         observedText = string.Empty;
         lastVisibleCharacters = 0;
         eligibleCharacterCounter = 0;
+
+        RestoreCameraSmooth();
     }
 }
