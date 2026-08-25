@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -27,7 +27,7 @@ public static class RelicSystemSetupTool
             CreateRelic("EfficientUpgrade", "Efficient Upgrade", "Tower upgrade cost -5%.", RelicEffectType.UpgradeCostDiscountPercent, 0.05f, 18)
         };
 
-        RelicManager manager = Object.FindFirstObjectByType<RelicManager>();
+        RelicManager manager = Object.FindAnyObjectByType<RelicManager>();
         if (manager == null)
         {
             GameObject go = new GameObject("RelicManager");
@@ -35,7 +35,7 @@ public static class RelicSystemSetupTool
             manager = go.AddComponent<RelicManager>();
         }
 
-        RelicChoiceUI ui = Object.FindFirstObjectByType<RelicChoiceUI>(FindObjectsInactive.Include);
+        RelicChoiceUI ui = Object.FindAnyObjectByType<RelicChoiceUI>(FindObjectsInactive.Include);
         if (ui == null)
             ui = CreateUI();
         else
@@ -59,7 +59,7 @@ public static class RelicSystemSetupTool
     [MenuItem("Tower Defense/Relics/Upgrade Existing Relic UI")]
     public static void UpgradeExistingRelicUIFromMenu()
     {
-        RelicChoiceUI ui = Object.FindFirstObjectByType<RelicChoiceUI>(FindObjectsInactive.Include);
+        RelicChoiceUI ui = Object.FindAnyObjectByType<RelicChoiceUI>(FindObjectsInactive.Include);
         if (ui == null)
         {
             EditorUtility.DisplayDialog("Relic UI", "No RelicChoiceUI found in the open scene. Run Setup Relic System first.", "OK");
@@ -149,7 +149,7 @@ public static class RelicSystemSetupTool
         SetRect(name.rectTransform, new Vector2(0.5f, 0.57f), new Vector2(0.5f, 0.57f), new Vector2(360, 64), Vector2.zero);
 
         TextMeshProUGUI desc = MakeText("Description", cardGO.transform, "Description", 21, TextAlignmentOptions.Center);
-        desc.enableWordWrapping = true;
+        desc.textWrappingMode = TextWrappingModes.Normal;
         desc.color = new Color(0.83f, 0.88f, 0.95f, 1f);
         SetRect(desc.rectTransform, new Vector2(0.5f, 0.34f), new Vector2(0.5f, 0.34f), new Vector2(340, 150), Vector2.zero);
 
@@ -306,3 +306,4 @@ public static class RelicSystemSetupTool
     }
 }
 #endif
+

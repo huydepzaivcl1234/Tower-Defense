@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System.Collections.Generic;
 using TMPro;
 using UnityEditor;
@@ -31,7 +31,7 @@ public static class CleanUIRedesignToolV3
         if (canvas == null || hud == null || buildMenu == null || upgrade == null)
         {
             EditorUtility.DisplayDialog("Clean UI Redesign",
-                "Không tìm thấy đủ Canvas, HUDManager, BuildMenuUI và TowerUpgradeUI.\nHãy mở SampleScene rồi chạy lại.", "OK");
+                "KhÃ´ng tÃ¬m tháº¥y Ä‘á»§ Canvas, HUDManager, BuildMenuUI vÃ  TowerUpgradeUI.\nHÃ£y má»Ÿ SampleScene rá»“i cháº¡y láº¡i.", "OK");
             return;
         }
 
@@ -80,15 +80,15 @@ public static class CleanUIRedesignToolV3
         Selection.activeGameObject = root.gameObject;
 
         EditorUtility.DisplayDialog("Clean UI Redesign",
-            "Đã dựng CleanUIRoot và nối lại chức năng hiện tại. UI cũ chỉ bị ẩn, không bị xóa.\n\n" +
-            "Bấm Play để test Gold, Lives, Wave, Build, Upgrade, Sell và Close.", "OK");
+            "ÄÃ£ dá»±ng CleanUIRoot vÃ  ná»‘i láº¡i chá»©c nÄƒng hiá»‡n táº¡i. UI cÅ© chá»‰ bá»‹ áº©n, khÃ´ng bá»‹ xÃ³a.\n\n" +
+            "Báº¥m Play Ä‘á»ƒ test Gold, Lives, Wave, Build, Upgrade, Sell vÃ  Close.", "OK");
     }
 
     private static void BuildResources(RectTransform root, HUDManager hud)
     {
         RectTransform box = PanelRect("ResourceHUD", root, new Vector2(24, -24), new Vector2(320, 142), new Vector2(0, 1), Panel);
         CreateResourceRow(box, "GoldRow", 0, "$", "Gold", out TMP_Text goldValue, Gold);
-        CreateResourceRow(box, "LivesRow", 1, "♥", "Lives", out TMP_Text livesValue, Cyan);
+        CreateResourceRow(box, "LivesRow", 1, "â™¥", "Lives", out TMP_Text livesValue, Cyan);
         hud.goldText = goldValue;
         hud.livesText = livesValue;
     }
@@ -120,7 +120,7 @@ public static class CleanUIRedesignToolV3
         wave.fontStyle = FontStyles.Bold;
         hud.waveText = wave;
 
-        Button start = ButtonEl("StartWaveButton", wrap, "▶  START WAVE", CyanDim, Cyan);
+        Button start = ButtonEl("StartWaveButton", wrap, "â–¶  START WAVE", CyanDim, Cyan);
         Place(start.GetComponent<RectTransform>(), new Vector2(0, -72), new Vector2(390, 62), new Vector2(.5f, 1));
         start.GetComponent<RectTransform>().pivot = new Vector2(.5f, 1);
         hud.startWaveButton = start;
@@ -342,7 +342,7 @@ public static class CleanUIRedesignToolV3
         tmp.fontSize = fontSize;
         tmp.color = color;
         tmp.alignment = align;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.raycastTarget = false;
         return tmp;
     }
@@ -398,3 +398,4 @@ public static class CleanUIRedesignToolV3
     }
 }
 #endif
+

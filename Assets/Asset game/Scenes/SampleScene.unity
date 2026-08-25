@@ -3932,6 +3932,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 708533698}
+  - {fileID: 682755386}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -10345,6 +10346,106 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 664771357}
   m_CullTransparentMesh: 1
+--- !u!1 &682755385
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 682755386}
+  - component: {fileID: 682755387}
+  m_Layer: 0
+  m_Name: RelicOwnedHUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &682755386
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 682755385}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 241891867}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 272.1445, y: 76}
+  m_Pivot: {x: 0, y: 0}
+--- !u!114 &682755387
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 682755385}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22aa2b94ca5d90848ada629c058d67db, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RelicOwnedHUD
+  maxCompactRelics: 5
+  refreshInterval: 0.15
+  hudAnchor: {x: 0, y: 0}
+  hudPivot: {x: 0, y: 0}
+  hudPosition: {x: 12, y: 12}
+  hudSize: {x: 250, y: 180}
+  compactBarAnchor: {x: 0, y: 0}
+  compactBarPivot: {x: 0, y: 0}
+  compactBarPosition: {x: 0, y: 0}
+  compactBarSize: {x: 265, y: 150}
+  compactColumns: 3
+  compactCellSize: {x: 78, y: 68}
+  compactSpacing: {x: 6, y: 6}
+  compactPaddingLeft: 7
+  compactPaddingRight: 7
+  compactPaddingTop: 7
+  compactPaddingBottom: 7
+  compactStartCorner: 2
+  compactChildAlignment: 6
+  compactIconSize: {x: 58, y: 58}
+  compactIconOffset: {x: -6, y: 0}
+  rarityLineHeight: 3
+  stackBadgeSize: {x: 40, y: 27}
+  stackBadgeOffset: {x: -2, y: 3}
+  compactStackFontSize: 20
+  stackBadgeColor: {r: 0.015, g: 0.025, b: 0.04, a: 0.94}
+  expandButtonSize: {x: 78, y: 68}
+  expandButtonFontSize: 28
+  fullPanelAnchor: {x: 0, y: 0}
+  fullPanelPivot: {x: 0, y: 0}
+  fullPanelPosition: {x: 0, y: 142}
+  fullPanelSize: {x: 390, y: 420}
+  fullPanelTitle: OWNED RELICS
+  fullPanelTitleFontSize: 23
+  closeButtonSize: {x: 42, y: 42}
+  closeButtonOffset: {x: -7, y: -7}
+  fullPanelRowHeight: 68
+  fullPanelIconSize: {x: 52, y: 52}
+  fullPanelNameFontMin: 12
+  fullPanelNameFontMax: 19
+  fullPanelStackFontSize: 22
+  scrollSensitivity: 24
+  fullPanelRowSpacing: 7
+  panelColor: {r: 0.025, g: 0.045, b: 0.07, a: 0.94}
+  entryColor: {r: 0.055, g: 0.085, b: 0.12, a: 0.96}
+  accentColor: {r: 0.08, g: 0.72, b: 0.92, a: 1}
+  textColor: {r: 0.9, g: 0.96, b: 1, a: 1}
+  viewportColor: {r: 0, g: 0, b: 0, a: 0.12}
+  compactBar: {fileID: 0}
+  expandButton: {fileID: 0}
+  allRelicsPanel: {fileID: 0}
+  allRelicsContent: {fileID: 0}
 --- !u!1 &693074986
 GameObject:
   m_ObjectHideFlags: 0
@@ -19076,7 +19177,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 211.24, y: -16}
+  m_AnchoredPosition: {x: 211.24, y: 33}
   m_SizeDelta: {x: 300, y: 74}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &1316198409
@@ -20402,6 +20503,32 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1407500941}
   m_CullTransparentMesh: 1
+--- !u!1 &1407694145 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7731708680386513935, guid: b44682073049f3e42b951c8675cc86fd,
+    type: 3}
+  m_PrefabInstance: {fileID: 1857071312029786007}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1407694146
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1407694145}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a632b3f4ba8b26d47b35393af72eea13, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BuildExclusionZone
+  radius: 6
+  centerOffset: {x: 0, y: 0, z: 0}
+--- !u!4 &1407694147 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3308872666089106981, guid: b44682073049f3e42b951c8675cc86fd,
+    type: 3}
+  m_PrefabInstance: {fileID: 1857071312029786007}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1411449949
 GameObject:
   m_ObjectHideFlags: 0
@@ -27839,13 +27966,13 @@ MonoBehaviour:
     - enemyData: {fileID: 11400000, guid: e9ce3221fac74d342975d98ae0746b4d, type: 2}
       count: 1
       spawnInterval: 1
-    startDelay: 3
+    startDelay: 1
   - waveName: Normal
     entries:
     - enemyData: {fileID: 11400000, guid: e9ce3221fac74d342975d98ae0746b4d, type: 2}
       count: 5
       spawnInterval: 1
-    startDelay: 3
+    startDelay: 1
   - waveName: Hard
     entries:
     - enemyData: {fileID: 11400000, guid: e9ce3221fac74d342975d98ae0746b4d, type: 2}
@@ -27854,7 +27981,7 @@ MonoBehaviour:
     - enemyData: {fileID: 11400000, guid: adbc06336ce255e4a9ede72f3e55f403, type: 2}
       count: 5
       spawnInterval: 1
-    startDelay: 3
+    startDelay: 1
   - waveName: Night
     entries:
     - enemyData: {fileID: 11400000, guid: e9ce3221fac74d342975d98ae0746b4d, type: 2}
@@ -27869,13 +27996,13 @@ MonoBehaviour:
     - enemyData: {fileID: 11400000, guid: 36c91c07dc0f5914492e1ca7c657c76e, type: 2}
       count: 1
       spawnInterval: 1
-    startDelay: 3
+    startDelay: 1
   - waveName: Hell
     entries:
     - enemyData: {fileID: 11400000, guid: d91df9224e223e040a2f3a39472c4887, type: 2}
       count: 1
       spawnInterval: 2
-    startDelay: 3
+    startDelay: 1
   - waveName: 1
     entries:
     - enemyData: {fileID: 11400000, guid: 08414f13777746746bc4ee65ea7dba1e, type: 2}
@@ -27999,6 +28126,9 @@ MonoBehaviour:
       count: 1
       spawnInterval: 5
     startDelay: 1
+  spawnPortal: {fileID: 1407694147}
+  portalOpenDuration: 1
+  portalCloseDuration: 1
   currentWaveIndex: -1
 --- !u!4 &1938674720
 Transform:
@@ -30463,7 +30593,11 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7731708680386513935, guid: b44682073049f3e42b951c8675cc86fd,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1407694146}
   m_SourcePrefab: {fileID: 100100000, guid: b44682073049f3e42b951c8675cc86fd, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

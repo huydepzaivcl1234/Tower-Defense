@@ -21,6 +21,11 @@ MonoBehaviour:
   hpRegenTickInterval: 0.5
   goldReward: 1000
   damageToPlayer: 100
+  relicDropChance: 0.01
+  minimumDropRarity: 0
+  isBoss: 1
+  bossGuaranteedRelic: 1
+  bossGuaranteedMinimumRarity: 2
   ccResistPercent: 0.3
   shieldTriggerHPPercent: 0.2
   shieldTriggerAmount: 2000

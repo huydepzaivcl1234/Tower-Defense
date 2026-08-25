@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System;
 using TMPro;
 using UnityEditor;
@@ -19,7 +19,7 @@ public static class MainMenuSetupTool
     [MenuItem("Tower Defense/UI/Setup Main Menu")]
     public static void SetupMainMenu()
     {
-        if (UnityEngine.Object.FindFirstObjectByType<MainMenuController>(FindObjectsInactive.Include) != null)
+        if (UnityEngine.Object.FindAnyObjectByType<MainMenuController>(FindObjectsInactive.Include) != null)
         {
             EditorUtility.DisplayDialog(
                 "Main Menu",
@@ -64,7 +64,7 @@ public static class MainMenuSetupTool
         TMP_Text title = CreateText("Title", mainPanel, "TOWER DEFENSE", 74, FontStyles.Bold, TextAlignmentOptions.Center, Text);
         SetAnchored(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 245f), new Vector2(760f, 100f));
 
-        TMP_Text subtitle = CreateText("Subtitle", mainPanel, "DEFEND  •  UPGRADE  •  SURVIVE", 21, FontStyles.Bold, TextAlignmentOptions.Center, Muted);
+        TMP_Text subtitle = CreateText("Subtitle", mainPanel, "DEFEND  â€¢  UPGRADE  â€¢  SURVIVE", 21, FontStyles.Bold, TextAlignmentOptions.Center, Muted);
         SetAnchored(subtitle.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 176f), new Vector2(700f, 44f));
 
         RectTransform titleLine = CreateRect("TitleLine", mainPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-170f, 142f), new Vector2(170f, 146f));
@@ -226,7 +226,7 @@ public static class MainMenuSetupTool
         text.fontStyle = style;
         text.alignment = align;
         text.color = color;
-        text.enableWordWrapping = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
         text.raycastTarget = false;
         return text;
     }
@@ -263,9 +263,10 @@ public static class MainMenuSetupTool
 
     private static void EnsureEventSystem()
     {
-        if (UnityEngine.Object.FindFirstObjectByType<EventSystem>(FindObjectsInactive.Include) != null) return;
+        if (UnityEngine.Object.FindAnyObjectByType<EventSystem>(FindObjectsInactive.Include) != null) return;
         GameObject eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         Undo.RegisterCreatedObjectUndo(eventSystem, "Create EventSystem");
     }
 }
 #endif
+

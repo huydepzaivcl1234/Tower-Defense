@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System;
 using TMPro;
 using UnityEditor;
@@ -19,7 +19,7 @@ public static class PauseMenuSetupTool
     [MenuItem("Tower Defense/UI/Setup Pause Menu + Settings Gear")]
     public static void SetupPauseMenu()
     {
-        if (UnityEngine.Object.FindFirstObjectByType<PauseMenuController>(FindObjectsInactive.Include) != null)
+        if (UnityEngine.Object.FindAnyObjectByType<PauseMenuController>(FindObjectsInactive.Include) != null)
         {
             EditorUtility.DisplayDialog(
                 "Pause Menu",
@@ -28,12 +28,12 @@ public static class PauseMenuSetupTool
             return;
         }
 
-        MainMenuController mainMenu = UnityEngine.Object.FindFirstObjectByType<MainMenuController>(FindObjectsInactive.Include);
+        MainMenuController mainMenu = UnityEngine.Object.FindAnyObjectByType<MainMenuController>(FindObjectsInactive.Include);
         if (mainMenu == null)
         {
             EditorUtility.DisplayDialog(
                 "Pause Menu",
-                "MainMenuController was not found. Run Tower Defense → UI → Setup Main Menu first.",
+                "MainMenuController was not found. Run Tower Defense â†’ UI â†’ Setup Main Menu first.",
                 "OK");
             return;
         }
@@ -124,7 +124,7 @@ public static class PauseMenuSetupTool
         colors.fadeDuration = 0.08f;
         button.colors = colors;
 
-        TMP_Text icon = CreateText("GearIcon", rt, "⚙", 39, FontStyles.Bold, TextAlignmentOptions.Center, Text);
+        TMP_Text icon = CreateText("GearIcon", rt, "âš™", 39, FontStyles.Bold, TextAlignmentOptions.Center, Text);
         Stretch(icon.rectTransform);
 
         AddPunchIfAvailable(rt.gameObject);
@@ -185,7 +185,7 @@ public static class PauseMenuSetupTool
         text.fontStyle = style;
         text.alignment = align;
         text.color = color;
-        text.enableWordWrapping = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
         text.raycastTarget = false;
         return text;
     }
@@ -222,9 +222,10 @@ public static class PauseMenuSetupTool
 
     private static void EnsureEventSystem()
     {
-        if (UnityEngine.Object.FindFirstObjectByType<EventSystem>(FindObjectsInactive.Include) != null) return;
+        if (UnityEngine.Object.FindAnyObjectByType<EventSystem>(FindObjectsInactive.Include) != null) return;
         GameObject eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         Undo.RegisterCreatedObjectUndo(eventSystem, "Create EventSystem");
     }
 }
 #endif
+

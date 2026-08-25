@@ -18,7 +18,7 @@ MonoBehaviour:
     per level, and +10% damage per distance step travelled up to +50%.
   icon: {fileID: -186678098, guid: ca65e7e5566bcc741acfb613904edf0d, type: 3}
   rarity: 1
-  selectionWeight: 0.45
+  selectionWeight: 0.1
   maxStacks: 1
   modifiers:
   - effect: 11

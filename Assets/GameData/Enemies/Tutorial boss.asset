@@ -21,7 +21,7 @@ MonoBehaviour:
   hpRegenTickInterval: 1
   goldReward: 500
   damageToPlayer: 50
-  relicDropChance: 0.01
+  relicDropChance: 0.005
   minimumDropRarity: 0
   isBoss: 1
   bossGuaranteedRelic: 1

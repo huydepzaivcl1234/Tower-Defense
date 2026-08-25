@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,7 +12,7 @@ public static class LivelyUISetupTool
     [MenuItem("Tower Defense/UI/Setup Lively UI Feedback")]
     public static void Setup()
     {
-        Button[] buttons = Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Button[] buttons = Object.FindObjectsByType<Button>(FindObjectsInactive.Include);
         int added = 0;
         int existing = 0;
 
@@ -36,3 +36,4 @@ public static class LivelyUISetupTool
     }
 }
 #endif
+

@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System;
 using TMPro;
 using UnityEditor;
@@ -21,7 +21,7 @@ public static class EndGameUISetupTool
     [MenuItem("Tower Defense/UI/Setup Win Lose Screen")]
     public static void Setup()
     {
-        EndGameUIController existing = UnityEngine.Object.FindFirstObjectByType<EndGameUIController>(FindObjectsInactive.Include);
+        EndGameUIController existing = UnityEngine.Object.FindAnyObjectByType<EndGameUIController>(FindObjectsInactive.Include);
         if (existing != null)
         {
             EditorUtility.DisplayDialog("Win / Lose UI", "EndGameUIController already exists. No duplicate was created.", "OK");
@@ -88,7 +88,7 @@ public static class EndGameUISetupTool
         winContent.gameObject.SetActive(false);
         loseContent.gameObject.SetActive(false);
 
-        HUDManager hud = UnityEngine.Object.FindFirstObjectByType<HUDManager>(FindObjectsInactive.Include);
+        HUDManager hud = UnityEngine.Object.FindAnyObjectByType<HUDManager>(FindObjectsInactive.Include);
         if (hud != null)
         {
             if (hud.gameOverPanel != null) hud.gameOverPanel.SetActive(false);
@@ -155,7 +155,7 @@ public static class EndGameUISetupTool
         text.fontStyle = style;
         text.alignment = align;
         text.color = color;
-        text.enableWordWrapping = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
         text.raycastTarget = false;
         return text;
     }
@@ -192,9 +192,10 @@ public static class EndGameUISetupTool
 
     private static void EnsureEventSystem()
     {
-        if (UnityEngine.Object.FindFirstObjectByType<EventSystem>(FindObjectsInactive.Include) != null) return;
+        if (UnityEngine.Object.FindAnyObjectByType<EventSystem>(FindObjectsInactive.Include) != null) return;
         GameObject eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         Undo.RegisterCreatedObjectUndo(eventSystem, "Create EventSystem");
     }
 }
 #endif
+

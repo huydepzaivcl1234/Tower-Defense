@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -65,7 +65,7 @@ public static class MainBaseModelSetupTool
 
     private static void PlaceAtPathGoal(GameObject instance)
     {
-        WaypointPath path = Object.FindFirstObjectByType<WaypointPath>(FindObjectsInactive.Include);
+        WaypointPath path = Object.FindAnyObjectByType<WaypointPath>(FindObjectsInactive.Include);
         if (path == null) { instance.transform.position = Vector3.zero; return; }
         List<Transform> points = path.GetWaypoints();
         if (points == null || points.Count == 0 || points[points.Count - 1] == null) { instance.transform.position = Vector3.zero; return; }
@@ -145,3 +145,4 @@ public static class MainBaseModelSetupTool
     }
 }
 #endif
+

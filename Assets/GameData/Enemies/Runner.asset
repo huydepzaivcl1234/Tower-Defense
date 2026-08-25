@@ -18,8 +18,14 @@ MonoBehaviour:
   maxHP: 5
   moveSpeed: 6
   hpRegenPerSec: 0
+  hpRegenTickInterval: 1
   goldReward: 11
   damageToPlayer: 1
+  relicDropChance: 0.001
+  minimumDropRarity: 0
+  isBoss: 0
+  bossGuaranteedRelic: 1
+  bossGuaranteedMinimumRarity: 2
   ccResistPercent: 0
   shieldTriggerHPPercent: 0
   shieldTriggerAmount: 0

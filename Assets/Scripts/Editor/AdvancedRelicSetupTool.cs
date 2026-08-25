@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -80,7 +80,7 @@ public static class AdvancedRelicSetupTool
                 })
         };
 
-        RelicManager manager = Object.FindFirstObjectByType<RelicManager>(FindObjectsInactive.Include);
+        RelicManager manager = Object.FindAnyObjectByType<RelicManager>(FindObjectsInactive.Include);
         if (manager != null)
         {
             Undo.RecordObject(manager, "Add Advanced Relics");
@@ -141,3 +141,4 @@ public static class AdvancedRelicSetupTool
     }
 }
 #endif
+

@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,7 +8,7 @@ public static class UIButtonSFXSetupTool
     [MenuItem("Tower Defense/UI/Setup Button SFX")]
     public static void SetupButtonSfx()
     {
-        Button[] buttons = Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Button[] buttons = Object.FindObjectsByType<Button>(FindObjectsInactive.Include);
         int added = 0;
         int already = 0;
 
@@ -32,3 +32,4 @@ public static class UIButtonSFXSetupTool
     }
 }
 #endif
+

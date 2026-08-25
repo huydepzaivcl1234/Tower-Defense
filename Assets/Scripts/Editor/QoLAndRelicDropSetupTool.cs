@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -14,7 +14,7 @@ public static class QoLAndRelicDropSetupTool
     [MenuItem("Tower Defense/UI/Setup Speed + Relic Drop HUD")]
     public static void Setup()
     {
-        RelicManager relicManager = Object.FindFirstObjectByType<RelicManager>(FindObjectsInactive.Include);
+        RelicManager relicManager = Object.FindAnyObjectByType<RelicManager>(FindObjectsInactive.Include);
         if (relicManager == null)
         {
             EditorUtility.DisplayDialog("QoL Setup", "RelicManager was not found. Run Tower Defense > Relics > Setup Relic System first.", "OK");
@@ -24,7 +24,7 @@ public static class QoLAndRelicDropSetupTool
         Canvas canvas = FindOrCreateCanvas();
         Transform root = FindOrCreateRoot(canvas.transform);
 
-        GameSpeedController speed = Object.FindFirstObjectByType<GameSpeedController>(FindObjectsInactive.Include);
+        GameSpeedController speed = Object.FindAnyObjectByType<GameSpeedController>(FindObjectsInactive.Include);
         if (speed == null)
         {
             GameObject speedGO = new GameObject("GameSpeedController");
@@ -46,7 +46,7 @@ public static class QoLAndRelicDropSetupTool
         Selection.activeGameObject = root.gameObject;
         EditorUtility.DisplayDialog(
             "QoL Setup",
-            "Done.\n\n• Added 1x / 2x / 3x speed controls.\n• Added queued RELIC AVAILABLE notification.\n• New buttons use the existing punch + hover feedback.\n• EnemyData now controls each enemy's drop chance and boss guaranteed rare reward.\n\nRelic drops are collected by mouse hover, not click.",
+            "Done.\n\nâ€¢ Added 1x / 2x / 3x speed controls.\nâ€¢ Added queued RELIC AVAILABLE notification.\nâ€¢ New buttons use the existing punch + hover feedback.\nâ€¢ EnemyData now controls each enemy's drop chance and boss guaranteed rare reward.\n\nRelic drops are collected by mouse hover, not click.",
             "OK");
     }
 
@@ -221,3 +221,4 @@ public static class QoLAndRelicDropSetupTool
     }
 }
 #endif
+
