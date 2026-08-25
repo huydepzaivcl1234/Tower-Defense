@@ -42,7 +42,6 @@ public class QuestManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
         Instance = this;
     }
 
@@ -50,14 +49,12 @@ public class QuestManager : MonoBehaviour
     {
         Enemy.OnAnyEnemyDied += HandleEnemyDied;
         GameManager.OnGoldSpent += HandleGoldSpent;
-        Tower.OnAnyTowerUpgraded += HandleTowerUpgraded;
     }
 
     private void OnDisable()
     {
         Enemy.OnAnyEnemyDied -= HandleEnemyDied;
         GameManager.OnGoldSpent -= HandleGoldSpent;
-        Tower.OnAnyTowerUpgraded -= HandleTowerUpgraded;
     }
 
     public bool AcceptRandomQuest(QuestDifficulty difficulty)
@@ -123,40 +120,32 @@ public class QuestManager : MonoBehaviour
 
             float weight = Mathf.Max(0f, quest.selectionWeight);
             if (weight <= 0f) continue;
-
             candidates.Add(quest);
             totalWeight += weight;
         }
 
-        if (candidates.Count == 0 || totalWeight <= 0f)
-            return null;
+        if (candidates.Count == 0 || totalWeight <= 0f) return null;
 
         float roll = UnityEngine.Random.Range(0f, totalWeight);
         float cursor = 0f;
         for (int i = 0; i < candidates.Count; i++)
         {
             cursor += Mathf.Max(0f, candidates[i].selectionWeight);
-            if (roll <= cursor)
-                return candidates[i];
+            if (roll <= cursor) return candidates[i];
         }
-
         return candidates[candidates.Count - 1];
     }
 
-    private void HandleEnemyDied(Enemy enemy)
-    {
-        AddProgress(QuestObjectiveType.KillEnemies, 1);
-    }
+    private void HandleEnemyDied(Enemy enemy) => AddProgress(QuestObjectiveType.KillEnemies, 1);
 
     private void HandleGoldSpent(int amount)
     {
-        if (amount > 0)
-            AddProgress(QuestObjectiveType.SpendGold, amount);
+        if (amount > 0) AddProgress(QuestObjectiveType.SpendGold, amount);
     }
 
-    private void HandleTowerUpgraded(Tower tower)
+    public void NotifyTowerUpgraded(Tower tower)
     {
-        AddProgress(QuestObjectiveType.UpgradeTowers, 1);
+        if (tower != null) AddProgress(QuestObjectiveType.UpgradeTowers, 1);
     }
 
     public void AddProgress(QuestObjectiveType objectiveType, int amount)
@@ -172,30 +161,25 @@ public class QuestManager : MonoBehaviour
             int target = Mathf.Max(1, quest.data.targetAmount);
             quest.progress = Mathf.Min(target, quest.progress + amount);
             OnQuestProgressChanged?.Invoke(quest);
-
-            if (quest.progress >= target)
-                CompleteQuest(quest);
+            if (quest.progress >= target) CompleteQuest(quest);
         }
     }
 
     private void CompleteQuest(ActiveQuest quest)
     {
         if (quest == null || quest.data == null || quest.completed) return;
-
         quest.completed = true;
+
         if (!quest.data.repeatable && !completedNonRepeatable.Contains(quest.data))
             completedNonRepeatable.Add(quest.data);
 
         OnQuestCompleted?.Invoke(quest);
-
-        if (autoGrantRewardsOnComplete)
-            GrantRewards(quest);
+        if (autoGrantRewardsOnComplete) GrantRewards(quest);
     }
 
     public void GrantRewards(ActiveQuest quest)
     {
-        if (quest == null || quest.data == null || !quest.completed || quest.rewardsGranted)
-            return;
+        if (quest == null || quest.data == null || !quest.completed || quest.rewardsGranted) return;
 
         if (quest.data.rewards != null)
         {
@@ -215,8 +199,8 @@ public class QuestManager : MonoBehaviour
                         if (RelicManager.Instance != null && reward.relic != null)
                         {
                             int count = Mathf.Max(1, reward.amount);
-                            for (int stack = 0; stack < count; stack++)
-                                RelicManager.Instance.GrantRelic(reward.relic);
+                            for (int n = 0; n < count; n++)
+                                RelicManager.Instance.QueueDroppedReward(reward.relic.rarity, false);
                         }
                         break;
 
