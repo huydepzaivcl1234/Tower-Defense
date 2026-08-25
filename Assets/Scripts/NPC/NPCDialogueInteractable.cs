@@ -5,9 +5,9 @@ using UnityEngine.EventSystems;
 
 /// <summary>
 /// Bridges a world NPC to the imported DialogueEditor package.
-/// Clicking this object starts its NPCConversation. While DialogueEditor's typewriter
-/// reveals characters, configurable voice blips are played (Undertale-style).
-/// Dialogue content remains fully owned/edited by DialogueEditor.
+/// Clicking this NPC (including any child collider) starts its NPCConversation.
+/// While DialogueEditor's typewriter reveals characters, configurable voice blips
+/// are played in an Undertale-style rhythm.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NPCConversation))]
@@ -22,8 +22,16 @@ public class NPCDialogueInteractable : MonoBehaviour
     [Tooltip("Ignore world clicks while the pointer is over UI.")]
     public bool ignoreClicksOverUI = true;
 
-    [Header("Click")]
+    [Header("Click / Raycast")]
     [Range(0, 2)] public int mouseButton = 0;
+    [Tooltip("Camera used for clicking. If empty, Camera.main is used.")]
+    public Camera interactionCamera;
+    [Min(0.1f)] public float maxClickDistance = 1000f;
+    public LayerMask clickLayerMask = ~0;
+    [Tooltip("Allow colliders on children of this NPC/model to count as clicking the NPC.")]
+    public bool includeChildColliders = true;
+    [Tooltip("Do not try to start a conversation while the cursor is currently locked.")]
+    public bool requireUnlockedCursor = true;
 
     [Header("Undertale-style Voice Blip")]
     public bool enableVoiceBlip = true;
@@ -42,6 +50,9 @@ public class NPCDialogueInteractable : MonoBehaviour
     [Range(0f, 1f)] public float spatialBlend = 0f;
     public bool bypassReverbZones = true;
 
+    public bool OwnsActiveConversation => ownsConversation &&
+        ConversationManager.Instance != null && ConversationManager.Instance.IsConversationActive;
+
     private bool ownsConversation;
     private string observedText = string.Empty;
     private int lastVisibleCharacters;
@@ -50,6 +61,7 @@ public class NPCDialogueInteractable : MonoBehaviour
     private void Reset()
     {
         conversation = GetComponent<NPCConversation>();
+        interactionCamera = Camera.main;
         EnsureAudioSource();
     }
 
@@ -57,6 +69,9 @@ public class NPCDialogueInteractable : MonoBehaviour
     {
         if (conversation == null)
             conversation = GetComponent<NPCConversation>();
+
+        if (interactionCamera == null)
+            interactionCamera = Camera.main;
 
         EnsureAudioSource();
         ApplyAudioSettings();
@@ -76,6 +91,7 @@ public class NPCDialogueInteractable : MonoBehaviour
     private void OnValidate()
     {
         mouseButton = Mathf.Clamp(mouseButton, 0, 2);
+        maxClickDistance = Mathf.Max(0.1f, maxClickDistance);
         playEveryNCharacters = Mathf.Max(1, playEveryNCharacters);
         maxPitch = Mathf.Max(minPitch, maxPitch);
 
@@ -86,10 +102,43 @@ public class NPCDialogueInteractable : MonoBehaviour
             ApplyAudioSettings();
     }
 
-    private void OnMouseOver()
+    private void Update()
     {
-        if (Input.GetMouseButtonDown(mouseButton))
-            TryStartConversation();
+        HandleWorldClick();
+        UpdateVoiceBlips();
+    }
+
+    private void HandleWorldClick()
+    {
+        if (!Input.GetMouseButtonDown(mouseButton))
+            return;
+
+        if (requireUnlockedCursor && Cursor.lockState == CursorLockMode.Locked)
+            return;
+
+        if (ignoreClicksOverUI && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        Camera cam = interactionCamera != null ? interactionCamera : Camera.main;
+        if (cam == null)
+            return;
+
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit, maxClickDistance, clickLayerMask, QueryTriggerInteraction.Collide))
+            return;
+
+        Transform hitTransform = hit.collider != null ? hit.collider.transform : null;
+        if (hitTransform == null)
+            return;
+
+        bool hitThisNpc = hitTransform == transform;
+        if (!hitThisNpc && includeChildColliders)
+            hitThisNpc = hitTransform.IsChildOf(transform);
+
+        if (!hitThisNpc)
+            return;
+
+        TryStartConversation();
     }
 
     public void TryStartConversation()
@@ -100,7 +149,7 @@ public class NPCDialogueInteractable : MonoBehaviour
         ConversationManager manager = ConversationManager.Instance;
         if (manager == null)
         {
-            Debug.LogWarning("[NPCDialogue] No DialogueEditor ConversationManager exists in this scene.", this);
+            Debug.LogWarning("[NPCDialogue] No DialogueEditor ConversationManager exists in this scene. Run Tower Defense > NPC > Setup Selected Dummy Dialogue again.", this);
             return;
         }
 
@@ -113,6 +162,10 @@ public class NPCDialogueInteractable : MonoBehaviour
         if (blockIfConversationActive && manager.IsConversationActive)
             return;
 
+        // Immediately release the mouse before the conversation UI appears.
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
         ownsConversation = true;
         observedText = string.Empty;
         lastVisibleCharacters = 0;
@@ -123,9 +176,6 @@ public class NPCDialogueInteractable : MonoBehaviour
 
     private bool CanStartConversation()
     {
-        if (ignoreClicksOverUI && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-            return false;
-
         if (requireGameplayStarted && MainMenuController.Instance != null && !MainMenuController.Instance.GameplayStarted)
             return false;
 
@@ -142,7 +192,7 @@ public class NPCDialogueInteractable : MonoBehaviour
         return true;
     }
 
-    private void Update()
+    private void UpdateVoiceBlips()
     {
         if (!ownsConversation || !enableVoiceBlip)
             return;
