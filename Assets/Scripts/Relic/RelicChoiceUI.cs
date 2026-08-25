@@ -6,6 +6,8 @@ using TMPro;
 /// <summary>UI controller for the roguelite relic choice panel.</summary>
 public class RelicChoiceUI : MonoBehaviour
 {
+    public static RelicChoiceUI Instance { get; private set; }
+
     [System.Serializable]
     public class RelicCard
     {
@@ -20,12 +22,31 @@ public class RelicChoiceUI : MonoBehaviour
     public TMP_Text titleText;
     public RelicCard[] cards = new RelicCard[3];
 
+    public bool IsVisible => panelRoot != null && panelRoot.activeInHierarchy;
+
     private readonly List<RelicData> currentChoices = new List<RelicData>();
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+    }
 
     private void Start()
     {
         if (panelRoot != null) panelRoot.SetActive(false);
         WireButtons();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
     }
 
     private void WireButtons()
