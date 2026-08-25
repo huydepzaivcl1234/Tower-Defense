@@ -5,8 +5,8 @@ using UnityEngine;
 /// fly mode (mouse controls look direction, WASD + Space/Ctrl fly through the map in 3D);
 /// press Shift again to unlock the cursor and go back to normal clicking (build towers, use UI).
 ///
-/// Cursor locking is only allowed during active gameplay. Any menu/pause/end-game state
-/// automatically releases the cursor so UI can always be interacted with safely.
+/// Cursor locking is only allowed during active gameplay. Any menu/pause/end-game/relic-choice
+/// state automatically releases the cursor so UI can always be interacted with safely.
 ///
 /// Attach to Main Camera INSTEAD OF RTSCameraController - if both are enabled at once their
 /// WASD handling will fight each other. Disable/remove RTSCameraController first.
@@ -36,6 +36,8 @@ public class FreeLookCamera : MonoBehaviour
     public bool blockWhilePauseMenuVisible = true;
     [Tooltip("Block/unlock free-look while the Win/Lose screen is active.")]
     public bool blockWhileEndGameVisible = true;
+    [Tooltip("Block/unlock free-look while the relic choice screen is active.")]
+    public bool blockWhileRelicChoiceVisible = true;
 
     private float yaw;
     private float pitch;
@@ -46,14 +48,13 @@ public class FreeLookCamera : MonoBehaviour
         Vector3 angles = transform.eulerAngles;
         yaw = angles.y;
         pitch = NormalizeAngle(angles.x);
-        SetLocked(false); // start unlocked so build-menu / tower clicking works immediately
+        SetLocked(false);
     }
 
     private void Update()
     {
         bool gameplayInputAllowed = IsGameplayInputAllowed();
 
-        // If any menu opens while the cursor is locked, release it immediately.
         if (!gameplayInputAllowed)
         {
             if (isLocked || Cursor.lockState != CursorLockMode.None || !Cursor.visible)
@@ -64,7 +65,7 @@ public class FreeLookCamera : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
             SetLocked(!isLocked);
 
-        if (!isLocked) return; // cursor is free for clicking right now - don't fly/look
+        if (!isLocked) return;
 
         HandleLook();
         HandleMove();
@@ -76,7 +77,6 @@ public class FreeLookCamera : MonoBehaviour
 
         if (requireGameplayStarted)
         {
-            // If the menu controller exists, gameplay must explicitly be in its started state.
             if (mainMenu != null && !mainMenu.GameplayStarted)
                 return false;
         }
@@ -93,6 +93,9 @@ public class FreeLookCamera : MonoBehaviour
             if (endGameRoot != null && endGameRoot.activeInHierarchy)
                 return false;
         }
+
+        if (blockWhileRelicChoiceVisible && RelicChoiceUI.Instance != null && RelicChoiceUI.Instance.IsVisible)
+            return false;
 
         if (blockWhilePaused && Time.timeScale <= 0f)
             return false;
@@ -133,7 +136,6 @@ public class FreeLookCamera : MonoBehaviour
 
     private void OnDisable()
     {
-        // always release the cursor if this gets turned off mid-game, so the player isn't stuck
         SetLocked(false);
     }
 }
