@@ -1,3 +1,4 @@
+using System.Collections;
 using DialogueEditor;
 using UnityEngine;
 
@@ -38,10 +39,52 @@ public class QuestDialogueBridge : MonoBehaviour
     public bool HasMediumQuest => hasMediumQuest;
     public bool HasHardQuest => hasHardQuest;
 
+    private NPCDialogueInteractable dialogueInteractable;
+    private Coroutine delayedRefreshRoutine;
+
     private void Awake()
     {
         if (npcLifecycle == null)
             npcLifecycle = GetComponent<NPCQuestLifecycle>();
+        dialogueInteractable = GetComponent<NPCDialogueInteractable>();
+    }
+
+    private void OnEnable()
+    {
+        ConversationManager.OnConversationStarted += HandleConversationStarted;
+    }
+
+    private void OnDisable()
+    {
+        ConversationManager.OnConversationStarted -= HandleConversationStarted;
+        if (delayedRefreshRoutine != null)
+        {
+            StopCoroutine(delayedRefreshRoutine);
+            delayedRefreshRoutine = null;
+        }
+    }
+
+    private void HandleConversationStarted()
+    {
+        if (!autoSyncAvailability)
+            return;
+
+        if (delayedRefreshRoutine != null)
+            StopCoroutine(delayedRefreshRoutine);
+        delayedRefreshRoutine = StartCoroutine(RefreshAfterConversationStarts());
+    }
+
+    private IEnumerator RefreshAfterConversationStarts()
+    {
+        yield return null;
+        delayedRefreshRoutine = null;
+
+        if (dialogueInteractable == null)
+            dialogueInteractable = GetComponent<NPCDialogueInteractable>();
+
+        // Only the NPC that actually started this conversation may write its quest parameters.
+        if (dialogueInteractable != null && dialogueInteractable.OwnsActiveConversation)
+            RefreshQuestAvailability();
     }
 
     public void AcceptEasyQuest() => AcceptDifficulty(QuestDifficulty.Easy);
@@ -78,7 +121,6 @@ public class QuestDialogueBridge : MonoBehaviour
     {
         if (manager == null || string.IsNullOrWhiteSpace(parameterName))
             return;
-
         manager.SetBool(parameterName, value);
     }
 
