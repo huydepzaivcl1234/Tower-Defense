@@ -24,6 +24,10 @@ public class QuestManager : MonoBehaviour
     public bool autoGrantRewardsOnComplete = true;
     public bool preventDuplicateActiveQuest = true;
 
+    [Header("Completion Presentation")]
+    [Tooltip("When enabled and QuestLiveHUD exists, rewards wait until the green completion card finishes animating out.")]
+    public bool deferAutoRewardsUntilHudFinishes = true;
+
     [Header("Runtime (read-only)")]
     [SerializeField] private List<ActiveQuest> activeQuests = new List<ActiveQuest>();
     [SerializeField] private List<QuestData> completedNonRepeatable = new List<QuestData>();
@@ -66,7 +70,15 @@ public class QuestManager : MonoBehaviour
     public bool AcceptQuest(QuestData quest)
     {
         if (quest == null) return false;
-        if (activeQuests.Count >= Mathf.Max(1, maxActiveQuests)) return false;
+
+        int activeCount = 0;
+        for (int i = 0; i < activeQuests.Count; i++)
+        {
+            ActiveQuest existing = activeQuests[i];
+            if (existing != null && !existing.completed)
+                activeCount++;
+        }
+        if (activeCount >= Mathf.Max(1, maxActiveQuests)) return false;
 
         if (preventDuplicateActiveQuest)
         {
@@ -174,7 +186,34 @@ public class QuestManager : MonoBehaviour
             completedNonRepeatable.Add(quest.data);
 
         OnQuestCompleted?.Invoke(quest);
-        if (autoGrantRewardsOnComplete) GrantRewards(quest);
+
+        bool hudWillFinalize = deferAutoRewardsUntilHudFinishes && QuestLiveHUD.Instance != null;
+        if (!hudWillFinalize)
+        {
+            if (autoGrantRewardsOnComplete)
+                GrantRewards(quest);
+            RemoveCompletedQuest(quest);
+        }
+    }
+
+    /// <summary>
+    /// Called by QuestLiveHUD after the green completion card has finished its exit animation.
+    /// Rewards are granted here only when Auto Grant Rewards On Complete is enabled.
+    /// </summary>
+    public void FinalizeQuestPresentation(ActiveQuest quest)
+    {
+        if (quest == null || !quest.completed) return;
+
+        if (autoGrantRewardsOnComplete)
+            GrantRewards(quest);
+
+        RemoveCompletedQuest(quest);
+    }
+
+    private void RemoveCompletedQuest(ActiveQuest quest)
+    {
+        if (quest == null) return;
+        activeQuests.Remove(quest);
     }
 
     public void GrantRewards(ActiveQuest quest)
