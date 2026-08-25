@@ -6,7 +6,7 @@ using UnityEngine;
 /// press Shift again to unlock the cursor and go back to normal clicking (build towers, use UI).
 ///
 /// Cursor locking is only allowed during active gameplay. Any menu/pause/end-game/relic-choice
-/// state automatically releases the cursor so UI can always be interacted with safely.
+/// or DialogueEditor conversation state automatically releases the cursor.
 ///
 /// Attach to Main Camera INSTEAD OF RTSCameraController - if both are enabled at once their
 /// WASD handling will fight each other. Disable/remove RTSCameraController first.
@@ -38,6 +38,8 @@ public class FreeLookCamera : MonoBehaviour
     public bool blockWhileEndGameVisible = true;
     [Tooltip("Block/unlock free-look while the relic choice screen is active.")]
     public bool blockWhileRelicChoiceVisible = true;
+    [Tooltip("Block/unlock free-look while a DialogueEditor conversation is active.")]
+    public bool blockWhileDialogueVisible = true;
 
     private float yaw;
     private float pitch;
@@ -95,6 +97,10 @@ public class FreeLookCamera : MonoBehaviour
         }
 
         if (blockWhileRelicChoiceVisible && RelicChoiceUI.Instance != null && RelicChoiceUI.Instance.IsVisible)
+            return false;
+
+        if (blockWhileDialogueVisible && DialogueEditor.ConversationManager.Instance != null &&
+            DialogueEditor.ConversationManager.Instance.IsConversationActive)
             return false;
 
         if (blockWhilePaused && Time.timeScale <= 0f)
