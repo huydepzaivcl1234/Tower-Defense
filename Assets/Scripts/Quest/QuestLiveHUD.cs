@@ -24,7 +24,7 @@ public class QuestLiveHUD : MonoBehaviour
 
     [Header("Card Size")]
     public Vector2 cardSize = new Vector2(390f, 92f);
-    public Vector4 cardPadding = new Vector4(16f, 14f, 12f, 10f); // L R T B
+    public Vector4 cardPadding = new Vector4(16f, 14f, 12f, 10f);
 
     [Header("Typography")]
     public string headerText = "QUEST";
@@ -108,10 +108,12 @@ public class QuestLiveHUD : MonoBehaviour
         KillAllTweens();
     }
 
-    private void Start()
+    private void OnDestroy()
     {
-        RebuildExistingQuests();
+        if (Instance == this) Instance = null;
     }
+
+    private void Start() => RebuildExistingQuests();
 
 #if UNITY_EDITOR
     private void OnValidate()
@@ -191,9 +193,9 @@ public class QuestLiveHUD : MonoBehaviour
         go.transform.SetParent(transform, false);
 
         RectTransform rect = go.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.zero;
+        rect.pivot = Vector2.zero;
         rect.sizeDelta = cardSize;
         rect.localScale = Vector3.one;
 
@@ -236,12 +238,7 @@ public class QuestLiveHUD : MonoBehaviour
         if (animateIn)
         {
             cg.alpha = 0f;
-            Vector2 target = rect.anchoredPosition;
-            rect.anchoredPosition = target + new Vector2(enterOffsetX, 0f);
-            Sequence seq = DOTween.Sequence().SetUpdate(true);
-            seq.Join(cg.DOFade(1f, enterDuration));
-            seq.Join(rect.DOAnchorPos(target, enterDuration).SetEase(enterEase));
-            card.sequence = seq;
+            rect.anchoredPosition = new Vector2(enterOffsetX, 0f);
         }
         else
         {
@@ -292,7 +289,7 @@ public class QuestLiveHUD : MonoBehaviour
         seq.AppendInterval(completeHoldDuration);
 
         Vector2 exitTarget = card.rect.anchoredPosition + new Vector2(exitOffsetX, 0f);
-        seq.Join(card.canvasGroup.DOFade(0f, exitDuration));
+        seq.Append(card.canvasGroup.DOFade(0f, exitDuration));
         seq.Join(card.rect.DOAnchorPos(exitTarget, exitDuration).SetEase(exitEase));
         seq.OnComplete(() => FinishCard(card));
         card.sequence = seq;
@@ -321,10 +318,18 @@ public class QuestLiveHUD : MonoBehaviour
             float y = stackUpward ? index * step : -index * step;
             Vector2 target = new Vector2(0f, y);
 
+            card.rect.DOKill();
             if (animate)
-                card.rect.DOAnchorPos(target, 0.22f).SetEase(Ease.OutCubic).SetUpdate(true);
+            {
+                card.canvasGroup.DOKill();
+                if (card.canvasGroup.alpha < 1f)
+                    card.canvasGroup.DOFade(1f, enterDuration).SetUpdate(true);
+                card.rect.DOAnchorPos(target, enterDuration).SetEase(enterEase).SetUpdate(true);
+            }
             else
+            {
                 card.rect.anchoredPosition = target;
+            }
             index++;
         }
     }
@@ -371,6 +376,7 @@ public class QuestLiveHUD : MonoBehaviour
             if (card == null) continue;
             card.sequence?.Kill();
             card.rect?.DOKill();
+            card.canvasGroup?.DOKill();
             card.background?.DOKill();
             card.header?.DOKill();
             card.title?.DOKill();
