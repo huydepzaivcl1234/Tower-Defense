@@ -21,12 +21,13 @@ public class WorldEventData : ScriptableObject
     [TextArea(2, 5)] public string description;
     public WorldEventRarity rarity = WorldEventRarity.Common;
     public WorldEventType eventType = WorldEventType.DogCatRain;
-    [Tooltip("Relative chance inside this rarity. 2 = twice as likely as weight 1.")]
+    [Tooltip("Relative chance inside this rarity. 0 disables this event completely. Example: Dog 100 / Meteor 0 means only Dog can be rolled among Common events.")]
     [Min(0f)] public float selectionWeight = 1f;
     [Tooltip("How many complete waves/rounds this event remains active.")]
     [Min(1)] public int durationRounds = 1;
 
     [Header("Announcement")]
+    [Tooltip("Your own event icon. Drag any Sprite here. Runtime/setup code does not need a hard-coded icon.")]
     public Sprite icon;
     public Color accentColor = Color.white;
     public AudioClip announcementSfx;
@@ -48,13 +49,18 @@ public class WorldEventData : ScriptableObject
     [Tooltip("Chance to create a meteor each tick while enemies are alive.")]
     [Range(0f, 1f)] public float meteorChancePerTick = 0.22f;
     [Min(0.05f)] public float meteorTickInterval = 0.8f;
-    [Tooltip("Chance that a spawned meteor aims near a living enemy instead of a fully random map point.")]
+
+    [Header("Meteor Targeting")]
+    [Tooltip("Chance that a spawned meteor selects a real active Tower as its exact target. The meteor lands on that Tower and the debuff is guaranteed to apply to that selected Tower.")]
+    [Range(0f, 1f)] public float meteorTargetTowerChance = 0.25f;
+    [Tooltip("Chance that a non-Tower-targeted meteor aims near a living enemy. Remaining chance uses a random map point.")]
     [Range(0f, 1f)] public float meteorTargetEnemyChance = 0.75f;
-    [Tooltip("Random horizontal offset around a targeted enemy so meteors can miss or hit nearby towers.")]
+    [Tooltip("Random horizontal offset around a targeted enemy. Tower-targeted meteors never use scatter and land exactly on the selected Tower.")]
     [Min(0f)] public float meteorTargetScatterRadius = 2.25f;
+
     [Tooltip("0.10 = meteor deals 10% of the struck enemy's maximum HP.")]
     [Range(0f, 1f)] public float meteorEnemyMaxHpDamagePercent = 0.10f;
-    [Tooltip("0.20 = a hit tower temporarily loses 20% attack speed.")]
+    [Tooltip("0.20 = a targeted/hit tower temporarily loses 20% attack speed.")]
     [Range(0f, 1f)] public float meteorTowerAttackSpeedPenaltyPercent = 0.20f;
     [Min(0.05f)] public float meteorTowerDebuffDuration = 4f;
     public GameObject meteorPrefab;
