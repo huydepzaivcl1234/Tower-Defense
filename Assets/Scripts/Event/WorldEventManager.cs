@@ -60,6 +60,8 @@ public class WorldEventManager : MonoBehaviour
     [SerializeField] private bool holyCollapsed;
     [SerializeField] private bool currentWaveEffectsRunning;
     [SerializeField] private bool isPresentingAnnouncement;
+    [SerializeField] private bool holyPenaltyStartsNextWave;
+    [SerializeField] private bool holyCollapseRolledThisRound;
 
     private Coroutine continuousEffectRoutine;
     private GameObject holyVisualInstance;
@@ -177,8 +179,6 @@ public class WorldEventManager : MonoBehaviour
             ? WorldEventRarity.Rare
             : WorldEventRarity.Common;
 
-        // Do not fall back to another rarity. A 0% Rare chance must stay 0%, and
-        // a rarity with no enabled (weight > 0) event simply produces no event.
         return WeightedPick(wanted);
     }
 
@@ -224,6 +224,7 @@ public class WorldEventManager : MonoBehaviour
         activeEvent = data;
         activeRoundsRemaining = Mathf.Max(1, data.durationRounds);
         holyCollapsed = false;
+        holyCollapseRolledThisRound = false;
 
         if (data.eventType == WorldEventType.HolyLight)
             BeginHolyVisuals(data);
@@ -232,10 +233,31 @@ public class WorldEventManager : MonoBehaviour
     private void HandleWaveCleared()
     {
         currentWaveEffectsRunning = false;
+
+        // If Holy successfully rolled collapse this round but the wave ended before
+        // its configured delay elapsed, collapse now so a 100% roll can never be lost.
+        if (IsHolyLightActive && holyCollapseRolledThisRound)
+        {
+            StopContinuousEffect();
+            TriggerHolyCollapse();
+            holyPenaltyStartsNextWave = false;
+            holyCollapseRolledThisRound = false;
+            return;
+        }
+
         StopContinuousEffect();
+        holyCollapseRolledThisRound = false;
 
         if (holyPenaltyRoundsRemaining > 0)
         {
+            // A mid-wave collapse starts its penalty on the NEXT complete wave.
+            // Do not consume one penalty round when the collapse wave itself clears.
+            if (holyPenaltyStartsNextWave)
+            {
+                holyPenaltyStartsNextWave = false;
+                return;
+            }
+
             holyPenaltyRoundsRemaining--;
             if (holyPenaltyRoundsRemaining <= 0)
             {
@@ -248,15 +270,6 @@ public class WorldEventManager : MonoBehaviour
 
         if (activeEvent == null)
             return;
-
-        if (activeEvent.eventType == WorldEventType.HolyLight &&
-            !holyCollapsed &&
-            activeRoundsRemaining > 1 &&
-            Random.value < activeEvent.holyCollapseChancePerRound)
-        {
-            TriggerHolyCollapse();
-            return;
-        }
 
         activeRoundsRemaining--;
         if (activeRoundsRemaining <= 0)
@@ -273,6 +286,7 @@ public class WorldEventManager : MonoBehaviour
         activeRoundsRemaining = 0;
         holyPenaltySource = holy;
         holyPenaltyRoundsRemaining = Mathf.Max(1, holy.collapsePenaltyRounds);
+        holyPenaltyStartsNextWave = currentWaveEffectsRunning;
         pendingHolyCollapseAnnouncement = holy;
 
         SpawnHolyCollapseVfx(holy);
@@ -290,12 +304,14 @@ public class WorldEventManager : MonoBehaviour
         activeEvent = null;
         activeRoundsRemaining = 0;
         holyCollapsed = false;
+        holyCollapseRolledThisRound = false;
         cooldownRemaining = Mathf.Max(cooldownRemaining, cooldownWavesAfterEvent);
     }
 
     private void StartContinuousEffectForCurrentWave()
     {
         StopContinuousEffect();
+        holyCollapseRolledThisRound = false;
 
         if (!currentWaveEffectsRunning || activeEvent == null)
             return;
@@ -304,6 +320,8 @@ public class WorldEventManager : MonoBehaviour
             continuousEffectRoutine = StartCoroutine(DogCatRainRoutine(activeEvent));
         else if (activeEvent.eventType == WorldEventType.MeteorShower)
             continuousEffectRoutine = StartCoroutine(MeteorShowerRoutine(activeEvent));
+        else if (activeEvent.eventType == WorldEventType.HolyLight)
+            continuousEffectRoutine = StartCoroutine(HolyLightCollapseRoutine(activeEvent));
     }
 
     private void StopContinuousEffect()
@@ -312,6 +330,52 @@ public class WorldEventManager : MonoBehaviour
             return;
 
         StopCoroutine(continuousEffectRoutine);
+        continuousEffectRoutine = null;
+    }
+
+    private IEnumerator HolyLightCollapseRoutine(WorldEventData data)
+    {
+        if (data == null)
+        {
+            continuousEffectRoutine = null;
+            yield break;
+        }
+
+        // Collapse is a per-round event. Wait until combat really starts so a 100%
+        // chance visibly collapses during the affected round, not during announcement/portal setup.
+        while (currentWaveEffectsRunning && activeEvent == data && !HasLivingEnemies())
+            yield return null;
+
+        if (!currentWaveEffectsRunning || activeEvent != data || holyCollapsed)
+        {
+            continuousEffectRoutine = null;
+            yield break;
+        }
+
+        float chance = Mathf.Clamp01(data.holyCollapseChancePerRound);
+        holyCollapseRolledThisRound = chance >= 1f || (chance > 0f && Random.value < chance);
+
+        if (!holyCollapseRolledThisRound)
+        {
+            continuousEffectRoutine = null;
+            yield break;
+        }
+
+        float minDelay = Mathf.Max(0f, data.holyCollapseMinDelay);
+        float maxDelay = Mathf.Max(minDelay, data.holyCollapseMaxDelay);
+        float delay = Random.Range(minDelay, maxDelay);
+        float elapsed = 0f;
+
+        while (elapsed < delay && currentWaveEffectsRunning && activeEvent == data && !holyCollapsed)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (currentWaveEffectsRunning && activeEvent == data && !holyCollapsed)
+            TriggerHolyCollapse();
+
+        holyCollapseRolledThisRound = false;
         continuousEffectRoutine = null;
     }
 
@@ -466,8 +530,6 @@ public class WorldEventManager : MonoBehaviour
         HashSet<Enemy> enemies = new HashSet<Enemy>();
         HashSet<Tower> towers = new HashSet<Tower>();
 
-        // A meteor rolled for a Tower is guaranteed to debuff that selected active Tower.
-        // Collider/layout inaccuracies cannot cause the authored debuff to miss.
         if (exactTowerTarget != null && exactTowerTarget.isActiveAndEnabled && exactTowerTarget.gameObject.activeInHierarchy)
             towers.Add(exactTowerTarget);
 
@@ -879,7 +941,7 @@ public class WorldEventManager : MonoBehaviour
         if (data.holyLightVisualPrefab == null || holyVisualInstance != null)
             return;
 
-        Vector3 position = worldCenter != null ? worldCenter.position : Vector3.zero;
+        Vector3 position = (worldCenter != null ? worldCenter.position : Vector3.zero) + data.holyLightVisualOffset;
         holyVisualInstance = Instantiate(data.holyLightVisualPrefab, position, Quaternion.identity);
 
         Vector3 authoredScale = holyVisualInstance.transform.localScale;
@@ -951,7 +1013,7 @@ public class WorldEventManager : MonoBehaviour
         if (data == null || data.holyCollapseVfxPrefab == null)
             return;
 
-        Vector3 position = worldCenter != null ? worldCenter.position : Vector3.zero;
+        Vector3 position = (worldCenter != null ? worldCenter.position : Vector3.zero) + data.holyLightVisualOffset;
         GameObject vfx = Instantiate(data.holyCollapseVfxPrefab, position, Quaternion.identity);
 
         ParticleSystem particle = vfx.GetComponentInChildren<ParticleSystem>();
