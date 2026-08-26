@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f478077623c1a14e835d77a6e4d0ac1, type: 3}
   m_Name: kill the weak
   m_EditorClassIdentifier: Assembly-CSharp::QuestData
-  questId: quest_id
+  questId: easyquest_id
   questTitle: Slam the weak
   description: kill 5 enemies
   difficulty: 0
