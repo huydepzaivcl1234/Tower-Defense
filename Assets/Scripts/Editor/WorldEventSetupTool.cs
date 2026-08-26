@@ -24,22 +24,17 @@ public static class WorldEventSetupTool
         WorldEventData meteor = ResolveOrCreate(manager, WorldEventType.MeteorShower, "MeteorShower.asset", "Meteor Shower", WorldEventRarity.Common);
         WorldEventData holy = ResolveOrCreate(manager, WorldEventType.HolyLight, "HolyLight.asset", "Holy Light", WorldEventRarity.Rare);
 
-        NormalizeIdentity(dog, "Dog & Cat Rain", WorldEventRarity.Common, WorldEventType.DogCatRain);
-        NormalizeIdentity(meteor, "Meteor Shower", WorldEventRarity.Common, WorldEventType.MeteorShower);
-        NormalizeIdentity(holy, "Holy Light", WorldEventRarity.Rare, WorldEventType.HolyLight);
+        NormalizeIdentityOnly(dog, "Dog & Cat Rain", WorldEventRarity.Common, WorldEventType.DogCatRain);
+        NormalizeIdentityOnly(meteor, "Meteor Shower", WorldEventRarity.Common, WorldEventType.MeteorShower);
+        NormalizeIdentityOnly(holy, "Holy Light", WorldEventRarity.Rare, WorldEventType.HolyLight);
 
         EnsureEventInPool(manager, dog);
         EnsureEventInPool(manager, meteor);
         EnsureEventInPool(manager, holy);
 
-        WorldEventGeneratedAssets.EnsureAndAssign(dog, meteor, holy);
-
-        if (manager.eventChancePerOpportunity <= 0f)
-            manager.eventChancePerOpportunity = 0.35f;
-        if (manager.rareChanceWhenEventRolls <= 0f)
-            manager.rareChanceWhenEventRolls = 0.10f;
-        if (manager.firstEligibleWave < 1)
-            manager.firstEligibleWave = 2;
+        // Important: setup must not overwrite authored gameplay tuning or presentation assets.
+        // Generated fallback assets are still available through their separate editor menu,
+        // but World Event Setup never forces icons/SFX/prefabs into existing event data.
 
         EnsureAudioSource(manager);
         EnsureWorldCenter(manager);
@@ -60,12 +55,10 @@ public static class WorldEventSetupTool
         EditorGUIUtility.PingObject(manager.gameObject);
 
         string message =
-            "World Event System repaired without replacing your custom data.\n\n" +
-            "Runtime sources:\n" +
-            "Dog: " + WorldEventAssetResolver.Describe(dog) + "\n" +
-            "Meteor: " + WorldEventAssetResolver.Describe(meteor) + "\n" +
-            "Holy: " + WorldEventAssetResolver.Describe(holy) + "\n\n" +
-            "Event HUD slide now mirrors the existing NPC DialogueHUDPresentationController targets and hidden offsets.";
+            "World Event System ready.\n\n" +
+            "Your event weights, global event chance, rare chance, icons, SFX and prefab references are preserved.\n" +
+            "Weight 0 means that event is disabled.\n\n" +
+            "Event HUD slide mirrors the existing NPC DialogueHUDPresentationController targets and hidden offsets.";
 
         EditorUtility.DisplayDialog("World Event System Ready", message, "OK");
     }
@@ -112,7 +105,7 @@ public static class WorldEventSetupTool
         return data;
     }
 
-    private static void NormalizeIdentity(
+    private static void NormalizeIdentityOnly(
         WorldEventData data,
         string displayName,
         WorldEventRarity rarity,
@@ -124,10 +117,9 @@ public static class WorldEventSetupTool
         data.eventName = displayName;
         data.rarity = rarity;
         data.eventType = type;
-        if (data.selectionWeight <= 0f)
-            data.selectionWeight = 1f;
-        if (data.durationRounds < 1)
-            data.durationRounds = 1;
+
+        // Deliberately do NOT modify selectionWeight or durationRounds here.
+        // A weight of 0 is a valid authored value meaning disabled.
     }
 
     private static void EnsureFallbackFolder()
@@ -289,10 +281,6 @@ public static class WorldEventSetupTool
         return fallback;
     }
 
-    /// <summary>
-    /// Reuse the exact HUD targets and hidden offsets already authored for NPC dialogue.
-    /// This intentionally removes the separate automatic edge/Canvas offset calculation.
-    /// </summary>
     private static void SyncHUDTargetsFromNpcDialogue(WorldEventManager manager)
     {
         DialogueHUDPresentationController dialogueHud = Object.FindAnyObjectByType<DialogueHUDPresentationController>(FindObjectsInactive.Include);
