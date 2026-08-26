@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Core tower behaviour: targeting, aiming, firing and upgrades.
-/// Relic modifiers are read at runtime and never mutate TowerData assets.
+/// Relic/world-event modifiers are read at runtime and never mutate TowerData assets.
 /// </summary>
 public class Tower : MonoBehaviour
 {
@@ -32,6 +32,8 @@ public class Tower : MonoBehaviour
 
     [Header("Runtime (read-only)")]
     [SerializeField] private int currentLevelIndex = 0;
+    [SerializeField] private float temporaryAttackSpeedPenaltyPercent;
+    [SerializeField] private float temporaryAttackSpeedPenaltyTime;
 
     [HideInInspector] public TowerPlacementSpot occupiedSpot;
 
@@ -57,18 +59,26 @@ public class Tower : MonoBehaviour
     {
         if (data == null || data.levels == null || data.levels.Length == 0) return 0f;
         int index = Mathf.Clamp(levelIndex, 0, data.levels.Length - 1);
-        float baseDamage = data.levels[index].strength;
-        return RelicManager.Instance != null
-            ? RelicManager.Instance.ApplyDamageForLevel(data, index + 1, baseDamage)
-            : baseDamage;
+        float result = data.levels[index].strength;
+        if (RelicManager.Instance != null)
+            result = RelicManager.Instance.ApplyDamageForLevel(data, index + 1, result);
+        if (WorldEventManager.Instance != null)
+            result = WorldEventManager.Instance.ApplyTowerDamage(result);
+        return result;
     }
 
     public float GetEffectiveAttackSpeedForLevel(int levelIndex)
     {
         if (data == null || data.levels == null || data.levels.Length == 0) return 0f;
         int index = Mathf.Clamp(levelIndex, 0, data.levels.Length - 1);
-        float baseSpeed = data.levels[index].attackSpeed;
-        return RelicManager.Instance != null ? RelicManager.Instance.ApplyAttackSpeed(baseSpeed) : baseSpeed;
+        float result = data.levels[index].attackSpeed;
+        if (RelicManager.Instance != null)
+            result = RelicManager.Instance.ApplyAttackSpeed(result);
+        if (WorldEventManager.Instance != null)
+            result = WorldEventManager.Instance.ApplyTowerAttackSpeed(result);
+        if (temporaryAttackSpeedPenaltyTime > 0f)
+            result *= 1f - Mathf.Clamp01(temporaryAttackSpeedPenaltyPercent);
+        return Mathf.Max(0.01f, result);
     }
 
     public float GetEffectiveRangeForLevel(int levelIndex)
@@ -77,6 +87,13 @@ public class Tower : MonoBehaviour
         int index = Mathf.Clamp(levelIndex, 0, data.levels.Length - 1);
         float baseRange = data.levels[index].range;
         return RelicManager.Instance != null ? RelicManager.Instance.ApplyRange(data, baseRange) : baseRange;
+    }
+
+    public void ApplyTemporaryAttackSpeedPenalty(float percent, float duration)
+    {
+        if (percent <= 0f || duration <= 0f) return;
+        temporaryAttackSpeedPenaltyPercent = Mathf.Max(temporaryAttackSpeedPenaltyPercent, Mathf.Clamp01(percent));
+        temporaryAttackSpeedPenaltyTime = Mathf.Max(temporaryAttackSpeedPenaltyTime, duration);
     }
 
     private void Awake()
@@ -90,7 +107,7 @@ public class Tower : MonoBehaviour
 
     private void OnEnable()
     {
-        activeTowers.Add(this);
+        if (!activeTowers.Contains(this)) activeTowers.Add(this);
         WaveManager.OnWaveCleared += HandleWaveCleared;
     }
 
@@ -122,6 +139,16 @@ public class Tower : MonoBehaviour
 
     private void Update()
     {
+        if (temporaryAttackSpeedPenaltyTime > 0f)
+        {
+            temporaryAttackSpeedPenaltyTime -= Time.deltaTime;
+            if (temporaryAttackSpeedPenaltyTime <= 0f)
+            {
+                temporaryAttackSpeedPenaltyTime = 0f;
+                temporaryAttackSpeedPenaltyPercent = 0f;
+            }
+        }
+
         if (data == null || data.levels == null || data.levels.Length == 0) return;
         if (data.isGoldGenerator) return;
 
