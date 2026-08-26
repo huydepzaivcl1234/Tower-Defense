@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Metoer Shower
   m_EditorClassIdentifier: Assembly-CSharp::WorldEventData
   eventName: Meteor Shower
-  description: Meteors fall while enemies are alive. Enemy hits lose Max-HP damage; tower hits temporarily reduce attack speed.
+  description: Meteors fall while enemies are alive. Enemy hits lose Max-HP damage;
+    tower hits temporarily reduce attack speed.
   rarity: 0
   eventType: 1
   selectionWeight: 1
@@ -28,14 +29,16 @@ MonoBehaviour:
   goldDropAreaSize: {x: 30, y: 18}
   goldDropHeight: 18
   goldDropFallDuration: 0.7
-  meteorChancePerTick: 0.22
+  meteorChancePerTick: 0.3
   meteorTickInterval: 0.8
+  meteorTargetTowerChance: 0.25
   meteorTargetEnemyChance: 0.75
   meteorTargetScatterRadius: 2.25
-  meteorEnemyMaxHpDamagePercent: 0.1
+  meteorEnemyMaxHpDamagePercent: 0.01
   meteorTowerAttackSpeedPenaltyPercent: 0.2
   meteorTowerDebuffDuration: 4
-  meteorPrefab: {fileID: 3530315664873638944, guid: 059b58b214a839e43815911eba66f205, type: 3}
+  meteorPrefab: {fileID: 3530315664873638944, guid: 059b58b214a839e43815911eba66f205,
+    type: 3}
   meteorImpactVfxPrefab: {fileID: 0}
   meteorAreaSize: {x: 34, y: 22}
   meteorSpawnHeight: 20

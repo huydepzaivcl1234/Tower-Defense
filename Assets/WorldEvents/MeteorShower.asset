@@ -19,9 +19,9 @@ MonoBehaviour:
   eventType: 1
   selectionWeight: 1
   durationRounds: 1
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 75ad67d7309f63e41bc2b3c938a17bca, type: 3}
   accentColor: {r: 1, g: 1, b: 1, a: 1}
-  announcementSfx: {fileID: 8300000, guid: 8f512bbaf37b93547a64e0088a537bd0, type: 3}
+  announcementSfx: {fileID: 8300000, guid: 95ceab9577acae041bb02835cd900883, type: 3}
   goldPerDrop: 5
   goldDropInterval: 0.8
   enemyMaxHpBonusPercent: 0.3
@@ -31,11 +31,15 @@ MonoBehaviour:
   goldDropFallDuration: 0.7
   meteorChancePerTick: 0.22
   meteorTickInterval: 0.8
+  meteorTargetTowerChance: 0.25
+  meteorTargetEnemyChance: 0.75
+  meteorTargetScatterRadius: 2.25
   meteorEnemyMaxHpDamagePercent: 0.1
   meteorTowerAttackSpeedPenaltyPercent: 0.2
   meteorTowerDebuffDuration: 4
   meteorPrefab: {fileID: 3530315664873638944, guid: 059b58b214a839e43815911eba66f205,
     type: 3}
+  meteorImpactVfxPrefab: {fileID: 0}
   meteorAreaSize: {x: 34, y: 22}
   meteorSpawnHeight: 20
   meteorFallDuration: 0.55
@@ -49,3 +53,5 @@ MonoBehaviour:
   collapseEnemyMaxHpBonusPercent: 0.35
   collapseEnemyCCResistanceBonusPercent: 0.3
   collapseEnemyShieldPercentOfMaxHp: 0.2
+  holyCollapseSfx: {fileID: 0}
+  holyCollapseVfxPrefab: {fileID: 0}

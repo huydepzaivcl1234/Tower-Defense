@@ -31,10 +31,14 @@ MonoBehaviour:
   goldDropFallDuration: 0.7
   meteorChancePerTick: 0.22
   meteorTickInterval: 0.8
+  meteorTargetTowerChance: 0.25
+  meteorTargetEnemyChance: 0.75
+  meteorTargetScatterRadius: 2.25
   meteorEnemyMaxHpDamagePercent: 0.1
   meteorTowerAttackSpeedPenaltyPercent: 0.2
   meteorTowerDebuffDuration: 4
   meteorPrefab: {fileID: 0}
+  meteorImpactVfxPrefab: {fileID: 0}
   meteorAreaSize: {x: 34, y: 22}
   meteorSpawnHeight: 20
   meteorFallDuration: 0.55
@@ -48,3 +52,5 @@ MonoBehaviour:
   collapseEnemyMaxHpBonusPercent: 0.35
   collapseEnemyCCResistanceBonusPercent: 0.3
   collapseEnemyShieldPercentOfMaxHp: 0.2
+  holyCollapseSfx: {fileID: 0}
+  holyCollapseVfxPrefab: {fileID: 0}
