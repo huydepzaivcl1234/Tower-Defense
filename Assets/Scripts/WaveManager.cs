@@ -34,9 +34,7 @@ public class WaveManager : MonoBehaviour
     [Header("Spawn Portal Animation")]
     [Tooltip("Root Transform of your existing Portal VFX. Leave empty to auto-find a GameObject named 'Portal'.")]
     public Transform spawnPortal;
-    [Tooltip("Smooth zoom-in time before the first enemy spawns.")]
     [Min(0.05f)] public float portalOpenDuration = 0.65f;
-    [Tooltip("Smooth zoom-out time after the final enemy has spawned.")]
     [Min(0.05f)] public float portalCloseDuration = 0.55f;
 
     [SerializeField] private int currentWaveIndex = -1;
@@ -46,8 +44,6 @@ public class WaveManager : MonoBehaviour
     private Vector3 portalBaseScale = Vector3.one;
     private ParticleSystem[] portalParticles;
     private bool portalReady;
-
-    // Prevents the same wave from firing OnWaveCleared more than once.
     private int lastClearedWaveIndex = -1;
 
     public int CurrentWaveNumber => currentWaveIndex + 1;
@@ -62,10 +58,7 @@ public class WaveManager : MonoBehaviour
         CacheSpawnPortal();
     }
 
-    private void Start()
-    {
-        HidePortalInstant();
-    }
+    private void Start() => HidePortalInstant();
 
     private void OnEnable()
     {
@@ -84,16 +77,9 @@ public class WaveManager : MonoBehaviour
         if (spawnPortal == null)
         {
             GameObject portalObject = GameObject.Find("Portal");
-            if (portalObject != null)
-                spawnPortal = portalObject.transform;
+            if (portalObject != null) spawnPortal = portalObject.transform;
         }
-
-        if (spawnPortal == null)
-        {
-            portalReady = false;
-            return;
-        }
-
+        if (spawnPortal == null) { portalReady = false; return; }
         portalBaseScale = spawnPortal.localScale;
         portalParticles = spawnPortal.GetComponentsInChildren<ParticleSystem>(true);
         portalReady = true;
@@ -101,20 +87,13 @@ public class WaveManager : MonoBehaviour
 
     private void HidePortalInstant()
     {
-        if (!portalReady)
-            CacheSpawnPortal();
-        if (!portalReady)
-            return;
-
+        if (!portalReady) CacheSpawnPortal();
+        if (!portalReady) return;
         spawnPortal.localScale = Vector3.zero;
         ClearPortalParticles();
         spawnPortal.gameObject.SetActive(false);
     }
 
-    /// <summary>
-    /// Smooth 0..1 easing with zero velocity at both ends.
-    /// This avoids the hard "pop" of a linear scale or overshoot curve.
-    /// </summary>
     private static float SmootherStep01(float t)
     {
         t = Mathf.Clamp01(t);
@@ -123,23 +102,14 @@ public class WaveManager : MonoBehaviour
 
     private IEnumerator OpenPortal()
     {
-        if (!portalReady)
-            CacheSpawnPortal();
-        if (!portalReady)
-            yield break;
-
-        // Activate while still exactly scale-zero so there is no visible one-frame pop.
+        if (!portalReady) CacheSpawnPortal();
+        if (!portalReady) yield break;
         spawnPortal.localScale = Vector3.zero;
         spawnPortal.gameObject.SetActive(true);
-
-        // Give Unity one frame to initialize renderers/particles while the root is invisible.
         yield return null;
-
         PlayPortalParticles();
-
         float duration = Mathf.Max(0.05f, portalOpenDuration);
         float elapsed = 0f;
-
         while (elapsed < duration)
         {
             float t = SmootherStep01(elapsed / duration);
@@ -147,23 +117,16 @@ public class WaveManager : MonoBehaviour
             elapsed += Time.deltaTime;
             yield return null;
         }
-
         spawnPortal.localScale = portalBaseScale;
     }
 
     private IEnumerator ClosePortal()
     {
-        if (!portalReady)
-            yield break;
-
-        // Stop creating NEW particles, but do not clear existing ones yet.
-        // Existing visual layers remain visible while the whole portal smoothly shrinks.
+        if (!portalReady) yield break;
         StopPortalEmission();
-
         float duration = Mathf.Max(0.05f, portalCloseDuration);
         Vector3 startScale = spawnPortal.localScale;
         float elapsed = 0f;
-
         while (elapsed < duration)
         {
             float t = SmootherStep01(elapsed / duration);
@@ -171,8 +134,6 @@ public class WaveManager : MonoBehaviour
             elapsed += Time.deltaTime;
             yield return null;
         }
-
-        // Only after the zoom-out visually reaches zero do we clear and disable it.
         spawnPortal.localScale = Vector3.zero;
         ClearPortalParticles();
         spawnPortal.gameObject.SetActive(false);
@@ -180,17 +141,12 @@ public class WaveManager : MonoBehaviour
 
     private void PlayPortalParticles()
     {
-        if (portalParticles == null)
-            return;
-
+        if (portalParticles == null) return;
         foreach (ParticleSystem ps in portalParticles)
         {
             if (ps == null) continue;
-
-            // Hierarchy scaling makes authored particle sizes follow the root portal zoom.
             ParticleSystem.MainModule main = ps.main;
             main.scalingMode = ParticleSystemScalingMode.Hierarchy;
-
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             ps.Play(true);
         }
@@ -198,26 +154,16 @@ public class WaveManager : MonoBehaviour
 
     private void StopPortalEmission()
     {
-        if (portalParticles == null)
-            return;
-
+        if (portalParticles == null) return;
         foreach (ParticleSystem ps in portalParticles)
-        {
-            if (ps == null) continue;
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-        }
+            if (ps != null) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
     }
 
     private void ClearPortalParticles()
     {
-        if (portalParticles == null)
-            return;
-
+        if (portalParticles == null) return;
         foreach (ParticleSystem ps in portalParticles)
-        {
-            if (ps == null) continue;
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        }
+            if (ps != null) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
 
     private void HandleEnemyRemoved(Enemy e)
@@ -233,7 +179,6 @@ public class WaveManager : MonoBehaviour
         if (aliveEnemies > 0) return;
         if (currentWaveIndex < 0 || currentWaveIndex >= waves.Count) return;
         if (lastClearedWaveIndex == currentWaveIndex) return;
-
         lastClearedWaveIndex = currentWaveIndex;
         OnWaveCleared?.Invoke();
     }
@@ -254,27 +199,26 @@ public class WaveManager : MonoBehaviour
     private IEnumerator SpawnWave(Wave wave)
     {
         waveInProgress = true;
-        yield return new WaitForSeconds(wave.startDelay);
 
-        // Portal smoothly opens completely before the first enemy appears.
+        // World event roll and presentation always happens BEFORE the portal opens/enemies spawn.
+        if (WorldEventManager.Instance != null)
+            yield return WorldEventManager.Instance.PrepareForWave(currentWaveIndex + 1);
+
+        yield return new WaitForSeconds(wave.startDelay);
         yield return OpenPortal();
 
         foreach (var entry in wave.entries)
         {
             if (entry == null) continue;
-
             for (int i = 0; i < entry.count; i++)
             {
                 SpawnEnemy(entry.enemyData);
-
                 if (i < entry.count - 1 && entry.spawnInterval > 0f)
                     yield return new WaitForSeconds(entry.spawnInterval);
             }
         }
 
-        // Final enemy is now out of the portal; smoothly close it.
         yield return ClosePortal();
-
         waveInProgress = false;
         TryCompleteCurrentWave();
         CheckForWin();
@@ -289,7 +233,6 @@ public class WaveManager : MonoBehaviour
     private void SpawnEnemy(EnemyData data)
     {
         if (data == null || data.enemyPrefab == null || path == null) return;
-
         Vector3 spawnPos = path.GetSpawnPosition();
         GameObject go = ObjectPool.Instance != null
             ? ObjectPool.Instance.Get(data.enemyPrefab, spawnPos, Quaternion.identity)
