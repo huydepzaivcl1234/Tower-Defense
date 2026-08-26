@@ -1,10 +1,9 @@
-using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 
 /// <summary>
 /// Gives a quest-giver NPC a subtle wind/idle motion and handles its quest lifecycle:
-/// disappear after giving a quest, then respawn at a safe random point when that quest completes.
+/// disappear after giving a quest, then return to its original scene position when that quest completes.
 /// The GameObject itself remains active while hidden so it can keep listening for quest events.
 /// </summary>
 [DisallowMultipleComponent]
@@ -37,29 +36,9 @@ public class NPCQuestLifecycle : MonoBehaviour
     [Min(0f)] public float appearSpinDegrees = 14f;
     public Ease appearEase = Ease.OutBack;
 
-    [Header("Random Respawn Area")]
-    [Tooltip("Optional BoxCollider defining the random spawn area. If empty, Spawn Area Center/Size are used in world space.")]
-    public BoxCollider spawnArea;
-    public Vector3 spawnAreaCenter = Vector3.zero;
-    public Vector2 spawnAreaSize = new Vector2(36f, 36f);
-    [Min(1)] public int maxSpawnAttempts = 40;
-
-    [Header("Ground Placement")]
-    public LayerMask groundMask = ~0;
-    [Min(0.1f)] public float groundRayHeight = 20f;
-    [Min(0.1f)] public float groundRayDistance = 60f;
-    public float groundYOffset = 0f;
-    public bool useCurrentYIfNoGroundFound = true;
-
-    [Header("Safety / Exclusion")]
-    [Min(0f)] public float towerClearance = 3.5f;
-    [Min(0f)] public float exclusionZonePadding = 1.5f;
-    [Min(0f)] public float extraPhysicsClearance = 0.75f;
-    public LayerMask additionalBlockingLayers = 0;
-
-    [Header("Debug")]
-    public bool drawSpawnAreaGizmo = true;
-    public bool logRespawnFailures = true;
+    [Header("Spawn Point")]
+    [Tooltip("When enabled, the NPC returns to the exact world position/rotation it had when this component first Awake'd.")]
+    public bool returnToOriginalSpawnPoint = true;
 
     private ActiveQuest trackedQuest;
     private Renderer[] cachedRenderers;
@@ -67,6 +46,8 @@ public class NPCQuestLifecycle : MonoBehaviour
     private Vector3 baseVisualLocalPosition;
     private Quaternion baseVisualLocalRotation;
     private Vector3 baseVisualLocalScale;
+    private Vector3 originalWorldPosition;
+    private Quaternion originalWorldRotation;
     private float idleSeed;
     private bool hidden;
     private bool transitioning;
@@ -77,6 +58,9 @@ public class NPCQuestLifecycle : MonoBehaviour
 
     private void Awake()
     {
+        originalWorldPosition = transform.position;
+        originalWorldRotation = transform.rotation;
+
         ResolveReferences();
         CacheVisualState();
         idleSeed = Random.Range(0f, 1000f);
@@ -108,7 +92,7 @@ public class NPCQuestLifecycle : MonoBehaviour
     {
         if (questData == null || QuestManager.Instance == null) return;
 
-        IReadOnlyList<ActiveQuest> active = QuestManager.Instance.ActiveQuests;
+        var active = QuestManager.Instance.ActiveQuests;
         ActiveQuest match = null;
         for (int i = active.Count - 1; i >= 0; i--)
         {
@@ -128,7 +112,14 @@ public class NPCQuestLifecycle : MonoBehaviour
     private void HandleQuestCompleted(ActiveQuest quest)
     {
         if (quest == null || trackedQuest == null || quest != trackedQuest) return;
-        RespawnAtSafeRandomPosition();
+
+        if (returnToOriginalSpawnPoint)
+        {
+            transform.position = originalWorldPosition;
+            transform.rotation = originalWorldRotation;
+        }
+
+        PlayAppear();
     }
 
     private void ResolveReferences()
@@ -208,36 +199,19 @@ public class NPCQuestLifecycle : MonoBehaviour
         });
     }
 
-    private void RespawnAtSafeRandomPosition()
-    {
-        if (!hidden && !transitioning) return;
-        transitionSequence?.Kill();
-        transitioning = false;
-
-        Vector3 targetPosition;
-        if (!TryFindSafeSpawnPosition(out targetPosition))
-        {
-            if (logRespawnFailures)
-                Debug.LogWarning("NPCQuestLifecycle: Could not find a safe random respawn point. Reusing the NPC's current position.", this);
-            targetPosition = transform.position;
-        }
-
-        transform.position = targetPosition;
-        PlayAppear();
-    }
-
     private void PlayAppear()
     {
         if (visualRoot == null) return;
+
+        transitionSequence?.Kill();
+        visualRoot.DOKill();
+
         transitioning = true;
         hidden = false;
 
         SetVisualAndColliders(true);
         if (dialogueInteractable != null)
             dialogueInteractable.enabled = false;
-
-        transitionSequence?.Kill();
-        visualRoot.DOKill();
 
         visualRoot.localScale = Vector3.zero;
         visualRoot.localPosition = baseVisualLocalPosition + Vector3.up * appearDropHeight;
@@ -254,6 +228,7 @@ public class NPCQuestLifecycle : MonoBehaviour
             visualRoot.localScale = baseVisualLocalScale;
             transitioning = false;
             trackedQuest = null;
+
             if (dialogueInteractable != null)
                 dialogueInteractable.enabled = true;
         });
@@ -261,124 +236,21 @@ public class NPCQuestLifecycle : MonoBehaviour
 
     private void SetVisualAndColliders(bool visible)
     {
-        if (cachedRenderers == null || cachedColliders == null) ResolveReferences();
+        if (cachedRenderers == null || cachedColliders == null)
+            ResolveReferences();
 
         if (cachedRenderers != null)
         {
             for (int i = 0; i < cachedRenderers.Length; i++)
-                if (cachedRenderers[i] != null) cachedRenderers[i].enabled = visible;
+                if (cachedRenderers[i] != null)
+                    cachedRenderers[i].enabled = visible;
         }
 
         if (cachedColliders != null)
         {
             for (int i = 0; i < cachedColliders.Length; i++)
-            {
-                Collider col = cachedColliders[i];
-                if (col == null || col == spawnArea) continue;
-                col.enabled = visible;
-            }
+                if (cachedColliders[i] != null)
+                    cachedColliders[i].enabled = visible;
         }
     }
-
-    private bool TryFindSafeSpawnPosition(out Vector3 result)
-    {
-        for (int attempt = 0; attempt < Mathf.Max(1, maxSpawnAttempts); attempt++)
-        {
-            Vector3 candidate = SampleSpawnPointXZ();
-
-            RaycastHit hit;
-            Vector3 rayStart = new Vector3(candidate.x, candidate.y + groundRayHeight, candidate.z);
-            if (Physics.Raycast(rayStart, Vector3.down, out hit, groundRayDistance, groundMask, QueryTriggerInteraction.Ignore))
-            {
-                if (hit.collider != null)
-                {
-                    if (hit.collider.GetComponentInParent<Tower>() != null) continue;
-                    if (hit.collider.GetComponentInParent<BuildExclusionZone>() != null) continue;
-                }
-                candidate.y = hit.point.y + groundYOffset;
-            }
-            else if (useCurrentYIfNoGroundFound)
-            {
-                candidate.y = transform.position.y;
-            }
-            else
-            {
-                continue;
-            }
-
-            if (!IsSafeFromExclusionZones(candidate)) continue;
-            if (!IsSafeFromTowers(candidate)) continue;
-            if (!IsSafeFromExtraBlockingLayers(candidate)) continue;
-
-            result = candidate;
-            return true;
-        }
-
-        result = transform.position;
-        return false;
-    }
-
-    private Vector3 SampleSpawnPointXZ()
-    {
-        if (spawnArea != null)
-        {
-            Bounds bounds = spawnArea.bounds;
-            return new Vector3(
-                Random.Range(bounds.min.x, bounds.max.x),
-                bounds.center.y,
-                Random.Range(bounds.min.z, bounds.max.z));
-        }
-
-        Vector3 center = spawnAreaCenter;
-        if (center == Vector3.zero) center = transform.position;
-        return new Vector3(
-            center.x + Random.Range(-spawnAreaSize.x * 0.5f, spawnAreaSize.x * 0.5f),
-            center.y,
-            center.z + Random.Range(-spawnAreaSize.y * 0.5f, spawnAreaSize.y * 0.5f));
-    }
-
-    private bool IsSafeFromExclusionZones(Vector3 position)
-    {
-        foreach (BuildExclusionZone zone in BuildExclusionZone.ActiveZones)
-        {
-            if (zone == null) continue;
-            Vector3 delta = position - zone.WorldCenter;
-            delta.y = 0f;
-            float safeRadius = Mathf.Max(0f, zone.radius) + exclusionZonePadding;
-            if (delta.sqrMagnitude < safeRadius * safeRadius) return false;
-        }
-        return true;
-    }
-
-    private bool IsSafeFromTowers(Vector3 position)
-    {
-        float clearance = Mathf.Max(0f, towerClearance);
-        float clearanceSq = clearance * clearance;
-        IReadOnlyList<Tower> towers = Tower.ActiveTowers;
-        for (int i = 0; i < towers.Count; i++)
-        {
-            Tower tower = towers[i];
-            if (tower == null) continue;
-            Vector3 delta = position - tower.transform.position;
-            delta.y = 0f;
-            if (delta.sqrMagnitude < clearanceSq) return false;
-        }
-        return true;
-    }
-
-    private bool IsSafeFromExtraBlockingLayers(Vector3 position)
-    {
-        if (additionalBlockingLayers.value == 0 || extraPhysicsClearance <= 0f) return true;
-        return !Physics.CheckSphere(position, extraPhysicsClearance, additionalBlockingLayers, QueryTriggerInteraction.Ignore);
-    }
-
-#if UNITY_EDITOR
-    private void OnDrawGizmosSelected()
-    {
-        if (!drawSpawnAreaGizmo || spawnArea != null) return;
-        Vector3 center = spawnAreaCenter == Vector3.zero ? transform.position : spawnAreaCenter;
-        Gizmos.color = new Color(0.15f, 0.9f, 0.95f, 0.5f);
-        Gizmos.DrawWireCube(center, new Vector3(spawnAreaSize.x, 0.1f, spawnAreaSize.y));
-    }
-#endif
 }
