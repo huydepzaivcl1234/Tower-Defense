@@ -65,8 +65,7 @@ public static class WorldEventSetupTool
             "Dog: " + WorldEventAssetResolver.Describe(dog) + "\n" +
             "Meteor: " + WorldEventAssetResolver.Describe(meteor) + "\n" +
             "Holy: " + WorldEventAssetResolver.Describe(holy) + "\n\n" +
-            "Holy Light is forced to Rare; Dog & Cat Rain and Meteor Shower are Common. " +
-            "Missing icon/SFX/fallback models are filled only when fields are empty.";
+            "HUD slide offsets were recalculated from the real Canvas size so every HUD target moves completely outside the screen during event announcements.";
 
         EditorUtility.DisplayDialog("World Event System Ready", message, "OK");
     }
@@ -144,7 +143,6 @@ public static class WorldEventSetupTool
         if (manager.eventPool == null)
             manager.eventPool = new List<WorldEventData>();
 
-        // Do not add another asset for a type already represented in the runtime pool.
         for (int i = 0; i < manager.eventPool.Count; i++)
         {
             WorldEventData existing = manager.eventPool[i];
@@ -296,6 +294,21 @@ public static class WorldEventSetupTool
         if (manager.hudTargets == null)
             manager.hudTargets = new List<WorldEventManager.HUDTarget>();
 
+        // Refresh every existing target as well. Older setup versions used small fixed offsets
+        // (500 / 900 canvas units), which are not enough on QHD/large canvases.
+        for (int i = manager.hudTargets.Count - 1; i >= 0; i--)
+        {
+            WorldEventManager.HUDTarget item = manager.hudTargets[i];
+            if (item == null || item.target == null)
+            {
+                manager.hudTargets.RemoveAt(i);
+                continue;
+            }
+
+            item.hiddenOffset = ChooseHiddenOffset(item.target);
+            item.captured = false;
+        }
+
         string[] names = { "HUDPanel", "ResourceHUD", "WaveHUD", "BuildDock", "UpgradePanelClean", "QoLCanvas", "QoLTopRight", "RelicOwnedHUD", "QuestLiveHUD", "GameSpeedController" };
         RectTransform[] rects = Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
@@ -311,7 +324,6 @@ public static class WorldEventSetupTool
                 if (HasHUDTarget(manager, rect))
                     continue;
 
-                // Skip child if a parent is already one of our HUD targets.
                 bool parentAlreadyAdded = false;
                 for (int h = 0; h < manager.hudTargets.Count; h++)
                 {
@@ -328,7 +340,8 @@ public static class WorldEventSetupTool
                 manager.hudTargets.Add(new WorldEventManager.HUDTarget
                 {
                     target = rect,
-                    hiddenOffset = ChooseHiddenOffset(rect)
+                    hiddenOffset = ChooseHiddenOffset(rect),
+                    captured = false
                 });
             }
         }
@@ -347,10 +360,46 @@ public static class WorldEventSetupTool
 
     private static Vector2 ChooseHiddenOffset(RectTransform rect)
     {
-        Vector2 p = rect.anchoredPosition;
-        if (Mathf.Abs(p.y) > Mathf.Abs(p.x) * 1.15f)
-            return p.y >= 0f ? new Vector2(0f, 500f) : new Vector2(0f, -500f);
-        return p.x < 0f ? new Vector2(-900f, 0f) : new Vector2(900f, 0f);
+        if (rect == null)
+            return Vector2.zero;
+
+        Canvas canvas = rect.GetComponentInParent<Canvas>();
+        RectTransform canvasRect = canvas != null ? canvas.transform as RectTransform : null;
+
+        float canvasWidth = canvasRect != null && canvasRect.rect.width > 1f ? canvasRect.rect.width : 1920f;
+        float canvasHeight = canvasRect != null && canvasRect.rect.height > 1f ? canvasRect.rect.height : 1080f;
+
+        Vector2 centerInCanvas;
+        if (canvasRect != null)
+        {
+            Vector3 worldCenter = rect.TransformPoint(rect.rect.center);
+            Vector3 localCenter = canvasRect.InverseTransformPoint(worldCenter);
+            centerInCanvas = new Vector2(localCenter.x, localCenter.y);
+        }
+        else
+        {
+            centerInCanvas = rect.anchoredPosition;
+        }
+
+        float halfW = canvasWidth * 0.5f;
+        float halfH = canvasHeight * 0.5f;
+        float distanceLeft = centerInCanvas.x + halfW;
+        float distanceRight = halfW - centerInCanvas.x;
+        float distanceBottom = centerInCanvas.y + halfH;
+        float distanceTop = halfH - centerInCanvas.y;
+
+        float nearest = Mathf.Min(distanceLeft, distanceRight, distanceBottom, distanceTop);
+        float horizontalTravel = canvasWidth + Mathf.Max(0f, rect.rect.width) + 300f;
+        float verticalTravel = canvasHeight + Mathf.Max(0f, rect.rect.height) + 300f;
+
+        if (Mathf.Approximately(nearest, distanceLeft))
+            return new Vector2(-horizontalTravel, 0f);
+        if (Mathf.Approximately(nearest, distanceRight))
+            return new Vector2(horizontalTravel, 0f);
+        if (Mathf.Approximately(nearest, distanceBottom))
+            return new Vector2(0f, -verticalTravel);
+
+        return new Vector2(0f, verticalTravel);
     }
 
     private static Transform FindDeepChild(Transform root, string name)
