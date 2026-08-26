@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Simple projectile movement. Carries a snapshot of tower stats at launch.
-/// Advanced relics can modify projectile speed, critical hits and damage by travelled distance.
+/// Advanced relics and world events can modify projectile speed and damage.
 /// </summary>
 public class Projectile : MonoBehaviour
 {
@@ -48,9 +48,11 @@ public class Projectile : MonoBehaviour
         damage = effectiveDamage;
         sourceTowerData = sourceTower;
         distanceTravelled = 0f;
-        effectiveSpeed = RelicManager.Instance != null
-            ? RelicManager.Instance.ApplyProjectileSpeed(baseSpeed)
-            : baseSpeed;
+        effectiveSpeed = baseSpeed;
+        if (RelicManager.Instance != null)
+            effectiveSpeed = RelicManager.Instance.ApplyProjectileSpeed(effectiveSpeed);
+        if (WorldEventManager.Instance != null)
+            effectiveSpeed = WorldEventManager.Instance.ApplyProjectileSpeed(effectiveSpeed);
 
         splashRadius = stats.splashRadius;
         bleedDamagePerTick = stats.bleedDamagePerTick;
@@ -116,19 +118,15 @@ public class Projectile : MonoBehaviour
     private void SpawnImpactEffect()
     {
         if (impactEffectPrefab == null) return;
-
         if (ObjectPool.Instance == null)
         {
             Instantiate(impactEffectPrefab, transform.position, Quaternion.identity);
             return;
         }
-
         GameObject fx = ObjectPool.Instance.Get(impactEffectPrefab, transform.position, Quaternion.identity);
         if (fx == null) return;
-
         PooledVFXAutoRelease autoRelease = fx.GetComponent<PooledVFXAutoRelease>();
-        if (autoRelease == null)
-            autoRelease = fx.AddComponent<PooledVFXAutoRelease>();
+        if (autoRelease == null) autoRelease = fx.AddComponent<PooledVFXAutoRelease>();
         autoRelease.PlayAndSchedule();
     }
 
