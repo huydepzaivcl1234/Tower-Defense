@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eabad72e1cd5bdf4f929bf8362a9c0ab, type: 3}
   m_Name: Metoer Shower
   m_EditorClassIdentifier: Assembly-CSharp::WorldEventData
-  eventName: Metoer Shower
-  description: 
+  eventName: Meteor Shower
+  description: Meteors fall while enemies are alive. Enemy hits lose Max-HP damage; tower hits temporarily reduce attack speed.
   rarity: 0
   eventType: 1
   selectionWeight: 1
-  durationRounds: 1
+  durationRounds: 2
   icon: {fileID: -1673172507, guid: 0131d310bb5524546b5658a63ed8d211, type: 3}
-  accentColor: {r: 1, g: 1, b: 1, a: 1}
+  accentColor: {r: 1, g: 0.34, b: 0.08, a: 1}
   announcementSfx: {fileID: 8300000, guid: 8f512bbaf37b93547a64e0088a537bd0, type: 3}
   goldPerDrop: 5
   goldDropInterval: 0.8
@@ -30,11 +30,13 @@ MonoBehaviour:
   goldDropFallDuration: 0.7
   meteorChancePerTick: 0.22
   meteorTickInterval: 0.8
+  meteorTargetEnemyChance: 0.75
+  meteorTargetScatterRadius: 2.25
   meteorEnemyMaxHpDamagePercent: 0.1
   meteorTowerAttackSpeedPenaltyPercent: 0.2
   meteorTowerDebuffDuration: 4
-  meteorPrefab: {fileID: 3530315664873638944, guid: 059b58b214a839e43815911eba66f205,
-    type: 3}
+  meteorPrefab: {fileID: 3530315664873638944, guid: 059b58b214a839e43815911eba66f205, type: 3}
+  meteorImpactVfxPrefab: {fileID: 0}
   meteorAreaSize: {x: 34, y: 22}
   meteorSpawnHeight: 20
   meteorFallDuration: 0.55
@@ -48,3 +50,5 @@ MonoBehaviour:
   collapseEnemyMaxHpBonusPercent: 0.35
   collapseEnemyCCResistanceBonusPercent: 0.3
   collapseEnemyShieldPercentOfMaxHp: 0.2
+  holyCollapseSfx: {fileID: 0}
+  holyCollapseVfxPrefab: {fileID: 0}
