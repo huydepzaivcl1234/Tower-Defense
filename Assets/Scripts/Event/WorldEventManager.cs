@@ -130,10 +130,6 @@ public class WorldEventManager : MonoBehaviour
             Instance = null;
     }
 
-    /// <summary>
-    /// Called by WaveManager before the portal opens. Handles pending collapse announcement,
-    /// rolls a new event only when no event/penalty is active, then starts per-wave effects.
-    /// </summary>
     public IEnumerator PrepareForWave(int upcomingWaveNumber)
     {
         currentWaveEffectsRunning = true;
@@ -170,23 +166,20 @@ public class WorldEventManager : MonoBehaviour
         if (eventPool == null || eventPool.Count == 0)
             return null;
 
-        if (Random.value > eventChancePerOpportunity)
+        float eventChance = Mathf.Clamp01(eventChancePerOpportunity);
+        if (eventChance <= 0f)
+            return null;
+        if (eventChance < 1f && Random.value >= eventChance)
             return null;
 
-        WorldEventRarity wanted = Random.value < rareChanceWhenEventRolls
+        float rareChance = Mathf.Clamp01(rareChanceWhenEventRolls);
+        WorldEventRarity wanted = rareChance > 0f && Random.value < rareChance
             ? WorldEventRarity.Rare
             : WorldEventRarity.Common;
 
-        WorldEventData chosen = WeightedPick(wanted);
-        if (chosen == null)
-        {
-            WorldEventRarity fallback = wanted == WorldEventRarity.Rare
-                ? WorldEventRarity.Common
-                : WorldEventRarity.Rare;
-            chosen = WeightedPick(fallback);
-        }
-
-        return chosen;
+        // Do not fall back to another rarity. A 0% Rare chance must stay 0%, and
+        // a rarity with no enabled (weight > 0) event simply produces no event.
+        return WeightedPick(wanted);
     }
 
     private WorldEventData WeightedPick(WorldEventRarity rarity)
@@ -391,7 +384,11 @@ public class WorldEventManager : MonoBehaviour
 
     private void SpawnMeteor(WorldEventData data)
     {
-        Vector3 end = ChooseMeteorImpactPoint(data);
+        Tower exactTowerTarget = RollMeteorTowerTarget(data);
+        Vector3 end = exactTowerTarget != null
+            ? exactTowerTarget.transform.position
+            : ChooseMeteorEnemyOrMapImpactPoint(data);
+
         Vector3 start = end + Vector3.up * data.meteorSpawnHeight + new Vector3(-data.meteorSpawnHeight * 0.35f, 0f, 0f);
         float duration = Mathf.Max(0.05f, data.meteorFallDuration);
 
@@ -401,7 +398,7 @@ public class WorldEventManager : MonoBehaviour
 
         if (meteor == null)
         {
-            ResolveMeteorImpact(end, data);
+            ResolveMeteorImpact(end, data, exactTowerTarget);
             return;
         }
 
@@ -413,15 +410,41 @@ public class WorldEventManager : MonoBehaviour
             .SetEase(Ease.InQuad)
             .OnComplete(() =>
             {
-                ResolveMeteorImpact(end, data);
+                ResolveMeteorImpact(end, data, exactTowerTarget);
                 if (meteor != null)
                     Destroy(meteor);
             });
     }
 
-    private Vector3 ChooseMeteorImpactPoint(WorldEventData data)
+    private Tower RollMeteorTowerTarget(WorldEventData data)
     {
-        if (Random.value <= data.meteorTargetEnemyChance)
+        if (data == null || data.meteorTargetTowerChance <= 0f)
+            return null;
+        if (Random.value >= Mathf.Clamp01(data.meteorTargetTowerChance))
+            return null;
+
+        IReadOnlyList<Tower> towers = Tower.ActiveTowers;
+        Tower chosen = null;
+        int validCount = 0;
+
+        for (int i = 0; i < towers.Count; i++)
+        {
+            Tower tower = towers[i];
+            if (tower == null || !tower.isActiveAndEnabled || !tower.gameObject.activeInHierarchy)
+                continue;
+
+            validCount++;
+            if (Random.Range(0, validCount) == 0)
+                chosen = tower;
+        }
+
+        return chosen;
+    }
+
+    private Vector3 ChooseMeteorEnemyOrMapImpactPoint(WorldEventData data)
+    {
+        if (data != null && data.meteorTargetEnemyChance > 0f &&
+            Random.value < Mathf.Clamp01(data.meteorTargetEnemyChance))
         {
             Enemy target = GetRandomLivingEnemy();
             if (target != null)
@@ -433,15 +456,20 @@ public class WorldEventManager : MonoBehaviour
             }
         }
 
-        return RandomGroundPoint(data.meteorAreaSize);
+        return RandomGroundPoint(data != null ? data.meteorAreaSize : Vector2.zero);
     }
 
-    private void ResolveMeteorImpact(Vector3 point, WorldEventData data)
+    private void ResolveMeteorImpact(Vector3 point, WorldEventData data, Tower exactTowerTarget)
     {
         float radius = Mathf.Max(0.1f, data.meteorHitRadius);
         float radiusSq = radius * radius;
         HashSet<Enemy> enemies = new HashSet<Enemy>();
         HashSet<Tower> towers = new HashSet<Tower>();
+
+        // A meteor rolled for a Tower is guaranteed to debuff that selected active Tower.
+        // Collider/layout inaccuracies cannot cause the authored debuff to miss.
+        if (exactTowerTarget != null && exactTowerTarget.isActiveAndEnabled && exactTowerTarget.gameObject.activeInHierarchy)
+            towers.Add(exactTowerTarget);
 
         Collider[] hits = Physics.OverlapSphere(point, radius, ~0, QueryTriggerInteraction.Collide);
         for (int i = 0; i < hits.Length; i++)
@@ -459,7 +487,6 @@ public class WorldEventManager : MonoBehaviour
                 towers.Add(tower);
         }
 
-        // Fallback distance checks make event hits work even when an authored enemy/tower lacks a collider.
         Enemy[] livingEnemies = FindObjectsByType<Enemy>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < livingEnemies.Length; i++)
         {
