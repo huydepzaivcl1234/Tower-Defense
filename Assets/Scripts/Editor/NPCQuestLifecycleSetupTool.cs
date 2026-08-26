@@ -33,9 +33,6 @@ public static class NPCQuestLifecycleSetupTool
                 lifecycle.visualRoot = selected.transform;
         }
 
-        if (lifecycle.spawnAreaCenter == Vector3.zero)
-            lifecycle.spawnAreaCenter = selected.transform.position;
-
         QuestDialogueBridge bridge = selected.GetComponent<QuestDialogueBridge>();
         if (bridge == null)
             bridge = Undo.AddComponent<QuestDialogueBridge>(selected);
