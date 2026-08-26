@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: Holy Light
   m_EditorClassIdentifier: Assembly-CSharp::WorldEventData
   eventName: Holy Light
-  description: 
-  rarity: 0
+  description: Holy Light empowers towers, but the blessing may collapse and empower enemies instead.
+  rarity: 1
   eventType: 2
   selectionWeight: 1
-  durationRounds: 1
+  durationRounds: 3
   icon: {fileID: -1465737632, guid: 2652ed71e00e44c4baae1eefa4e69bd1, type: 3}
-  accentColor: {r: 1, g: 1, b: 1, a: 1}
+  accentColor: {r: 1, g: 0.88, b: 0.38, a: 1}
   announcementSfx: {fileID: 8300000, guid: fafe72aadea7a204b934982fb64f71c5, type: 3}
   goldPerDrop: 5
   goldDropInterval: 0.8
@@ -30,10 +30,13 @@ MonoBehaviour:
   goldDropFallDuration: 0.7
   meteorChancePerTick: 0.22
   meteorTickInterval: 0.8
+  meteorTargetEnemyChance: 0.75
+  meteorTargetScatterRadius: 2.25
   meteorEnemyMaxHpDamagePercent: 0.1
   meteorTowerAttackSpeedPenaltyPercent: 0.2
   meteorTowerDebuffDuration: 4
   meteorPrefab: {fileID: 0}
+  meteorImpactVfxPrefab: {fileID: 0}
   meteorAreaSize: {x: 34, y: 22}
   meteorSpawnHeight: 20
   meteorFallDuration: 0.55
@@ -42,9 +45,10 @@ MonoBehaviour:
   holyTowerDamageBonusPercent: 0.25
   holyProjectileSpeedBonusPercent: 0.25
   holyCollapseChancePerRound: 0.2
-  holyLightVisualPrefab: {fileID: 6417033564592282063, guid: 5218dc1687cf52743af5fd5e51b125a7,
-    type: 3}
+  holyLightVisualPrefab: {fileID: 6417033564592282063, guid: 5218dc1687cf52743af5fd5e51b125a7, type: 3}
   collapsePenaltyRounds: 2
   collapseEnemyMaxHpBonusPercent: 0.35
   collapseEnemyCCResistanceBonusPercent: 0.3
   collapseEnemyShieldPercentOfMaxHp: 0.2
+  holyCollapseSfx: {fileID: 0}
+  holyCollapseVfxPrefab: {fileID: 0}
