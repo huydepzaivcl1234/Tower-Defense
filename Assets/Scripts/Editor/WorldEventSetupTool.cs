@@ -7,46 +7,11 @@ using UnityEngine.UI;
 
 public static class WorldEventSetupTool
 {
-    private const string EventFolder = "Assets/WorldEvents";
+    private const string FallbackFolder = "Assets/WorldEvents";
 
     [MenuItem("Tower Defense/Event/Setup World Event System")]
     public static void Setup()
     {
-        EnsureFolder();
-
-        bool dogCreated;
-        WorldEventData dogCat = GetOrCreateEvent(
-            "DogCatRain.asset",
-            "Dog & Cat Rain",
-            WorldEventRarity.Common,
-            WorldEventType.DogCatRain,
-            out dogCreated);
-        if (dogCreated)
-            ApplyDogCatDefaults(dogCat);
-
-        bool meteorCreated;
-        WorldEventData meteor = GetOrCreateEvent(
-            "MeteorShower.asset",
-            "Meteor Shower",
-            WorldEventRarity.Common,
-            WorldEventType.MeteorShower,
-            out meteorCreated);
-        if (meteorCreated)
-            ApplyMeteorDefaults(meteor);
-
-        bool holyCreated;
-        WorldEventData holy = GetOrCreateEvent(
-            "HolyLight.asset",
-            "Holy Light",
-            WorldEventRarity.Rare,
-            WorldEventType.HolyLight,
-            out holyCreated);
-        if (holyCreated)
-            ApplyHolyDefaults(holy);
-
-        // Fill generated icon/SFX/model slots only when the user has not assigned custom assets.
-        WorldEventGeneratedAssets.EnsureAndAssign(dogCat, meteor, holy);
-
         WorldEventManager manager = Object.FindAnyObjectByType<WorldEventManager>(FindObjectsInactive.Include);
         if (manager == null)
         {
@@ -55,210 +20,187 @@ public static class WorldEventSetupTool
             manager = managerGo.AddComponent<WorldEventManager>();
         }
 
-        EnsureEventInPool(manager, dogCat);
+        WorldEventData dog = ResolveOrCreate(manager, WorldEventType.DogCatRain, "DogCatRain.asset", "Dog & Cat Rain", WorldEventRarity.Common);
+        WorldEventData meteor = ResolveOrCreate(manager, WorldEventType.MeteorShower, "MeteorShower.asset", "Meteor Shower", WorldEventRarity.Common);
+        WorldEventData holy = ResolveOrCreate(manager, WorldEventType.HolyLight, "HolyLight.asset", "Holy Light", WorldEventRarity.Rare);
+
+        NormalizeIdentity(dog, "Dog & Cat Rain", WorldEventRarity.Common, WorldEventType.DogCatRain);
+        NormalizeIdentity(meteor, "Meteor Shower", WorldEventRarity.Common, WorldEventType.MeteorShower);
+        NormalizeIdentity(holy, "Holy Light", WorldEventRarity.Rare, WorldEventType.HolyLight);
+
+        EnsureEventInPool(manager, dog);
         EnsureEventInPool(manager, meteor);
         EnsureEventInPool(manager, holy);
 
-        if (Mathf.Approximately(manager.eventChancePerOpportunity, 0f))
+        WorldEventGeneratedAssets.EnsureAndAssign(dog, meteor, holy);
+
+        if (manager.eventChancePerOpportunity <= 0f)
             manager.eventChancePerOpportunity = 0.35f;
-        if (Mathf.Approximately(manager.rareChanceWhenEventRolls, 0f))
+        if (manager.rareChanceWhenEventRolls <= 0f)
             manager.rareChanceWhenEventRolls = 0.10f;
         if (manager.firstEligibleWave < 1)
             manager.firstEligibleWave = 2;
 
         EnsureAudioSource(manager);
         EnsureWorldCenter(manager);
-
-        Canvas canvas = FindBestCanvas();
-        if (canvas != null)
-            SetupAnnouncementUI(manager, canvas.transform);
-
+        EnsureAnnouncementUI(manager);
         AutoAssignHUDTargets(manager);
 
-        Light sun = RenderSettings.sun;
-        if (manager.holyDirectionalLight == null && sun != null)
-            manager.holyDirectionalLight = sun;
+        if (manager.holyDirectionalLight == null && RenderSettings.sun != null)
+            manager.holyDirectionalLight = RenderSettings.sun;
 
-        EditorUtility.SetDirty(dogCat);
-        EditorUtility.SetDirty(meteor);
-        EditorUtility.SetDirty(holy);
         EditorUtility.SetDirty(manager);
+        if (dog != null) EditorUtility.SetDirty(dog);
+        if (meteor != null) EditorUtility.SetDirty(meteor);
+        if (holy != null) EditorUtility.SetDirty(holy);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
         Selection.activeGameObject = manager.gameObject;
         EditorGUIUtility.PingObject(manager.gameObject);
 
-        EditorUtility.DisplayDialog(
-            "World Event System Ready",
-            "World Event System has been created/repaired without overwriting your custom values.\n\n" +
-            "• Dog & Cat Rain — Common\n" +
-            "• Meteor Shower — Common\n" +
-            "• Holy Light — Rare\n\n" +
-            "Missing generated icons, SFX and fallback 3D prefabs were also assigned. " +
-            "Move WorldEventAreaCenter to the center of the playable map if needed.",
-            "OK");
+        string message =
+            "World Event System repaired without replacing your custom data.\n\n" +
+            "Runtime sources:\n" +
+            "Dog: " + WorldEventAssetResolver.Describe(dog) + "\n" +
+            "Meteor: " + WorldEventAssetResolver.Describe(meteor) + "\n" +
+            "Holy: " + WorldEventAssetResolver.Describe(holy) + "\n\n" +
+            "Holy Light is forced to Rare; Dog & Cat Rain and Meteor Shower are Common. " +
+            "Missing icon/SFX/fallback models are filled only when fields are empty.";
+
+        EditorUtility.DisplayDialog("World Event System Ready", message, "OK");
     }
 
-    private static void ApplyDogCatDefaults(WorldEventData data)
-    {
-        data.description = "Gold rains from the sky while enemies are alive, but enemies gain +30% maximum HP.";
-        data.durationRounds = 2;
-        data.selectionWeight = 1f;
-        data.enemyMaxHpBonusPercent = 0.30f;
-        data.goldPerDrop = 5;
-        data.goldDropInterval = 0.8f;
-        data.accentColor = new Color(1f, 0.76f, 0.18f, 1f);
-    }
-
-    private static void ApplyMeteorDefaults(WorldEventData data)
-    {
-        data.description = "Meteors fall while enemies are alive. Enemy hits lose Max-HP damage; tower hits temporarily reduce attack speed.";
-        data.durationRounds = 2;
-        data.selectionWeight = 1f;
-        data.meteorChancePerTick = 0.22f;
-        data.meteorTickInterval = 0.8f;
-        data.meteorTargetEnemyChance = 0.75f;
-        data.meteorTargetScatterRadius = 2.25f;
-        data.meteorEnemyMaxHpDamagePercent = 0.10f;
-        data.meteorTowerAttackSpeedPenaltyPercent = 0.20f;
-        data.meteorTowerDebuffDuration = 4f;
-        data.accentColor = new Color(1f, 0.34f, 0.08f, 1f);
-    }
-
-    private static void ApplyHolyDefaults(WorldEventData data)
-    {
-        data.description = "Holy Light empowers towers. At the end of an affected round, the blessing may collapse and empower enemies instead.";
-        data.durationRounds = 3;
-        data.selectionWeight = 1f;
-        data.holyTowerAttackSpeedBonusPercent = 0.25f;
-        data.holyTowerDamageBonusPercent = 0.25f;
-        data.holyProjectileSpeedBonusPercent = 0.25f;
-        data.holyCollapseChancePerRound = 0.20f;
-        data.collapsePenaltyRounds = 2;
-        data.collapseEnemyMaxHpBonusPercent = 0.35f;
-        data.collapseEnemyCCResistanceBonusPercent = 0.30f;
-        data.collapseEnemyShieldPercentOfMaxHp = 0.20f;
-        data.accentColor = new Color(1f, 0.88f, 0.38f, 1f);
-    }
-
-    private static void EnsureFolder()
-    {
-        if (!AssetDatabase.IsValidFolder(EventFolder))
-            AssetDatabase.CreateFolder("Assets", "WorldEvents");
-    }
-
-    private static WorldEventData GetOrCreateEvent(
-        string fileName,
-        string displayName,
-        WorldEventRarity rarity,
+    private static WorldEventData ResolveOrCreate(
+        WorldEventManager manager,
         WorldEventType type,
-        out bool created)
+        string fallbackFile,
+        string displayName,
+        WorldEventRarity rarity)
     {
-        string path = EventFolder + "/" + fileName;
-        WorldEventData data = AssetDatabase.LoadAssetAtPath<WorldEventData>(path);
-        created = data == null;
+        WorldEventData data = WorldEventAssetResolver.Resolve(manager, type);
+        if (data != null)
+            return data;
 
-        if (created)
+        EnsureFallbackFolder();
+        string path = FallbackFolder + "/" + fallbackFile;
+        data = AssetDatabase.LoadAssetAtPath<WorldEventData>(path);
+        if (data == null)
         {
             data = ScriptableObject.CreateInstance<WorldEventData>();
+            data.eventName = displayName;
+            data.eventType = type;
+            data.rarity = rarity;
+            data.selectionWeight = 1f;
+            data.durationRounds = type == WorldEventType.HolyLight ? 3 : 2;
+
+            if (type == WorldEventType.DogCatRain)
+            {
+                data.description = "Gold rains while enemies are alive, but enemies gain increased maximum HP.";
+                data.enemyMaxHpBonusPercent = 0.30f;
+            }
+            else if (type == WorldEventType.MeteorShower)
+            {
+                data.description = "Meteors damage enemies by Max HP and temporarily slow struck towers' attack speed.";
+            }
+            else
+            {
+                data.description = "Holy Light empowers towers, but the blessing may collapse and empower enemies instead.";
+            }
+
             AssetDatabase.CreateAsset(data, path);
         }
+        return data;
+    }
 
-        // Identity is canonical; gameplay tuning is not overwritten on re-run.
+    private static void NormalizeIdentity(
+        WorldEventData data,
+        string displayName,
+        WorldEventRarity rarity,
+        WorldEventType type)
+    {
+        if (data == null)
+            return;
+
         data.eventName = displayName;
         data.rarity = rarity;
         data.eventType = type;
         if (data.selectionWeight <= 0f)
             data.selectionWeight = 1f;
+        if (data.durationRounds < 1)
+            data.durationRounds = 1;
+    }
 
-        EditorUtility.SetDirty(data);
-        return data;
+    private static void EnsureFallbackFolder()
+    {
+        if (!AssetDatabase.IsValidFolder(FallbackFolder))
+            AssetDatabase.CreateFolder("Assets", "WorldEvents");
     }
 
     private static void EnsureEventInPool(WorldEventManager manager, WorldEventData data)
     {
         if (manager == null || data == null)
             return;
-
         if (manager.eventPool == null)
             manager.eventPool = new List<WorldEventData>();
 
-        if (!manager.eventPool.Contains(data))
-            manager.eventPool.Add(data);
+        // Do not add another asset for a type already represented in the runtime pool.
+        for (int i = 0; i < manager.eventPool.Count; i++)
+        {
+            WorldEventData existing = manager.eventPool[i];
+            if (existing != null && existing.eventType == data.eventType)
+                return;
+        }
+        manager.eventPool.Add(data);
     }
 
     private static void EnsureAudioSource(WorldEventManager manager)
     {
-        if (manager == null)
-            return;
+        if (manager.eventAudioSource == null)
+            manager.eventAudioSource = manager.GetComponent<AudioSource>();
+        if (manager.eventAudioSource == null)
+            manager.eventAudioSource = Undo.AddComponent<AudioSource>(manager.gameObject);
 
-        AudioSource source = manager.eventAudioSource;
-        if (source == null)
-            source = manager.GetComponent<AudioSource>();
-        if (source == null)
-            source = Undo.AddComponent<AudioSource>(manager.gameObject);
-
-        source.playOnAwake = false;
-        source.loop = false;
-        source.spatialBlend = 0f;
-        manager.eventAudioSource = source;
+        manager.eventAudioSource.playOnAwake = false;
+        manager.eventAudioSource.loop = false;
+        manager.eventAudioSource.spatialBlend = 0f;
     }
 
     private static void EnsureWorldCenter(WorldEventManager manager)
     {
-        if (manager == null || manager.worldCenter != null)
+        if (manager.worldCenter != null)
             return;
 
-        Transform existing = manager.transform.Find("WorldEventAreaCenter");
-        if (existing != null)
+        Transform child = manager.transform.Find("WorldEventAreaCenter");
+        if (child == null)
         {
-            manager.worldCenter = existing;
+            GameObject go = new GameObject("WorldEventAreaCenter");
+            Undo.RegisterCreatedObjectUndo(go, "Create World Event Area Center");
+            go.transform.SetParent(manager.transform, false);
+            child = go.transform;
+        }
+        manager.worldCenter = child;
+    }
+
+    private static void EnsureAnnouncementUI(WorldEventManager manager)
+    {
+        if (manager.announcementRoot != null &&
+            manager.rarityText != null && manager.titleText != null && manager.descriptionText != null && manager.iconImage != null)
             return;
-        }
 
-        GameObject center = new GameObject("WorldEventAreaCenter");
-        Undo.RegisterCreatedObjectUndo(center, "Create World Event Area Center");
-        center.transform.SetParent(manager.transform, false);
-        center.transform.localPosition = Vector3.zero;
-        manager.worldCenter = center.transform;
-    }
-
-    private static Canvas FindBestCanvas()
-    {
-        Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        Canvas fallback = null;
-
-        for (int i = 0; i < canvases.Length; i++)
+        Canvas canvas = FindScreenCanvas();
+        if (canvas == null)
         {
-            Canvas canvas = canvases[i];
-            if (canvas == null)
-                continue;
-
-            if (fallback == null)
-                fallback = canvas;
-
-            if (canvas.renderMode == RenderMode.WorldSpace)
-                continue;
-
-            // Prefer a gameplay canvas, but any screen-space canvas is safe for the announcement.
-            string lower = canvas.name.ToLowerInvariant();
-            if (lower.Contains("hud") || lower.Contains("game") || lower.Contains("qol"))
-                return canvas;
+            GameObject canvasGo = new GameObject("WorldEventCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            Undo.RegisterCreatedObjectUndo(canvasGo, "Create World Event Canvas");
+            canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
         }
 
-        for (int i = 0; i < canvases.Length; i++)
-        {
-            if (canvases[i] != null && canvases[i].renderMode != RenderMode.WorldSpace)
-                return canvases[i];
-        }
-
-        return fallback;
-    }
-
-    private static void SetupAnnouncementUI(WorldEventManager manager, Transform canvas)
-    {
-        Transform existing = FindDeepChild(canvas, "WorldEventAnnouncement");
+        Transform existing = FindDeepChild(canvas.transform, "WorldEventAnnouncement");
         GameObject root = existing != null
             ? existing.gameObject
             : new GameObject("WorldEventAnnouncement", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
@@ -266,86 +208,52 @@ public static class WorldEventSetupTool
         if (existing == null)
         {
             Undo.RegisterCreatedObjectUndo(root, "Create World Event Announcement");
-            root.transform.SetParent(canvas, false);
+            root.transform.SetParent(canvas.transform, false);
         }
-
         root.transform.SetAsLastSibling();
 
-        RectTransform rect = root.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = new Vector2(820f, 250f);
-        rect.anchoredPosition = Vector2.zero;
+        RectTransform rootRect = root.GetComponent<RectTransform>();
+        rootRect.anchorMin = rootRect.anchorMax = new Vector2(0.5f, 0.5f);
+        rootRect.pivot = new Vector2(0.5f, 0.5f);
+        rootRect.sizeDelta = new Vector2(820f, 250f);
+        rootRect.anchoredPosition = Vector2.zero;
 
         Image background = root.GetComponent<Image>();
         background.color = new Color(0.025f, 0.055f, 0.09f, 0.97f);
+        background.raycastTarget = false;
 
         CanvasGroup group = root.GetComponent<CanvasGroup>();
         group.interactable = false;
         group.blocksRaycasts = false;
         manager.announcementRoot = group;
 
-        manager.rarityText = EnsureText(
-            root.transform,
-            "Rarity",
-            new Vector2(55f, 78f),
-            new Vector2(610f, 30f),
-            18f,
-            FontStyles.Bold);
+        manager.rarityText = EnsureText(root.transform, "Rarity", new Vector2(65f, 78f), new Vector2(610f, 30f), 18f, FontStyles.Bold);
+        manager.titleText = EnsureText(root.transform, "Title", new Vector2(65f, 28f), new Vector2(610f, 50f), 34f, FontStyles.Bold);
+        manager.descriptionText = EnsureText(root.transform, "Description", new Vector2(65f, -52f), new Vector2(610f, 82f), 17f, FontStyles.Normal);
 
-        manager.titleText = EnsureText(
-            root.transform,
-            "Title",
-            new Vector2(55f, 28f),
-            new Vector2(610f, 50f),
-            34f,
-            FontStyles.Bold);
+        Transform iconTr = root.transform.Find("Icon");
+        GameObject iconGo = iconTr != null ? iconTr.gameObject : new GameObject("Icon", typeof(RectTransform), typeof(Image));
+        if (iconTr == null)
+            iconGo.transform.SetParent(root.transform, false);
 
-        manager.descriptionText = EnsureText(
-            root.transform,
-            "Description",
-            new Vector2(55f, -52f),
-            new Vector2(610f, 82f),
-            17f,
-            FontStyles.Normal);
-
-        Transform iconTransform = root.transform.Find("Icon");
-        GameObject iconObject = iconTransform != null
-            ? iconTransform.gameObject
-            : new GameObject("Icon", typeof(RectTransform), typeof(Image));
-
-        if (iconTransform == null)
-            iconObject.transform.SetParent(root.transform, false);
-
-        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+        RectTransform iconRect = iconGo.GetComponent<RectTransform>();
         iconRect.anchorMin = iconRect.anchorMax = new Vector2(0f, 0.5f);
         iconRect.pivot = new Vector2(0.5f, 0.5f);
-        iconRect.sizeDelta = new Vector2(105f, 105f);
-        iconRect.anchoredPosition = new Vector2(75f, 0f);
+        iconRect.sizeDelta = new Vector2(110f, 110f);
+        iconRect.anchoredPosition = new Vector2(78f, 0f);
 
-        Image icon = iconObject.GetComponent<Image>();
-        icon.preserveAspect = true;
-        icon.raycastTarget = false;
-        manager.iconImage = icon;
+        manager.iconImage = iconGo.GetComponent<Image>();
+        manager.iconImage.preserveAspect = true;
+        manager.iconImage.raycastTarget = false;
 
         group.alpha = 0f;
         root.SetActive(false);
     }
 
-    private static TMP_Text EnsureText(
-        Transform parent,
-        string name,
-        Vector2 position,
-        Vector2 size,
-        float fontSize,
-        FontStyles style)
+    private static TMP_Text EnsureText(Transform parent, string name, Vector2 pos, Vector2 size, float fontSize, FontStyles style)
     {
         Transform found = parent.Find(name);
-        GameObject go = found != null
-            ? found.gameObject
-            : new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-
+        GameObject go = found != null ? found.gameObject : new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
         if (found == null)
             go.transform.SetParent(parent, false);
 
@@ -353,7 +261,7 @@ public static class WorldEventSetupTool
         rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.sizeDelta = size;
-        rect.anchoredPosition = position;
+        rect.anchoredPosition = pos;
 
         TextMeshProUGUI text = go.GetComponent<TextMeshProUGUI>();
         text.fontSize = fontSize;
@@ -365,102 +273,84 @@ public static class WorldEventSetupTool
         return text;
     }
 
+    private static Canvas FindScreenCanvas()
+    {
+        Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Canvas fallback = null;
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            Canvas canvas = canvases[i];
+            if (canvas == null || canvas.renderMode == RenderMode.WorldSpace)
+                continue;
+            if (fallback == null)
+                fallback = canvas;
+            string n = canvas.name.ToLowerInvariant();
+            if (n.Contains("hud") || n.Contains("game") || n.Contains("qol"))
+                return canvas;
+        }
+        return fallback;
+    }
+
     private static void AutoAssignHUDTargets(WorldEventManager manager)
     {
-        if (manager == null)
-            return;
-
         if (manager.hudTargets == null)
             manager.hudTargets = new List<WorldEventManager.HUDTarget>();
 
-        string[] preferredNames =
-        {
-            "HUDPanel",
-            "ResourceHUD",
-            "WaveHUD",
-            "BuildDock",
-            "UpgradePanelClean",
-            "QoLCanvas",
-            "QoLTopRight",
-            "RelicOwnedHUD",
-            "QuestLiveHUD",
-            "GameSpeedController"
-        };
+        string[] names = { "HUDPanel", "ResourceHUD", "WaveHUD", "BuildDock", "UpgradePanelClean", "QoLCanvas", "QoLTopRight", "RelicOwnedHUD", "QuestLiveHUD", "GameSpeedController" };
+        RectTransform[] rects = Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
-        RectTransform[] allRects = Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        List<RectTransform> candidates = new List<RectTransform>();
-
-        for (int n = 0; n < preferredNames.Length; n++)
+        for (int n = 0; n < names.Length; n++)
         {
-            string wanted = preferredNames[n];
-            for (int i = 0; i < allRects.Length; i++)
+            for (int i = 0; i < rects.Length; i++)
             {
-                RectTransform rect = allRects[i];
-                if (rect == null || rect.name != wanted)
+                RectTransform rect = rects[i];
+                if (rect == null || rect.name != names[n])
                     continue;
                 if (manager.announcementRoot != null && rect.IsChildOf(manager.announcementRoot.transform))
                     continue;
-                if (!candidates.Contains(rect))
-                    candidates.Add(rect);
-            }
-        }
-
-        // If both a parent HUD root and one of its children were found, move only the parent.
-        for (int i = candidates.Count - 1; i >= 0; i--)
-        {
-            RectTransform candidate = candidates[i];
-            for (int j = 0; j < candidates.Count; j++)
-            {
-                if (i == j)
+                if (HasHUDTarget(manager, rect))
                     continue;
-                RectTransform possibleParent = candidates[j];
-                if (candidate != null && possibleParent != null && candidate.IsChildOf(possibleParent))
+
+                // Skip child if a parent is already one of our HUD targets.
+                bool parentAlreadyAdded = false;
+                for (int h = 0; h < manager.hudTargets.Count; h++)
                 {
-                    candidates.RemoveAt(i);
-                    break;
+                    WorldEventManager.HUDTarget existing = manager.hudTargets[h];
+                    if (existing != null && existing.target != null && rect.IsChildOf(existing.target))
+                    {
+                        parentAlreadyAdded = true;
+                        break;
+                    }
                 }
+                if (parentAlreadyAdded)
+                    continue;
+
+                manager.hudTargets.Add(new WorldEventManager.HUDTarget
+                {
+                    target = rect,
+                    hiddenOffset = ChooseHiddenOffset(rect)
+                });
             }
-        }
-
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            RectTransform rect = candidates[i];
-            if (rect == null || ContainsTarget(manager, rect))
-                continue;
-
-            manager.hudTargets.Add(new WorldEventManager.HUDTarget
-            {
-                target = rect,
-                hiddenOffset = ChooseHiddenOffset(rect)
-            });
         }
     }
 
-    private static bool ContainsTarget(WorldEventManager manager, RectTransform target)
+    private static bool HasHUDTarget(WorldEventManager manager, RectTransform rect)
     {
-        if (manager.hudTargets == null)
-            return false;
-
         for (int i = 0; i < manager.hudTargets.Count; i++)
         {
             WorldEventManager.HUDTarget item = manager.hudTargets[i];
-            if (item != null && item.target == target)
+            if (item != null && item.target == rect)
                 return true;
         }
-
         return false;
     }
 
     private static Vector2 ChooseHiddenOffset(RectTransform rect)
     {
-        Vector2 position = rect.anchoredPosition;
-
-        if (Mathf.Abs(position.y) > Mathf.Abs(position.x) * 1.15f)
-            return position.y >= 0f ? new Vector2(0f, 450f) : new Vector2(0f, -450f);
-
-        return position.x < 0f
-            ? new Vector2(-850f, 0f)
-            : new Vector2(850f, 0f);
+        Vector2 p = rect.anchoredPosition;
+        if (Mathf.Abs(p.y) > Mathf.Abs(p.x) * 1.15f)
+            return p.y >= 0f ? new Vector2(0f, 500f) : new Vector2(0f, -500f);
+        return p.x < 0f ? new Vector2(-900f, 0f) : new Vector2(900f, 0f);
     }
 
     private static Transform FindDeepChild(Transform root, string name)
@@ -469,14 +359,12 @@ public static class WorldEventSetupTool
             return null;
         if (root.name == name)
             return root;
-
         for (int i = 0; i < root.childCount; i++)
         {
-            Transform result = FindDeepChild(root.GetChild(i), name);
-            if (result != null)
-                return result;
+            Transform child = FindDeepChild(root.GetChild(i), name);
+            if (child != null)
+                return child;
         }
-
         return null;
     }
 }
