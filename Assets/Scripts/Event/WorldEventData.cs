@@ -75,9 +75,15 @@ public class WorldEventData : ScriptableObject
     [Range(0f, 5f)] public float holyTowerAttackSpeedBonusPercent = 0.25f;
     [Range(0f, 5f)] public float holyTowerDamageBonusPercent = 0.25f;
     [Range(0f, 5f)] public float holyProjectileSpeedBonusPercent = 0.25f;
-    [Tooltip("Checked when an affected round ends. If it succeeds, Holy Light ends and the enemy penalty begins next round.")]
+    [Tooltip("Rolled once during every affected round after enemies appear. 1 = guaranteed collapse during that round; 0 = never collapse.")]
     [Range(0f, 1f)] public float holyCollapseChancePerRound = 0.20f;
+    [Tooltip("After a round successfully rolls Collapse, minimum gameplay seconds before the Holy Light shuts off. The timer starts after at least one enemy is alive.")]
+    [Min(0f)] public float holyCollapseMinDelay = 1.5f;
+    [Tooltip("Maximum gameplay seconds before a successful Holy Light Collapse triggers during the round.")]
+    [Min(0f)] public float holyCollapseMaxDelay = 5f;
     public GameObject holyLightVisualPrefab;
+    [Tooltip("World-space offset from WorldEventAreaCenter for the Holy visual. Increase Y to keep a large shrine/light object above towers.")]
+    public Vector3 holyLightVisualOffset = new Vector3(0f, 12f, 0f);
 
     [Header("Holy Light - Collapse Penalty")]
     [Min(1)] public int collapsePenaltyRounds = 2;
