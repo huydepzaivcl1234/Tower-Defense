@@ -6,7 +6,7 @@ public static class WorldEventGeneratedAssetsMenu
 {
     private const string EventFolder = "Assets/WorldEvents";
 
-    [MenuItem("Tower Defense/Event/Generate Event SFX & Models")]
+    [MenuItem("Tower Defense/Event/Generate Event Icons, SFX & Models")]
     public static void Generate()
     {
         WorldEventData dogCat = AssetDatabase.LoadAssetAtPath<WorldEventData>(EventFolder + "/DogCatRain.asset");
@@ -30,12 +30,13 @@ public static class WorldEventGeneratedAssetsMenu
         EditorGUIUtility.PingObject(dogCat);
 
         EditorUtility.DisplayDialog(
-            "Event SFX & Models Ready",
-            "Generated and assigned:\n\n" +
-            "• Dog & Cat Rain: bright coin/paw announcement SFX + stylized glowing gold paw drop prefab\n" +
-            "• Meteor Shower: rumble/impact announcement SFX + molten meteor prefab with rock shell and fire trail\n" +
-            "• Holy Light: layered blessing chord SFX + glowing beam/halo blessing prefab\n\n" +
-            "Generated assets are stored under Assets/WorldEvents/Generated. Existing custom assignments are never overwritten.",
+            "Event Assets Ready",
+            "Generated missing fallback assets without overwriting your custom assignments:\n\n" +
+            "• 3 event icons\n" +
+            "• Dog & Cat Rain announcement SFX + gold paw 3D prefab\n" +
+            "• Meteor Shower announcement SFX + molten meteor 3D prefab\n" +
+            "• Holy Light blessing SFX + collapse SFX + holy beam/halo 3D prefab\n\n" +
+            "Assets are stored under Assets/WorldEvents/Generated.",
             "OK");
     }
 }
