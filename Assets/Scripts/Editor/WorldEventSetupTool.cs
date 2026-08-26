@@ -44,7 +44,7 @@ public static class WorldEventSetupTool
         EnsureAudioSource(manager);
         EnsureWorldCenter(manager);
         EnsureAnnouncementUI(manager);
-        AutoAssignHUDTargets(manager);
+        SyncHUDTargetsFromNpcDialogue(manager);
 
         if (manager.holyDirectionalLight == null && RenderSettings.sun != null)
             manager.holyDirectionalLight = RenderSettings.sun;
@@ -65,7 +65,7 @@ public static class WorldEventSetupTool
             "Dog: " + WorldEventAssetResolver.Describe(dog) + "\n" +
             "Meteor: " + WorldEventAssetResolver.Describe(meteor) + "\n" +
             "Holy: " + WorldEventAssetResolver.Describe(holy) + "\n\n" +
-            "HUD slide offsets were recalculated from the real Canvas size so every HUD target moves completely outside the screen during event announcements.";
+            "Event HUD slide now mirrors the existing NPC DialogueHUDPresentationController targets and hidden offsets.";
 
         EditorUtility.DisplayDialog("World Event System Ready", message, "OK");
     }
@@ -289,117 +289,50 @@ public static class WorldEventSetupTool
         return fallback;
     }
 
-    private static void AutoAssignHUDTargets(WorldEventManager manager)
+    /// <summary>
+    /// Reuse the exact HUD targets and hidden offsets already authored for NPC dialogue.
+    /// This intentionally removes the separate automatic edge/Canvas offset calculation.
+    /// </summary>
+    private static void SyncHUDTargetsFromNpcDialogue(WorldEventManager manager)
     {
+        DialogueHUDPresentationController dialogueHud = Object.FindAnyObjectByType<DialogueHUDPresentationController>(FindObjectsInactive.Include);
+        if (dialogueHud == null || dialogueHud.hudTargets == null || dialogueHud.hudTargets.Count == 0)
+        {
+            Debug.LogWarning(
+                "WorldEventSetupTool: no configured DialogueHUDPresentationController was found. " +
+                "WorldEventManager HUD targets were left unchanged.",
+                manager);
+            return;
+        }
+
+        Undo.RecordObject(manager, "Sync World Event HUD From NPC Dialogue");
+
         if (manager.hudTargets == null)
             manager.hudTargets = new List<WorldEventManager.HUDTarget>();
-
-        // Refresh every existing target as well. Older setup versions used small fixed offsets
-        // (500 / 900 canvas units), which are not enough on QHD/large canvases.
-        for (int i = manager.hudTargets.Count - 1; i >= 0; i--)
-        {
-            WorldEventManager.HUDTarget item = manager.hudTargets[i];
-            if (item == null || item.target == null)
-            {
-                manager.hudTargets.RemoveAt(i);
-                continue;
-            }
-
-            item.hiddenOffset = ChooseHiddenOffset(item.target);
-            item.captured = false;
-        }
-
-        string[] names = { "HUDPanel", "ResourceHUD", "WaveHUD", "BuildDock", "UpgradePanelClean", "QoLCanvas", "QoLTopRight", "RelicOwnedHUD", "QuestLiveHUD", "GameSpeedController" };
-        RectTransform[] rects = Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-
-        for (int n = 0; n < names.Length; n++)
-        {
-            for (int i = 0; i < rects.Length; i++)
-            {
-                RectTransform rect = rects[i];
-                if (rect == null || rect.name != names[n])
-                    continue;
-                if (manager.announcementRoot != null && rect.IsChildOf(manager.announcementRoot.transform))
-                    continue;
-                if (HasHUDTarget(manager, rect))
-                    continue;
-
-                bool parentAlreadyAdded = false;
-                for (int h = 0; h < manager.hudTargets.Count; h++)
-                {
-                    WorldEventManager.HUDTarget existing = manager.hudTargets[h];
-                    if (existing != null && existing.target != null && rect.IsChildOf(existing.target))
-                    {
-                        parentAlreadyAdded = true;
-                        break;
-                    }
-                }
-                if (parentAlreadyAdded)
-                    continue;
-
-                manager.hudTargets.Add(new WorldEventManager.HUDTarget
-                {
-                    target = rect,
-                    hiddenOffset = ChooseHiddenOffset(rect),
-                    captured = false
-                });
-            }
-        }
-    }
-
-    private static bool HasHUDTarget(WorldEventManager manager, RectTransform rect)
-    {
-        for (int i = 0; i < manager.hudTargets.Count; i++)
-        {
-            WorldEventManager.HUDTarget item = manager.hudTargets[i];
-            if (item != null && item.target == rect)
-                return true;
-        }
-        return false;
-    }
-
-    private static Vector2 ChooseHiddenOffset(RectTransform rect)
-    {
-        if (rect == null)
-            return Vector2.zero;
-
-        Canvas canvas = rect.GetComponentInParent<Canvas>();
-        RectTransform canvasRect = canvas != null ? canvas.transform as RectTransform : null;
-
-        float canvasWidth = canvasRect != null && canvasRect.rect.width > 1f ? canvasRect.rect.width : 1920f;
-        float canvasHeight = canvasRect != null && canvasRect.rect.height > 1f ? canvasRect.rect.height : 1080f;
-
-        Vector2 centerInCanvas;
-        if (canvasRect != null)
-        {
-            Vector3 worldCenter = rect.TransformPoint(rect.rect.center);
-            Vector3 localCenter = canvasRect.InverseTransformPoint(worldCenter);
-            centerInCanvas = new Vector2(localCenter.x, localCenter.y);
-        }
         else
+            manager.hudTargets.Clear();
+
+        for (int i = 0; i < dialogueHud.hudTargets.Count; i++)
         {
-            centerInCanvas = rect.anchoredPosition;
+            DialogueHUDPresentationController.HUDSlideTarget source = dialogueHud.hudTargets[i];
+            if (source == null || source.target == null)
+                continue;
+
+            manager.hudTargets.Add(new WorldEventManager.HUDTarget
+            {
+                target = source.target,
+                hiddenOffset = source.hiddenOffset,
+                captured = false
+            });
         }
 
-        float halfW = canvasWidth * 0.5f;
-        float halfH = canvasHeight * 0.5f;
-        float distanceLeft = centerInCanvas.x + halfW;
-        float distanceRight = halfW - centerInCanvas.x;
-        float distanceBottom = centerInCanvas.y + halfH;
-        float distanceTop = halfH - centerInCanvas.y;
+        manager.hudSlideDuration = Mathf.Max(0f, dialogueHud.slideOutDuration);
+        EditorUtility.SetDirty(manager);
 
-        float nearest = Mathf.Min(distanceLeft, distanceRight, distanceBottom, distanceTop);
-        float horizontalTravel = canvasWidth + Mathf.Max(0f, rect.rect.width) + 300f;
-        float verticalTravel = canvasHeight + Mathf.Max(0f, rect.rect.height) + 300f;
-
-        if (Mathf.Approximately(nearest, distanceLeft))
-            return new Vector2(-horizontalTravel, 0f);
-        if (Mathf.Approximately(nearest, distanceRight))
-            return new Vector2(horizontalTravel, 0f);
-        if (Mathf.Approximately(nearest, distanceBottom))
-            return new Vector2(0f, -verticalTravel);
-
-        return new Vector2(0f, verticalTravel);
+        Debug.Log(
+            $"World Event HUD now mirrors NPC dialogue: {manager.hudTargets.Count} target(s), " +
+            $"duration {manager.hudSlideDuration:0.###}s.",
+            manager);
     }
 
     private static Transform FindDeepChild(Transform root, string name)
