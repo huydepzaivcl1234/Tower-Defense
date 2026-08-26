@@ -23,6 +23,7 @@ public class WorldEventManager : MonoBehaviour
     public TMP_Text titleText;
     public TMP_Text descriptionText;
     public Image iconImage;
+    public AudioSource eventAudioSource;
     [Min(0f)] public float hudSlideDuration = 0.35f;
     [Min(0f)] public float announcementEnterDuration = 0.35f;
     [Min(0f)] public float announcementHoldDuration = 2.2f;
@@ -57,6 +58,8 @@ public class WorldEventManager : MonoBehaviour
     [SerializeField] private int holyPenaltyRoundsRemaining;
     [SerializeField] private int cooldownRemaining;
     [SerializeField] private bool holyCollapsed;
+    [SerializeField] private bool currentWaveEffectsRunning;
+    [SerializeField] private bool isPresentingAnnouncement;
 
     private Coroutine continuousEffectRoutine;
     private GameObject holyVisualInstance;
@@ -64,35 +67,84 @@ public class WorldEventManager : MonoBehaviour
     private Color normalLightColor;
     private bool lightStateCaptured;
 
+    private WorldEventData holyPenaltySource;
+    private WorldEventData pendingHolyCollapseAnnouncement;
+
     public WorldEventData ActiveEvent => activeEvent;
     public bool HasActiveEvent => activeEvent != null;
     public bool IsDogCatRainActive => activeEvent != null && activeEvent.eventType == WorldEventType.DogCatRain;
     public bool IsMeteorShowerActive => activeEvent != null && activeEvent.eventType == WorldEventType.MeteorShower;
     public bool IsHolyLightActive => activeEvent != null && activeEvent.eventType == WorldEventType.HolyLight && !holyCollapsed;
-    public bool IsHolyPenaltyActive => holyPenaltyRoundsRemaining > 0;
+    public bool IsHolyPenaltyActive => holyPenaltyRoundsRemaining > 0 && holyPenaltySource != null;
+    public bool IsPresentingAnnouncement => isPresentingAnnouncement;
+    public int ActiveRoundsRemaining => activeRoundsRemaining;
+    public int HolyPenaltyRoundsRemaining => holyPenaltyRoundsRemaining;
 
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
         CaptureHUDPositions();
+
+        if (eventAudioSource == null)
+        {
+            eventAudioSource = GetComponent<AudioSource>();
+            if (eventAudioSource == null)
+                eventAudioSource = gameObject.AddComponent<AudioSource>();
+            eventAudioSource.playOnAwake = false;
+            eventAudioSource.loop = false;
+            eventAudioSource.spatialBlend = 0f;
+        }
+
         if (announcementRoot != null)
         {
             announcementRoot.alpha = 0f;
             announcementRoot.gameObject.SetActive(false);
         }
+
         CaptureLightState();
     }
 
-    private void OnEnable() => WaveManager.OnWaveCleared += HandleWaveCleared;
+    private void OnEnable()
+    {
+        WaveManager.OnWaveCleared += HandleWaveCleared;
+    }
+
     private void OnDisable()
     {
         WaveManager.OnWaveCleared -= HandleWaveCleared;
+        currentWaveEffectsRunning = false;
         StopContinuousEffect();
+        RestoreHUDInstant();
+        RestoreHolyLightInstant();
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+    }
+
+    /// <summary>
+    /// Called by WaveManager before the portal opens. Handles pending collapse announcement,
+    /// rolls a new event only when no event/penalty is active, then starts per-wave effects.
+    /// </summary>
     public IEnumerator PrepareForWave(int upcomingWaveNumber)
     {
+        currentWaveEffectsRunning = true;
+
+        if (pendingHolyCollapseAnnouncement != null)
+        {
+            WorldEventData collapsed = pendingHolyCollapseAnnouncement;
+            pendingHolyCollapseAnnouncement = null;
+            yield return PresentAnnouncement(collapsed, true);
+        }
+
         if (activeEvent == null && holyPenaltyRoundsRemaining <= 0)
         {
             if (cooldownRemaining > 0)
@@ -115,40 +167,66 @@ public class WorldEventManager : MonoBehaviour
 
     private WorldEventData RollEvent()
     {
-        if (eventPool == null || eventPool.Count == 0) return null;
-        if (Random.value > eventChancePerOpportunity) return null;
+        if (eventPool == null || eventPool.Count == 0)
+            return null;
 
-        WorldEventRarity wanted = Random.value < rareChanceWhenEventRolls ? WorldEventRarity.Rare : WorldEventRarity.Common;
+        if (Random.value > eventChancePerOpportunity)
+            return null;
+
+        WorldEventRarity wanted = Random.value < rareChanceWhenEventRolls
+            ? WorldEventRarity.Rare
+            : WorldEventRarity.Common;
+
         WorldEventData chosen = WeightedPick(wanted);
-        if (chosen == null) chosen = WeightedPick(wanted == WorldEventRarity.Rare ? WorldEventRarity.Common : WorldEventRarity.Rare);
+        if (chosen == null)
+        {
+            WorldEventRarity fallback = wanted == WorldEventRarity.Rare
+                ? WorldEventRarity.Common
+                : WorldEventRarity.Rare;
+            chosen = WeightedPick(fallback);
+        }
+
         return chosen;
     }
 
     private WorldEventData WeightedPick(WorldEventRarity rarity)
     {
-        float total = 0f;
-        for (int i = 0; i < eventPool.Count; i++)
-        {
-            WorldEventData e = eventPool[i];
-            if (e == null || e.rarity != rarity || e.selectionWeight <= 0f) continue;
-            total += e.selectionWeight;
-        }
-        if (total <= 0f) return null;
+        float totalWeight = 0f;
 
-        float roll = Random.Range(0f, total);
-        float cursor = 0f;
         for (int i = 0; i < eventPool.Count; i++)
         {
-            WorldEventData e = eventPool[i];
-            if (e == null || e.rarity != rarity || e.selectionWeight <= 0f) continue;
-            cursor += e.selectionWeight;
-            if (roll <= cursor) return e;
+            WorldEventData candidate = eventPool[i];
+            if (candidate == null || candidate.rarity != rarity || candidate.selectionWeight <= 0f)
+                continue;
+
+            totalWeight += candidate.selectionWeight;
         }
+
+        if (totalWeight <= 0f)
+            return null;
+
+        float roll = Random.Range(0f, totalWeight);
+        float cursor = 0f;
+
+        for (int i = 0; i < eventPool.Count; i++)
+        {
+            WorldEventData candidate = eventPool[i];
+            if (candidate == null || candidate.rarity != rarity || candidate.selectionWeight <= 0f)
+                continue;
+
+            cursor += candidate.selectionWeight;
+            if (roll <= cursor)
+                return candidate;
+        }
+
         return null;
     }
 
     private void ActivateEvent(WorldEventData data)
     {
+        if (data == null)
+            return;
+
         StopContinuousEffect();
         activeEvent = data;
         activeRoundsRemaining = Mathf.Max(1, data.durationRounds);
@@ -160,20 +238,28 @@ public class WorldEventManager : MonoBehaviour
 
     private void HandleWaveCleared()
     {
+        currentWaveEffectsRunning = false;
         StopContinuousEffect();
 
         if (holyPenaltyRoundsRemaining > 0)
         {
             holyPenaltyRoundsRemaining--;
             if (holyPenaltyRoundsRemaining <= 0)
+            {
                 holyPenaltyRoundsRemaining = 0;
+                holyPenaltySource = null;
+                holyCollapsed = false;
+            }
             return;
         }
 
-        if (activeEvent == null) return;
+        if (activeEvent == null)
+            return;
 
-        if (activeEvent.eventType == WorldEventType.HolyLight && !holyCollapsed &&
-            activeRoundsRemaining > 1 && Random.value < activeEvent.holyCollapseChancePerRound)
+        if (activeEvent.eventType == WorldEventType.HolyLight &&
+            !holyCollapsed &&
+            activeRoundsRemaining > 1 &&
+            Random.value < activeEvent.holyCollapseChancePerRound)
         {
             TriggerHolyCollapse();
             return;
@@ -186,12 +272,19 @@ public class WorldEventManager : MonoBehaviour
 
     private void TriggerHolyCollapse()
     {
-        if (activeEvent == null || activeEvent.eventType != WorldEventType.HolyLight) return;
+        if (activeEvent == null || activeEvent.eventType != WorldEventType.HolyLight)
+            return;
+
         WorldEventData holy = activeEvent;
         holyCollapsed = true;
         activeRoundsRemaining = 0;
+        holyPenaltySource = holy;
         holyPenaltyRoundsRemaining = Mathf.Max(1, holy.collapsePenaltyRounds);
+        pendingHolyCollapseAnnouncement = holy;
+
+        SpawnHolyCollapseVfx(holy);
         EndHolyVisuals();
+
         activeEvent = null;
         cooldownRemaining = Mathf.Max(cooldownRemaining, cooldownWavesAfterEvent);
     }
@@ -200,6 +293,7 @@ public class WorldEventManager : MonoBehaviour
     {
         if (activeEvent != null && activeEvent.eventType == WorldEventType.HolyLight)
             EndHolyVisuals();
+
         activeEvent = null;
         activeRoundsRemaining = 0;
         holyCollapsed = false;
@@ -209,7 +303,10 @@ public class WorldEventManager : MonoBehaviour
     private void StartContinuousEffectForCurrentWave()
     {
         StopContinuousEffect();
-        if (activeEvent == null) return;
+
+        if (!currentWaveEffectsRunning || activeEvent == null)
+            return;
+
         if (activeEvent.eventType == WorldEventType.DogCatRain)
             continuousEffectRoutine = StartCoroutine(DogCatRainRoutine(activeEvent));
         else if (activeEvent.eventType == WorldEventType.MeteorShower)
@@ -218,22 +315,25 @@ public class WorldEventManager : MonoBehaviour
 
     private void StopContinuousEffect()
     {
-        if (continuousEffectRoutine != null)
-        {
-            StopCoroutine(continuousEffectRoutine);
-            continuousEffectRoutine = null;
-        }
+        if (continuousEffectRoutine == null)
+            return;
+
+        StopCoroutine(continuousEffectRoutine);
+        continuousEffectRoutine = null;
     }
 
     private IEnumerator DogCatRainRoutine(WorldEventData data)
     {
         yield return null;
-        while (activeEvent == data && WaveManager.Instance != null && WaveManager.Instance.IsWaveInProgress)
+
+        while (currentWaveEffectsRunning && activeEvent == data)
         {
             if (HasLivingEnemies())
                 SpawnGoldDrop(data);
+
             yield return new WaitForSeconds(Mathf.Max(0.05f, data.goldDropInterval));
         }
+
         continuousEffectRoutine = null;
     }
 
@@ -241,81 +341,211 @@ public class WorldEventManager : MonoBehaviour
     {
         Vector3 end = RandomGroundPoint(data.goldDropAreaSize);
         Vector3 start = end + Vector3.up * data.goldDropHeight;
-        GameObject go = data.goldDropPrefab != null ? Instantiate(data.goldDropPrefab, start, Random.rotation) : null;
+        int goldAmount = Mathf.Max(0, data.goldPerDrop);
+
+        GameObject drop = data.goldDropPrefab != null
+            ? Instantiate(data.goldDropPrefab, start, Random.rotation)
+            : null;
+
         float duration = Mathf.Max(0.05f, data.goldDropFallDuration);
-        if (go != null)
+
+        if (drop == null)
         {
-            go.transform.DOMove(end, duration).SetEase(Ease.InQuad).OnComplete(() =>
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddGold(goldAmount);
+            return;
+        }
+
+        Transform dropTransform = drop.transform;
+        dropTransform.DOMove(end, duration)
+            .SetEase(Ease.InQuad)
+            .OnComplete(() =>
             {
-                if (GameManager.Instance != null) GameManager.Instance.AddGold(Mathf.Max(0, data.goldPerDrop));
-                Destroy(go);
+                if (GameManager.Instance != null)
+                    GameManager.Instance.AddGold(goldAmount);
+
+                if (drop != null)
+                    Destroy(drop);
             });
-            go.transform.DORotate(new Vector3(Random.Range(90f, 360f), Random.Range(90f, 360f), Random.Range(90f, 360f)), duration, RotateMode.LocalAxisAdd);
-        }
-        else if (GameManager.Instance != null)
-        {
-            GameManager.Instance.AddGold(Mathf.Max(0, data.goldPerDrop));
-        }
+
+        dropTransform.DORotate(
+            new Vector3(Random.Range(90f, 360f), Random.Range(90f, 360f), Random.Range(90f, 360f)),
+            duration,
+            RotateMode.LocalAxisAdd);
     }
 
     private IEnumerator MeteorShowerRoutine(WorldEventData data)
     {
         yield return null;
-        while (activeEvent == data && WaveManager.Instance != null && WaveManager.Instance.IsWaveInProgress)
+
+        while (currentWaveEffectsRunning && activeEvent == data)
         {
             if (HasLivingEnemies() && Random.value < data.meteorChancePerTick)
                 SpawnMeteor(data);
+
             yield return new WaitForSeconds(Mathf.Max(0.05f, data.meteorTickInterval));
         }
+
         continuousEffectRoutine = null;
     }
 
     private void SpawnMeteor(WorldEventData data)
     {
-        Vector3 end = RandomGroundPoint(data.meteorAreaSize);
+        Vector3 end = ChooseMeteorImpactPoint(data);
         Vector3 start = end + Vector3.up * data.meteorSpawnHeight + new Vector3(-data.meteorSpawnHeight * 0.35f, 0f, 0f);
-        GameObject go = data.meteorPrefab != null ? Instantiate(data.meteorPrefab, start, Quaternion.identity) : null;
         float duration = Mathf.Max(0.05f, data.meteorFallDuration);
-        if (go != null)
-        {
-            Vector3 dir = end - start;
-            if (dir.sqrMagnitude > 0.001f) go.transform.rotation = Quaternion.LookRotation(dir.normalized);
-            go.transform.DOMove(end, duration).SetEase(Ease.InQuad).OnComplete(() =>
-            {
-                ResolveMeteorImpact(end, data);
-                Destroy(go);
-            });
-        }
-        else
+
+        GameObject meteor = data.meteorPrefab != null
+            ? Instantiate(data.meteorPrefab, start, Quaternion.identity)
+            : null;
+
+        if (meteor == null)
         {
             ResolveMeteorImpact(end, data);
+            return;
         }
+
+        Vector3 direction = end - start;
+        if (direction.sqrMagnitude > 0.001f)
+            meteor.transform.rotation = Quaternion.LookRotation(direction.normalized);
+
+        meteor.transform.DOMove(end, duration)
+            .SetEase(Ease.InQuad)
+            .OnComplete(() =>
+            {
+                ResolveMeteorImpact(end, data);
+                if (meteor != null)
+                    Destroy(meteor);
+            });
+    }
+
+    private Vector3 ChooseMeteorImpactPoint(WorldEventData data)
+    {
+        if (Random.value <= data.meteorTargetEnemyChance)
+        {
+            Enemy target = GetRandomLivingEnemy();
+            if (target != null)
+            {
+                Vector2 scatter = Random.insideUnitCircle * Mathf.Max(0f, data.meteorTargetScatterRadius);
+                Vector3 point = target.transform.position + new Vector3(scatter.x, 0f, scatter.y);
+                point.y = worldGroundY;
+                return point;
+            }
+        }
+
+        return RandomGroundPoint(data.meteorAreaSize);
     }
 
     private void ResolveMeteorImpact(Vector3 point, WorldEventData data)
     {
-        Collider[] hits = Physics.OverlapSphere(point, Mathf.Max(0.1f, data.meteorHitRadius), ~0, QueryTriggerInteraction.Collide);
+        float radius = Mathf.Max(0.1f, data.meteorHitRadius);
+        float radiusSq = radius * radius;
         HashSet<Enemy> enemies = new HashSet<Enemy>();
         HashSet<Tower> towers = new HashSet<Tower>();
+
+        Collider[] hits = Physics.OverlapSphere(point, radius, ~0, QueryTriggerInteraction.Collide);
         for (int i = 0; i < hits.Length; i++)
         {
-            if (hits[i] == null) continue;
-            Enemy enemy = hits[i].GetComponentInParent<Enemy>();
-            if (enemy != null && enemy.IsAlive) enemies.Add(enemy);
-            Tower tower = hits[i].GetComponentInParent<Tower>();
-            if (tower != null) towers.Add(tower);
+            Collider hit = hits[i];
+            if (hit == null)
+                continue;
+
+            Enemy enemy = hit.GetComponentInParent<Enemy>();
+            if (enemy != null && enemy.IsAlive)
+                enemies.Add(enemy);
+
+            Tower tower = hit.GetComponentInParent<Tower>();
+            if (tower != null)
+                towers.Add(tower);
         }
+
+        // Fallback distance checks make event hits work even when an authored enemy/tower lacks a collider.
+        Enemy[] livingEnemies = FindObjectsByType<Enemy>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < livingEnemies.Length; i++)
+        {
+            Enemy enemy = livingEnemies[i];
+            if (enemy == null || !enemy.IsAlive)
+                continue;
+
+            Vector3 delta = enemy.transform.position - point;
+            delta.y = 0f;
+            if (delta.sqrMagnitude <= radiusSq)
+                enemies.Add(enemy);
+        }
+
+        IReadOnlyList<Tower> activeTowers = Tower.ActiveTowers;
+        for (int i = 0; i < activeTowers.Count; i++)
+        {
+            Tower tower = activeTowers[i];
+            if (tower == null)
+                continue;
+
+            Vector3 delta = tower.transform.position - point;
+            delta.y = 0f;
+            if (delta.sqrMagnitude <= radiusSq)
+                towers.Add(tower);
+        }
+
         foreach (Enemy enemy in enemies)
             enemy.TakeDamage(enemy.MaxHP * Mathf.Clamp01(data.meteorEnemyMaxHpDamagePercent));
+
         foreach (Tower tower in towers)
-            tower.ApplyTemporaryAttackSpeedPenalty(data.meteorTowerAttackSpeedPenaltyPercent, data.meteorTowerDebuffDuration);
+            tower.ApplyTemporaryAttackSpeedPenalty(
+                data.meteorTowerAttackSpeedPenaltyPercent,
+                data.meteorTowerDebuffDuration);
+
+        SpawnMeteorImpactVfx(point, data);
+    }
+
+    private void SpawnMeteorImpactVfx(Vector3 point, WorldEventData data)
+    {
+        if (data == null || data.meteorImpactVfxPrefab == null)
+            return;
+
+        GameObject vfx = Instantiate(data.meteorImpactVfxPrefab, point, Quaternion.identity);
+        PooledVFXAutoRelease autoRelease = vfx.GetComponent<PooledVFXAutoRelease>();
+        if (autoRelease != null)
+        {
+            autoRelease.PlayAndSchedule();
+            return;
+        }
+
+        ParticleSystem particle = vfx.GetComponentInChildren<ParticleSystem>();
+        float lifetime = 3f;
+        if (particle != null)
+            lifetime = Mathf.Max(0.5f, particle.main.duration + particle.main.startLifetime.constantMax);
+        Destroy(vfx, lifetime);
+    }
+
+    private Enemy GetRandomLivingEnemy()
+    {
+        Enemy[] enemies = FindObjectsByType<Enemy>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        Enemy chosen = null;
+        int validCount = 0;
+
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            Enemy enemy = enemies[i];
+            if (enemy == null || !enemy.IsAlive)
+                continue;
+
+            validCount++;
+            if (Random.Range(0, validCount) == 0)
+                chosen = enemy;
+        }
+
+        return chosen;
     }
 
     private bool HasLivingEnemies()
     {
         Enemy[] enemies = FindObjectsByType<Enemy>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < enemies.Length; i++)
-            if (enemies[i] != null && enemies[i].IsAlive) return true;
+        {
+            if (enemies[i] != null && enemies[i].IsAlive)
+                return true;
+        }
+
         return false;
     }
 
@@ -323,63 +553,69 @@ public class WorldEventManager : MonoBehaviour
     {
         Vector3 center = worldCenter != null ? worldCenter.position : Vector3.zero;
         center.y = worldGroundY;
-        return center + new Vector3(Random.Range(-size.x * 0.5f, size.x * 0.5f), 0f, Random.Range(-size.y * 0.5f, size.y * 0.5f));
+
+        return center + new Vector3(
+            Random.Range(-size.x * 0.5f, size.x * 0.5f),
+            0f,
+            Random.Range(-size.y * 0.5f, size.y * 0.5f));
     }
 
     public float ApplyTowerDamage(float value)
     {
-        if (IsHolyLightActive) value *= 1f + Mathf.Max(0f, activeEvent.holyTowerDamageBonusPercent);
+        if (IsHolyLightActive)
+            value *= 1f + Mathf.Max(0f, activeEvent.holyTowerDamageBonusPercent);
         return value;
     }
 
     public float ApplyTowerAttackSpeed(float value)
     {
-        if (IsHolyLightActive) value *= 1f + Mathf.Max(0f, activeEvent.holyTowerAttackSpeedBonusPercent);
+        if (IsHolyLightActive)
+            value *= 1f + Mathf.Max(0f, activeEvent.holyTowerAttackSpeedBonusPercent);
         return value;
     }
 
     public float ApplyProjectileSpeed(float value)
     {
-        if (IsHolyLightActive) value *= 1f + Mathf.Max(0f, activeEvent.holyProjectileSpeedBonusPercent);
+        if (IsHolyLightActive)
+            value *= 1f + Mathf.Max(0f, activeEvent.holyProjectileSpeedBonusPercent);
         return value;
     }
 
     public float GetEnemyMaxHpMultiplier()
     {
         float multiplier = 1f;
-        if (IsDogCatRainActive) multiplier *= 1f + Mathf.Max(0f, activeEvent.enemyMaxHpBonusPercent);
+
+        if (IsDogCatRainActive)
+            multiplier *= 1f + Mathf.Max(0f, activeEvent.enemyMaxHpBonusPercent);
+
         if (IsHolyPenaltyActive)
-        {
-            WorldEventData holy = FindHolyEventDefinition();
-            if (holy != null) multiplier *= 1f + Mathf.Max(0f, holy.collapseEnemyMaxHpBonusPercent);
-        }
+            multiplier *= 1f + Mathf.Max(0f, holyPenaltySource.collapseEnemyMaxHpBonusPercent);
+
         return multiplier;
     }
 
     public float GetEnemyCCResistanceBonus()
     {
-        if (!IsHolyPenaltyActive) return 0f;
-        WorldEventData holy = FindHolyEventDefinition();
-        return holy != null ? Mathf.Clamp01(holy.collapseEnemyCCResistanceBonusPercent) : 0f;
+        if (!IsHolyPenaltyActive)
+            return 0f;
+
+        return Mathf.Clamp01(holyPenaltySource.collapseEnemyCCResistanceBonusPercent);
     }
 
     public float GetEnemySpawnShieldPercent()
     {
-        if (!IsHolyPenaltyActive) return 0f;
-        WorldEventData holy = FindHolyEventDefinition();
-        return holy != null ? Mathf.Max(0f, holy.collapseEnemyShieldPercentOfMaxHp) : 0f;
-    }
+        if (!IsHolyPenaltyActive)
+            return 0f;
 
-    private WorldEventData FindHolyEventDefinition()
-    {
-        for (int i = 0; i < eventPool.Count; i++)
-            if (eventPool[i] != null && eventPool[i].eventType == WorldEventType.HolyLight) return eventPool[i];
-        return null;
+        return Mathf.Max(0f, holyPenaltySource.collapseEnemyShieldPercentOfMaxHp);
     }
 
     private IEnumerator PresentAnnouncement(WorldEventData data, bool collapsed)
     {
-        if (data == null) yield break;
+        if (data == null)
+            yield break;
+
+        isPresentingAnnouncement = true;
         CaptureHUDPositions();
         yield return AnimateHUD(false);
 
@@ -387,69 +623,203 @@ public class WorldEventManager : MonoBehaviour
         {
             announcementRoot.gameObject.SetActive(true);
             announcementRoot.alpha = 0f;
+
             RectTransform rect = announcementRoot.transform as RectTransform;
             Vector2 basePos = rect != null ? rect.anchoredPosition : Vector2.zero;
-            if (rect != null) rect.anchoredPosition = basePos + announcementEnterOffset;
+            if (rect != null)
+                rect.anchoredPosition = basePos + announcementEnterOffset;
 
-            if (rarityText != null) rarityText.text = collapsed ? "EVENT COLLAPSED" : data.rarity.ToString().ToUpperInvariant() + " EVENT";
-            if (titleText != null) titleText.text = collapsed ? "HOLY LIGHT FADES" : data.eventName;
-            if (descriptionText != null) descriptionText.text = collapsed ? "The blessing has vanished. Enemies are empowered." : data.description;
+            Color accent = collapsed
+                ? new Color(1f, 0.42f, 0.18f, 1f)
+                : data.accentColor;
+
+            if (rarityText != null)
+            {
+                rarityText.text = collapsed
+                    ? "EVENT COLLAPSED"
+                    : data.rarity.ToString().ToUpperInvariant() + " EVENT";
+                rarityText.color = accent;
+            }
+
+            if (titleText != null)
+            {
+                titleText.text = collapsed ? "HOLY LIGHT FADES" : data.eventName;
+                titleText.color = accent;
+            }
+
+            if (descriptionText != null)
+            {
+                descriptionText.text = collapsed
+                    ? BuildHolyCollapseDescription(data)
+                    : data.description;
+                descriptionText.color = Color.white;
+            }
+
             if (iconImage != null)
             {
                 iconImage.sprite = data.icon;
+                iconImage.color = Color.white;
                 iconImage.enabled = data.icon != null;
             }
-            if (data.announcementSfx != null) AudioSource.PlayClipAtPoint(data.announcementSfx, Camera.main != null ? Camera.main.transform.position : Vector3.zero);
 
-            Sequence seq = DOTween.Sequence().SetUpdate(true);
-            seq.Join(announcementRoot.DOFade(1f, announcementEnterDuration));
-            if (rect != null) seq.Join(rect.DOAnchorPos(basePos, announcementEnterDuration).SetEase(announcementEnterEase));
-            yield return seq.WaitForCompletion();
-            if (announcementHoldDuration > 0f) yield return new WaitForSecondsRealtime(announcementHoldDuration);
-            yield return announcementRoot.DOFade(0f, announcementExitDuration).SetEase(announcementExitEase).SetUpdate(true).WaitForCompletion();
+            PlayAnnouncementSfx(data, collapsed);
+
+            Sequence enter = DOTween.Sequence().SetUpdate(true);
+            enter.Join(announcementRoot.DOFade(1f, announcementEnterDuration));
+            if (rect != null)
+                enter.Join(rect.DOAnchorPos(basePos, announcementEnterDuration).SetEase(announcementEnterEase));
+            yield return enter.WaitForCompletion();
+
+            if (announcementHoldDuration > 0f)
+                yield return new WaitForSecondsRealtime(announcementHoldDuration);
+
+            Tween exit = announcementRoot
+                .DOFade(0f, announcementExitDuration)
+                .SetEase(announcementExitEase)
+                .SetUpdate(true);
+            yield return exit.WaitForCompletion();
+
             announcementRoot.gameObject.SetActive(false);
-            if (rect != null) rect.anchoredPosition = basePos;
+            if (rect != null)
+                rect.anchoredPosition = basePos;
         }
         else if (announcementHoldDuration > 0f)
         {
+            PlayAnnouncementSfx(data, collapsed);
             yield return new WaitForSecondsRealtime(announcementHoldDuration);
         }
 
         yield return AnimateHUD(true);
+        isPresentingAnnouncement = false;
+    }
+
+    private string BuildHolyCollapseDescription(WorldEventData data)
+    {
+        int rounds = Mathf.Max(1, data.collapsePenaltyRounds);
+        int hp = Mathf.RoundToInt(Mathf.Max(0f, data.collapseEnemyMaxHpBonusPercent) * 100f);
+        int resist = Mathf.RoundToInt(Mathf.Clamp01(data.collapseEnemyCCResistanceBonusPercent) * 100f);
+        int shield = Mathf.RoundToInt(Mathf.Max(0f, data.collapseEnemyShieldPercentOfMaxHp) * 100f);
+
+        return $"The blessing has vanished. For {rounds} round(s), enemies gain +{hp}% Max HP, +{resist}% effect resistance and a {shield}% Max HP shield.";
+    }
+
+    private void PlayAnnouncementSfx(WorldEventData data, bool collapsed)
+    {
+        if (data == null)
+            return;
+
+        AudioClip clip = collapsed && data.holyCollapseSfx != null
+            ? data.holyCollapseSfx
+            : data.announcementSfx;
+
+        if (clip == null)
+            return;
+
+        if (eventAudioSource != null)
+        {
+            eventAudioSource.Stop();
+            eventAudioSource.PlayOneShot(clip);
+        }
+        else
+        {
+            AudioSource.PlayClipAtPoint(
+                clip,
+                Camera.main != null ? Camera.main.transform.position : Vector3.zero);
+        }
     }
 
     private IEnumerator AnimateHUD(bool show)
     {
-        float duration = Mathf.Max(0f, hudSlideDuration);
         CaptureHUDPositions();
-        Sequence seq = DOTween.Sequence().SetUpdate(true);
+        float duration = Mathf.Max(0f, hudSlideDuration);
         bool any = false;
+
+        if (duration <= 0f)
+        {
+            for (int i = 0; i < hudTargets.Count; i++)
+            {
+                HUDTarget item = hudTargets[i];
+                if (item == null || item.target == null || !item.captured)
+                    continue;
+
+                item.target.anchoredPosition = show
+                    ? item.shownPosition
+                    : item.shownPosition + item.hiddenOffset;
+            }
+            yield break;
+        }
+
+        Sequence sequence = DOTween.Sequence().SetUpdate(true);
         for (int i = 0; i < hudTargets.Count; i++)
         {
             HUDTarget item = hudTargets[i];
-            if (item == null || item.target == null || !item.captured) continue;
-            Vector2 target = show ? item.shownPosition : item.shownPosition + item.hiddenOffset;
-            seq.Join(item.target.DOAnchorPos(target, duration).SetEase(Ease.InOutCubic));
+            if (item == null || item.target == null || !item.captured)
+                continue;
+
+            item.target.DOKill();
+            Vector2 target = show
+                ? item.shownPosition
+                : item.shownPosition + item.hiddenOffset;
+
+            sequence.Join(item.target.DOAnchorPos(target, duration).SetEase(Ease.InOutCubic));
             any = true;
         }
-        if (!any || duration <= 0f) yield break;
-        yield return seq.WaitForCompletion();
+
+        if (!any)
+        {
+            sequence.Kill();
+            yield break;
+        }
+
+        yield return sequence.WaitForCompletion();
     }
 
     private void CaptureHUDPositions()
     {
+        if (hudTargets == null)
+            return;
+
         for (int i = 0; i < hudTargets.Count; i++)
         {
             HUDTarget item = hudTargets[i];
-            if (item == null || item.target == null || item.captured) continue;
+            if (item == null || item.target == null || item.captured)
+                continue;
+
             item.shownPosition = item.target.anchoredPosition;
             item.captured = true;
         }
     }
 
+    private void RestoreHUDInstant()
+    {
+        if (hudTargets == null)
+            return;
+
+        for (int i = 0; i < hudTargets.Count; i++)
+        {
+            HUDTarget item = hudTargets[i];
+            if (item == null || item.target == null || !item.captured)
+                continue;
+
+            item.target.DOKill();
+            item.target.anchoredPosition = item.shownPosition;
+        }
+
+        if (announcementRoot != null)
+        {
+            announcementRoot.DOKill();
+            announcementRoot.alpha = 0f;
+            announcementRoot.gameObject.SetActive(false);
+        }
+
+        isPresentingAnnouncement = false;
+    }
+
     private void CaptureLightState()
     {
-        if (holyDirectionalLight == null || lightStateCaptured) return;
+        if (holyDirectionalLight == null || lightStateCaptured)
+            return;
+
         normalLightIntensity = holyDirectionalLight.intensity;
         normalLightColor = holyDirectionalLight.color;
         lightStateCaptured = true;
@@ -458,26 +828,109 @@ public class WorldEventManager : MonoBehaviour
     private void BeginHolyVisuals(WorldEventData data)
     {
         CaptureLightState();
+
         if (holyDirectionalLight != null)
         {
-            DOTween.To(() => holyDirectionalLight.intensity, x => holyDirectionalLight.intensity = x, holyLightIntensity, holyLightFadeDuration).SetUpdate(true);
-            DOTween.To(() => holyDirectionalLight.color, x => holyDirectionalLight.color = x, holyLightColor, holyLightFadeDuration).SetUpdate(true);
+            DOTween.Kill(holyDirectionalLight);
+            DOTween.To(
+                    () => holyDirectionalLight.intensity,
+                    value => holyDirectionalLight.intensity = value,
+                    holyLightIntensity,
+                    holyLightFadeDuration)
+                .SetUpdate(true)
+                .SetTarget(holyDirectionalLight);
+
+            DOTween.To(
+                    () => holyDirectionalLight.color,
+                    value => holyDirectionalLight.color = value,
+                    holyLightColor,
+                    holyLightFadeDuration)
+                .SetUpdate(true)
+                .SetTarget(holyDirectionalLight);
         }
-        if (data.holyLightVisualPrefab != null && holyVisualInstance == null)
-            holyVisualInstance = Instantiate(data.holyLightVisualPrefab, worldCenter != null ? worldCenter.position : Vector3.zero, Quaternion.identity);
+
+        if (data.holyLightVisualPrefab == null || holyVisualInstance != null)
+            return;
+
+        Vector3 position = worldCenter != null ? worldCenter.position : Vector3.zero;
+        holyVisualInstance = Instantiate(data.holyLightVisualPrefab, position, Quaternion.identity);
+
+        Vector3 authoredScale = holyVisualInstance.transform.localScale;
+        holyVisualInstance.transform.localScale = Vector3.zero;
+        holyVisualInstance.transform
+            .DOScale(authoredScale, Mathf.Max(0.05f, holyLightFadeDuration))
+            .SetEase(Ease.OutCubic)
+            .SetUpdate(true);
     }
 
     private void EndHolyVisuals()
     {
         if (holyDirectionalLight != null && lightStateCaptured)
         {
-            DOTween.To(() => holyDirectionalLight.intensity, x => holyDirectionalLight.intensity = x, normalLightIntensity, holyLightFadeDuration).SetUpdate(true);
-            DOTween.To(() => holyDirectionalLight.color, x => holyDirectionalLight.color = x, normalLightColor, holyLightFadeDuration).SetUpdate(true);
+            DOTween.Kill(holyDirectionalLight);
+            DOTween.To(
+                    () => holyDirectionalLight.intensity,
+                    value => holyDirectionalLight.intensity = value,
+                    normalLightIntensity,
+                    holyLightFadeDuration)
+                .SetUpdate(true)
+                .SetTarget(holyDirectionalLight);
+
+            DOTween.To(
+                    () => holyDirectionalLight.color,
+                    value => holyDirectionalLight.color = value,
+                    normalLightColor,
+                    holyLightFadeDuration)
+                .SetUpdate(true)
+                .SetTarget(holyDirectionalLight);
         }
+
+        if (holyVisualInstance == null)
+            return;
+
+        GameObject instance = holyVisualInstance;
+        holyVisualInstance = null;
+        instance.transform.DOKill();
+        instance.transform
+            .DOScale(Vector3.zero, Mathf.Max(0.05f, holyLightFadeDuration))
+            .SetEase(Ease.InCubic)
+            .SetUpdate(true)
+            .OnComplete(() =>
+            {
+                if (instance != null)
+                    Destroy(instance);
+            });
+    }
+
+    private void RestoreHolyLightInstant()
+    {
+        if (holyDirectionalLight != null && lightStateCaptured)
+        {
+            DOTween.Kill(holyDirectionalLight);
+            holyDirectionalLight.intensity = normalLightIntensity;
+            holyDirectionalLight.color = normalLightColor;
+        }
+
         if (holyVisualInstance != null)
         {
+            holyVisualInstance.transform.DOKill();
             Destroy(holyVisualInstance);
             holyVisualInstance = null;
         }
+    }
+
+    private void SpawnHolyCollapseVfx(WorldEventData data)
+    {
+        if (data == null || data.holyCollapseVfxPrefab == null)
+            return;
+
+        Vector3 position = worldCenter != null ? worldCenter.position : Vector3.zero;
+        GameObject vfx = Instantiate(data.holyCollapseVfxPrefab, position, Quaternion.identity);
+
+        ParticleSystem particle = vfx.GetComponentInChildren<ParticleSystem>();
+        float lifetime = 3f;
+        if (particle != null)
+            lifetime = Mathf.Max(0.5f, particle.main.duration + particle.main.startLifetime.constantMax);
+        Destroy(vfx, lifetime);
     }
 }
