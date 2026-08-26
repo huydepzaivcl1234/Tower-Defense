@@ -4,6 +4,7 @@ using System.Collections.Generic;
 /// <summary>
 /// Walks along a WaypointPath, takes damage/status effects from towers, regenerates HP in ticks,
 /// and either dies (rewarding gold) or reaches the end (costing player lives).
+/// Runtime world-event modifiers never mutate EnemyData assets.
 /// </summary>
 public class Enemy : MonoBehaviour
 {
@@ -29,6 +30,8 @@ public class Enemy : MonoBehaviour
     public Vector3 damagePopupOffset = new Vector3(0f, 1.6f, 0f);
 
     private float currentHP;
+    private float runtimeMaxHP;
+    private float runtimeCCResistanceBonus;
     private List<Transform> waypoints;
     private int currentWaypointIndex;
     private bool isDead;
@@ -59,7 +62,8 @@ public class Enemy : MonoBehaviour
 
     public bool IsAlive => !isDead && currentHP > 0f;
     public float CurrentHP => currentHP;
-    public float HPPercent => (data != null && data.maxHP > 0f) ? currentHP / data.maxHP : 0f;
+    public float MaxHP => runtimeMaxHP > 0f ? runtimeMaxHP : (data != null ? data.maxHP : 0f);
+    public float HPPercent => MaxHP > 0f ? currentHP / MaxHP : 0f;
     public bool IsBleeding => bleedTimeRemaining > 0f;
     public bool IsSlowed => slowTimeRemaining > 0f;
     public bool IsShielded => currentShield > 0f;
@@ -81,8 +85,11 @@ public class Enemy : MonoBehaviour
 
         data = enemyData;
         waypoints = path;
-        float spawnHpMultiplier = RelicManager.Instance != null ? RelicManager.Instance.GetSpawnHpMultiplier() : 1f;
-        currentHP = data.maxHP * spawnHpMultiplier;
+        float relicHpMultiplier = RelicManager.Instance != null ? RelicManager.Instance.GetSpawnHpMultiplier() : 1f;
+        float eventHpMultiplier = WorldEventManager.Instance != null ? WorldEventManager.Instance.GetEnemyMaxHpMultiplier() : 1f;
+        runtimeMaxHP = data.maxHP * relicHpMultiplier * eventHpMultiplier;
+        runtimeCCResistanceBonus = WorldEventManager.Instance != null ? WorldEventManager.Instance.GetEnemyCCResistanceBonus() : 0f;
+        currentHP = runtimeMaxHP;
         currentWaypointIndex = 0;
         isDead = false;
         PathProgress = 0f;
@@ -101,6 +108,13 @@ public class Enemy : MonoBehaviour
         isShieldVisualActive = false;
         regenTickTimer = GetRegenInterval();
 
+        float eventSpawnShieldPercent = WorldEventManager.Instance != null ? WorldEventManager.Instance.GetEnemySpawnShieldPercent() : 0f;
+        if (eventSpawnShieldPercent > 0f)
+        {
+            currentShield = runtimeMaxHP * eventSpawnShieldPercent;
+            shieldTimeRemaining = float.MaxValue;
+        }
+
         if (animator != null)
         {
             animator.Rebind();
@@ -109,7 +123,8 @@ public class Enemy : MonoBehaviour
         }
 
         if (healthBar != null) healthBar.SetData(this);
-        ApplyTintColor(data.tintColor);
+        ApplyTintColor(currentShield > 0f ? data.shieldTintColor : data.tintColor);
+        if (currentShield > 0f && healthBar != null) healthBar.RefreshShield(true);
     }
 
     private float GetRegenInterval()
@@ -143,7 +158,7 @@ public class Enemy : MonoBehaviour
 
     private void UpdateRegeneration()
     {
-        if (data.hpRegenPerSec <= 0f || currentHP >= data.maxHP)
+        if (data.hpRegenPerSec <= 0f || currentHP >= MaxHP)
         {
             regenTickTimer = GetRegenInterval();
             return;
@@ -157,15 +172,17 @@ public class Enemy : MonoBehaviour
 
     public float Heal(float amount, bool showPopup = true)
     {
-        if (isDead || data == null || amount <= 0f || currentHP >= data.maxHP) return 0f;
+        if (isDead || data == null || amount <= 0f || currentHP >= MaxHP) return 0f;
         float oldHP = currentHP;
-        currentHP = Mathf.Min(data.maxHP, currentHP + amount);
+        currentHP = Mathf.Min(MaxHP, currentHP + amount);
         float actualHeal = currentHP - oldHP;
         if (actualHeal <= 0f) return 0f;
         if (healthBar != null) healthBar.Refresh(true);
         if (showPopup) SpawnHealPopup(actualHeal);
         return actualHeal;
     }
+
+    private float EffectiveCCResistance => Mathf.Clamp01((data != null ? data.ccResistPercent : 0f) + runtimeCCResistanceBonus);
 
     private void UpdateStatusEffects()
     {
@@ -187,7 +204,7 @@ public class Enemy : MonoBehaviour
         }
         else if (slowPercent != 0f) slowPercent = 0f;
 
-        if (shieldTimeRemaining > 0f)
+        if (shieldTimeRemaining > 0f && shieldTimeRemaining < float.MaxValue)
         {
             shieldTimeRemaining -= Time.deltaTime;
             if (shieldTimeRemaining <= 0f)
@@ -203,14 +220,14 @@ public class Enemy : MonoBehaviour
         if (isDead || damagePerTick <= 0f || tickInterval <= 0f || duration <= 0f) return;
         bleedDamagePerTick = damagePerTick;
         bleedTickInterval = tickInterval;
-        bleedTimeRemaining = duration;
+        bleedTimeRemaining = duration * (1f - EffectiveCCResistance);
         bleedTickTimer = tickInterval;
     }
 
     public void ApplySlow(float percent, float duration)
     {
         if (isDead || data == null || percent <= 0f || duration <= 0f) return;
-        float effectiveDuration = duration * (1f - data.ccResistPercent);
+        float effectiveDuration = duration * (1f - EffectiveCCResistance);
         if (effectiveDuration <= 0f) return;
         slowPercent = Mathf.Clamp01(percent);
         slowTimeRemaining = effectiveDuration;
@@ -219,7 +236,7 @@ public class Enemy : MonoBehaviour
     public void ApplyKnockback(float distance)
     {
         if (isDead || distance <= 0f) return;
-        float effectiveDistance = distance * (1f - data.ccResistPercent);
+        float effectiveDistance = distance * (1f - EffectiveCCResistance);
         if (effectiveDistance <= 0f) return;
         knockbackRemaining += effectiveDistance;
     }
@@ -298,7 +315,7 @@ public class Enemy : MonoBehaviour
             UpdateShieldVisual();
         }
         if (amount > 0f) currentHP -= amount;
-        if (!hpThresholdShieldUsed && data.shieldTriggerHPPercent > 0f && currentHP <= data.maxHP * data.shieldTriggerHPPercent)
+        if (!hpThresholdShieldUsed && data.shieldTriggerHPPercent > 0f && currentHP <= MaxHP * data.shieldTriggerHPPercent)
         {
             hpThresholdShieldUsed = true;
             GrantShield(data.shieldTriggerAmount, data.shieldTriggerDuration);
