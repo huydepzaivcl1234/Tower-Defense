@@ -1,11 +1,10 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
 /// Unified Win/Lose screen with Retry and Main Menu actions.
-/// Uses the same fade system as the main Play button and reloads the active scene
-/// so the whole run (waves, towers, enemies, relics, gold/lives) starts clean.
 /// </summary>
 public class EndGameUIController : MonoBehaviour
 {
@@ -16,12 +15,19 @@ public class EndGameUIController : MonoBehaviour
     public GameObject winContent;
     public GameObject loseContent;
 
+    [Header("Win Diamond Summary")]
+    public TMP_Text diamondsEarnedText;
+    public TMP_Text diamondsTotalText;
+    public string diamondsEarnedFormat = "+{0} DIAMONDS";
+    public string diamondsTotalFormat = "TOTAL {0}";
+    public bool useCompactDiamondNumbers = true;
+    public bool hideEarnedTextWhenZero = false;
+
     [Header("Buttons")]
     public Button retryButton;
     public Button mainMenuButton;
 
     [Header("Transition")]
-    [Tooltip("When enabled, transition timing/color are copied from MainMenuController so Play/Retry/Main Menu feel identical.")]
     public bool useMainMenuFadeSettings = true;
     public bool fadeOnAction = true;
     [Min(0f)] public float fadeOutDuration = 0.55f;
@@ -78,9 +84,28 @@ public class EndGameUIController : MonoBehaviour
     {
         transitionInProgress = false;
         SyncFadeSettings();
+        RefreshDiamondSummary();
         if (rootPanel != null) rootPanel.SetActive(true);
         if (winContent != null) winContent.SetActive(true);
         if (loseContent != null) loseContent.SetActive(false);
+    }
+
+    private void RefreshDiamondSummary()
+    {
+        int earned = PlayerProfileManager.Instance != null ? PlayerProfileManager.Instance.DiamondsEarnedThisRun : 0;
+        int total = PlayerProfileManager.Instance != null ? PlayerProfileManager.Instance.CurrentDiamonds : 0;
+
+        string earnedValue = useCompactDiamondNumbers ? CompactNumber.Format(earned) : earned.ToString("N0");
+        string totalValue = useCompactDiamondNumbers ? CompactNumber.Format(total) : total.ToString("N0");
+
+        if (diamondsEarnedText != null)
+        {
+            diamondsEarnedText.text = string.Format(diamondsEarnedFormat, earnedValue);
+            diamondsEarnedText.gameObject.SetActive(!hideEarnedTextWhenZero || earned > 0);
+        }
+
+        if (diamondsTotalText != null)
+            diamondsTotalText.text = string.Format(diamondsTotalFormat, totalValue);
     }
 
     private void ShowLose()
