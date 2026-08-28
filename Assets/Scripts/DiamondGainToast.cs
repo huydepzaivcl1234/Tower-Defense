@@ -3,103 +3,148 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Animated gameplay notification for newly granted Diamonds.</summary>
+/// <summary>
+/// Gameplay-only Diamond notification. Slides in, counts from the previous total to the new total,
+/// optionally shows the amount gained, then slides back out.
+/// </summary>
 [DisallowMultipleComponent]
 public class DiamondGainToast : MonoBehaviour
 {
     [Header("References")]
     public RectTransform root;
     public CanvasGroup canvasGroup;
-    public TMP_Text amountText;
+    [Tooltip("Main counter. This animates from the previous total Diamonds to the new total.")]
+    public TMP_Text totalText;
+    [Tooltip("Optional secondary text such as +3. Can be left empty.")]
+    public TMP_Text gainText;
     public Image iconImage;
 
-    [Header("Presentation")]
+    [Header("Icon / Text")]
+    [Tooltip("Your own Diamond Sprite. Nothing is hard-coded.")]
     public Sprite diamondIcon;
-    public string prefix = "+";
-    public string suffix = "";
-    public bool useCompactNumbers = true;
     public bool hideIconWhenNoSprite = true;
+    public bool useCompactNumbers = true;
+    public string totalPrefix = "";
+    public string totalSuffix = "";
+    public bool showGainText = true;
+    public string gainPrefix = "+";
+    public string gainSuffix = "";
 
-    [Header("Motion")]
-    public Vector2 hiddenOffset = new Vector2(0f, 65f);
+    [Header("Count Animation")]
+    [Min(0f)] public float countDelayAfterEnter = 0.05f;
+    [Min(0f)] public float countDuration = 0.45f;
+    public Ease countEase = Ease.OutCubic;
+
+    [Header("Slide Motion")]
+    [Tooltip("Where the HUD waits while hidden, relative to its shown position. Positive Y makes it enter downward from above.")]
+    public Vector2 hiddenOffset = new Vector2(0f, 70f);
     [Min(0f)] public float enterDuration = 0.28f;
-    [Min(0f)] public float holdDuration = 1.1f;
+    [Min(0f)] public float holdDuration = 1.0f;
     [Min(0f)] public float exitDuration = 0.25f;
     public Ease enterEase = Ease.OutCubic;
     public Ease exitEase = Ease.InCubic;
     public bool useUnscaledTime = true;
 
-    [Header("Stacking")]
+    [Header("Repeated Gains")]
+    [Tooltip("If another Diamond is collected while this HUD is visible, combine it into the current notification and count toward the newest total.")]
     public bool combineWhileVisible = true;
 
     private Vector2 shownPosition;
     private Sequence sequence;
-    private int pendingAmount;
+    private Tween countTween;
     private bool initialized;
+    private int accumulatedGain;
+    private int displayedTotal;
+    private int targetTotal;
 
     private void Awake()
     {
         if (root == null) root = transform as RectTransform;
         if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
         CaptureShownPosition();
+        displayedTotal = PlayerProfileManager.Instance != null ? PlayerProfileManager.Instance.CurrentDiamonds : 0;
+        targetTotal = displayedTotal;
         HideInstant();
     }
 
-    private void OnEnable() => PlayerProfileManager.OnDiamondsGranted += HandleGranted;
+    private void OnEnable()
+    {
+        PlayerProfileManager.OnDiamondsGranted += HandleGranted;
+    }
 
     private void OnDisable()
     {
         PlayerProfileManager.OnDiamondsGranted -= HandleGranted;
-        sequence?.Kill();
-        sequence = null;
+        KillAnimation();
     }
 
     private void HandleGranted(int amount, int total)
     {
-        if (amount <= 0 || !IsGameplayVisible()) return;
-        ShowAmount(amount);
+        if (amount <= 0 || !IsGameplayVisible())
+            return;
+
+        ShowGain(amount, total);
     }
 
     private static bool IsGameplayVisible()
     {
-        if (MainMenuController.Instance == null) return true;
+        if (MainMenuController.Instance == null)
+            return true;
+
         return MainMenuController.Instance.GameplayStarted && !MainMenuController.Instance.IsAnyMenuVisible;
     }
 
-    public void ShowAmount(int amount)
+    public void ShowGain(int amount, int newTotal)
     {
-        if (amount <= 0) return;
+        if (amount <= 0)
+            return;
+
         CaptureShownPosition();
-
         bool alreadyVisible = sequence != null && sequence.IsActive();
-        pendingAmount = combineWhileVisible && alreadyVisible ? pendingAmount + amount : amount;
-        RefreshText();
 
-        if (iconImage != null)
+        int previousTotal = Mathf.Max(0, newTotal - amount);
+        if (!alreadyVisible || !combineWhileVisible)
         {
-            iconImage.sprite = diamondIcon;
-            iconImage.preserveAspect = true;
-            iconImage.enabled = diamondIcon != null || !hideIconWhenNoSprite;
+            accumulatedGain = amount;
+            displayedTotal = previousTotal;
+        }
+        else
+        {
+            accumulatedGain += amount;
+            displayedTotal = Mathf.Clamp(displayedTotal, 0, newTotal);
         }
 
-        sequence?.Kill();
+        targetTotal = Mathf.Max(0, newTotal);
+        RefreshGainText();
+        RefreshTotalText(displayedTotal);
+        RefreshIcon();
+
+        KillAnimation(false);
         sequence = DOTween.Sequence().SetUpdate(useUnscaledTime);
 
         if (root != null)
         {
-            if (!alreadyVisible) root.anchoredPosition = shownPosition + hiddenOffset;
+            if (!alreadyVisible)
+                root.anchoredPosition = shownPosition + hiddenOffset;
             sequence.Append(root.DOAnchorPos(shownPosition, Mathf.Max(0f, enterDuration)).SetEase(enterEase));
-            if (canvasGroup != null)
-            {
-                if (!alreadyVisible) canvasGroup.alpha = 0f;
-                sequence.Join(canvasGroup.DOFade(1f, Mathf.Max(0f, enterDuration)));
-            }
         }
-        else if (canvasGroup != null)
+
+        if (canvasGroup != null)
         {
-            if (!alreadyVisible) canvasGroup.alpha = 0f;
-            sequence.Append(canvasGroup.DOFade(1f, Mathf.Max(0f, enterDuration)));
+            if (!alreadyVisible)
+                canvasGroup.alpha = 0f;
+            if (root != null)
+                sequence.Join(canvasGroup.DOFade(1f, Mathf.Max(0f, enterDuration)));
+            else
+                sequence.Append(canvasGroup.DOFade(1f, Mathf.Max(0f, enterDuration)));
         }
+
+        if (countDelayAfterEnter > 0f)
+            sequence.AppendInterval(countDelayAfterEnter);
+
+        sequence.AppendCallback(StartCountTween);
+        if (countDuration > 0f)
+            sequence.AppendInterval(countDuration);
 
         if (holdDuration > 0f)
             sequence.AppendInterval(holdDuration);
@@ -117,32 +162,111 @@ public class DiamondGainToast : MonoBehaviour
 
         sequence.OnComplete(() =>
         {
-            pendingAmount = 0;
+            displayedTotal = targetTotal;
+            RefreshTotalText(displayedTotal);
+            accumulatedGain = 0;
             sequence = null;
         });
     }
 
-    private void RefreshText()
+    private void StartCountTween()
     {
-        if (amountText == null) return;
-        string value = useCompactNumbers ? CompactNumber.Format(pendingAmount) : pendingAmount.ToString("N0");
-        amountText.text = prefix + value + suffix;
+        countTween?.Kill();
+
+        if (countDuration <= 0f || displayedTotal == targetTotal)
+        {
+            displayedTotal = targetTotal;
+            RefreshTotalText(displayedTotal);
+            return;
+        }
+
+        float value = displayedTotal;
+        countTween = DOTween.To(
+                () => value,
+                x =>
+                {
+                    value = x;
+                    displayedTotal = Mathf.RoundToInt(x);
+                    RefreshTotalText(displayedTotal);
+                },
+                targetTotal,
+                countDuration)
+            .SetEase(countEase)
+            .SetUpdate(useUnscaledTime)
+            .OnComplete(() =>
+            {
+                displayedTotal = targetTotal;
+                RefreshTotalText(displayedTotal);
+                countTween = null;
+            });
+    }
+
+    private void RefreshTotalText(int value)
+    {
+        if (totalText == null)
+            return;
+
+        string formatted = useCompactNumbers ? CompactNumber.Format(value) : value.ToString("N0");
+        totalText.text = totalPrefix + formatted + totalSuffix;
+    }
+
+    private void RefreshGainText()
+    {
+        if (gainText == null)
+            return;
+
+        gainText.gameObject.SetActive(showGainText);
+        if (!showGainText)
+            return;
+
+        string formatted = useCompactNumbers ? CompactNumber.Format(accumulatedGain) : accumulatedGain.ToString("N0");
+        gainText.text = gainPrefix + formatted + gainSuffix;
+    }
+
+    private void RefreshIcon()
+    {
+        if (iconImage == null)
+            return;
+
+        iconImage.sprite = diamondIcon;
+        iconImage.preserveAspect = true;
+        iconImage.enabled = diamondIcon != null || !hideIconWhenNoSprite;
     }
 
     private void CaptureShownPosition()
     {
-        if (initialized || root == null) return;
+        if (initialized || root == null)
+            return;
+
         shownPosition = root.anchoredPosition;
         initialized = true;
     }
 
+    private void KillAnimation(bool killSequence = true)
+    {
+        countTween?.Kill();
+        countTween = null;
+
+        if (killSequence)
+        {
+            sequence?.Kill();
+            sequence = null;
+        }
+        else if (sequence != null)
+        {
+            sequence.Kill();
+            sequence = null;
+        }
+    }
+
     public void HideInstant()
     {
-        sequence?.Kill();
-        sequence = null;
-        pendingAmount = 0;
-        if (root != null) root.anchoredPosition = shownPosition + hiddenOffset;
-        if (canvasGroup != null) canvasGroup.alpha = 0f;
+        KillAnimation();
+        accumulatedGain = 0;
+        if (root != null)
+            root.anchoredPosition = shownPosition + hiddenOffset;
+        if (canvasGroup != null)
+            canvasGroup.alpha = 0f;
     }
 
 #if UNITY_EDITOR
@@ -150,12 +274,9 @@ public class DiamondGainToast : MonoBehaviour
     {
         if (root == null) root = transform as RectTransform;
         if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
-        if (iconImage != null)
-        {
-            iconImage.sprite = diamondIcon;
-            iconImage.preserveAspect = true;
-            iconImage.enabled = diamondIcon != null || !hideIconWhenNoSprite;
-        }
+        RefreshIcon();
+        if (gainText != null)
+            gainText.gameObject.SetActive(showGainText);
     }
 #endif
 }
