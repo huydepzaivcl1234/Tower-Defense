@@ -52,6 +52,7 @@ public static class PersistentProfileSetupTool
             "• On gain it slides in, counts old total -> new total, then slides out.\n" +
             "• EnemyData.Diamond Drop Prefab accepts your own 3D Diamond model/prefab.\n" +
             "• Main Menu and gameplay notification icons are editable Sprites in Inspector.\n" +
+            "• Running Setup again preserves your customized HUD position/size/icon.\n" +
             "• Scene was saved automatically.",
             "OK");
     }
@@ -76,8 +77,9 @@ public static class PersistentProfileSetupTool
             }
         }
 
-        Sprite preservedIcon = hud != null ? hud.diamondIcon : null;
         bool newlyCreated = hud == null;
+        bool convertingOldHud = hud != null && hud.gameObject.name != "MainMenuDiamondHUD";
+        Sprite preservedIcon = hud != null ? hud.diamondIcon : null;
 
         if (hud == null)
         {
@@ -98,25 +100,24 @@ public static class PersistentProfileSetupTool
         go.transform.SetAsLastSibling();
 
         RectTransform rect = go.GetComponent<RectTransform>();
-        if (newlyCreated || go.name == "MainMenuDiamondHUD")
+        if (newlyCreated || convertingOldHud)
         {
             rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
             rect.sizeDelta = new Vector2(220f, 54f);
-            if (newlyCreated || rect.anchoredPosition == Vector2.zero)
-                rect.anchoredPosition = new Vector2(-26f, -24f);
+            rect.anchoredPosition = new Vector2(-26f, -24f);
             rect.localScale = Vector3.one;
         }
 
         Image bg = go.GetComponent<Image>();
         if (bg == null) bg = Undo.AddComponent<Image>(go);
-        if (newlyCreated) bg.color = Panel;
+        if (newlyCreated || convertingOldHud) bg.color = Panel;
         bg.raycastTarget = false;
 
         Image icon = EnsureImage(go.transform, "Icon");
         TMP_Text value = EnsureText(go.transform, "Value", "0");
 
-        if (newlyCreated || icon.rectTransform.sizeDelta == Vector2.zero)
+        if (newlyCreated || convertingOldHud || icon.rectTransform.sizeDelta == Vector2.zero)
         {
             RectTransform ir = icon.rectTransform;
             ir.anchorMin = ir.anchorMax = new Vector2(0f, 0.5f);
@@ -125,15 +126,18 @@ public static class PersistentProfileSetupTool
             ir.anchoredPosition = new Vector2(28f, 0f);
         }
 
-        RectTransform vr = value.rectTransform;
-        vr.anchorMin = Vector2.zero;
-        vr.anchorMax = Vector2.one;
-        vr.offsetMin = new Vector2(56f, 0f);
-        vr.offsetMax = new Vector2(-14f, 0f);
-        value.alignment = TextAlignmentOptions.MidlineRight;
-        value.fontSize = 24f;
-        value.fontStyle = FontStyles.Bold;
-        value.color = DiamondColor;
+        if (newlyCreated || convertingOldHud)
+        {
+            RectTransform vr = value.rectTransform;
+            vr.anchorMin = Vector2.zero;
+            vr.anchorMax = Vector2.one;
+            vr.offsetMin = new Vector2(56f, 0f);
+            vr.offsetMax = new Vector2(-14f, 0f);
+            value.alignment = TextAlignmentOptions.MidlineRight;
+            value.fontSize = 24f;
+            value.fontStyle = FontStyles.Bold;
+            value.color = DiamondColor;
+        }
         value.raycastTarget = false;
 
         hud.valueText = value;
@@ -213,6 +217,10 @@ public static class PersistentProfileSetupTool
         TMP_Text total = EnsureText(go.transform, "Total", "0");
         TMP_Text gain = EnsureText(go.transform, "Gain", "+1");
 
+        Transform oldAmount = go.transform.Find("Amount");
+        if (oldAmount != null && oldAmount != total.transform && oldAmount != gain.transform)
+            oldAmount.gameObject.SetActive(false);
+
         if (created)
         {
             RectTransform ir = icon.rectTransform;
@@ -232,18 +240,19 @@ public static class PersistentProfileSetupTool
             gr.pivot = new Vector2(1f, 0.5f);
             gr.sizeDelta = new Vector2(72f, 36f);
             gr.anchoredPosition = new Vector2(-14f, 0f);
+
+            total.alignment = TextAlignmentOptions.Center;
+            total.fontSize = 24f;
+            total.fontStyle = FontStyles.Bold;
+            total.color = DiamondColor;
+
+            gain.alignment = TextAlignmentOptions.Center;
+            gain.fontSize = 17f;
+            gain.fontStyle = FontStyles.Bold;
+            gain.color = Color.white;
         }
 
-        total.alignment = TextAlignmentOptions.Center;
-        total.fontSize = 24f;
-        total.fontStyle = FontStyles.Bold;
-        total.color = DiamondColor;
         total.raycastTarget = false;
-
-        gain.alignment = TextAlignmentOptions.Center;
-        gain.fontSize = 17f;
-        gain.fontStyle = FontStyles.Bold;
-        gain.color = Color.white;
         gain.raycastTarget = false;
 
         toast.root = rect;
