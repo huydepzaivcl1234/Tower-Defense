@@ -1,13 +1,13 @@
 using UnityEngine;
 
 /// <summary>
-/// World Diamond pickup. Uses the shared WorldDropBounceAnimator for spawn/landing motion.
-/// Collect by hovering the mouse over it after it settles.
+/// Presentation + collection behavior for the Diamond world-drop prefab.
+/// EnemyData never owns model/SFX/VFX. Author those directly on this prefab/component.
 /// </summary>
 [DisallowMultipleComponent]
 public class DiamondDropPickup : MonoBehaviour
 {
-    [Header("Reward")]
+    [Header("Runtime Reward (set by DiamondDropSystem)")]
     [Min(1)] public int amount = 1;
 
     [Header("Collection")]
@@ -17,10 +17,25 @@ public class DiamondDropPickup : MonoBehaviour
     [Tooltip("Fallback collider radius only used when the custom prefab has no Collider at all.")]
     [Min(0.05f)] public float fallbackColliderRadius = 0.75f;
 
-    [Header("Optional")]
-    public WorldDropBounceAnimator bounceAnimator;
+    [Header("Spawn Presentation - Prefab Specific")]
+    [Tooltip("Optional SFX played when this Diamond prefab spawns.")]
+    public AudioClip spawnSfx;
+    [Range(0f, 1f)] public float spawnSfxVolume = 1f;
+    [Tooltip("Optional VFX prefab spawned at the Diamond's spawn position.")]
+    public GameObject spawnVfxPrefab;
+    [Min(0.1f)] public float spawnVfxLifetime = 2f;
+
+    [Header("Pickup Presentation - Prefab Specific")]
+    [Tooltip("Optional SFX played when this Diamond is collected.")]
     public AudioClip collectSfx;
     [Range(0f, 1f)] public float collectSfxVolume = 1f;
+    [Tooltip("Optional VFX prefab spawned when this Diamond is collected.")]
+    public GameObject collectVfxPrefab;
+    [Min(0.1f)] public float collectVfxLifetime = 2f;
+
+    [Header("Drop Motion - Prefab Specific")]
+    [Tooltip("Put and tune WorldDropBounceAnimator on the prefab for full control. This reference is auto-filled when possible.")]
+    public WorldDropBounceAnimator bounceAnimator;
 
     private bool settled;
     private bool collected;
@@ -36,6 +51,8 @@ public class DiamondDropPickup : MonoBehaviour
             bounceAnimator = GetComponent<WorldDropBounceAnimator>();
         if (bounceAnimator == null)
             bounceAnimator = gameObject.AddComponent<WorldDropBounceAnimator>();
+
+        PlaySpawnPresentation();
 
         bounceAnimator.OnSettled -= HandleSettled;
         bounceAnimator.OnSettled += HandleSettled;
@@ -97,9 +114,29 @@ public class DiamondDropPickup : MonoBehaviour
             return;
         }
 
-        if (collectSfx != null)
-            AudioSource.PlayClipAtPoint(collectSfx, transform.position, collectSfxVolume);
-
+        PlayOneShot(collectSfx, collectSfxVolume, transform.position);
+        SpawnTimedVfx(collectVfxPrefab, transform.position, collectVfxLifetime);
         Destroy(gameObject);
+    }
+
+    private void PlaySpawnPresentation()
+    {
+        PlayOneShot(spawnSfx, spawnSfxVolume, transform.position);
+        SpawnTimedVfx(spawnVfxPrefab, transform.position, spawnVfxLifetime);
+    }
+
+    private static void PlayOneShot(AudioClip clip, float volume, Vector3 position)
+    {
+        if (clip != null)
+            AudioSource.PlayClipAtPoint(clip, position, Mathf.Clamp01(volume));
+    }
+
+    private static void SpawnTimedVfx(GameObject prefab, Vector3 position, float lifetime)
+    {
+        if (prefab == null)
+            return;
+
+        GameObject instance = Instantiate(prefab, position, Quaternion.identity);
+        Destroy(instance, Mathf.Max(0.1f, lifetime));
     }
 }
