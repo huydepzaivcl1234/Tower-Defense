@@ -25,15 +25,18 @@ public class PlayerProfileManager : MonoBehaviour
 
     [Header("Runtime (read-only)")]
     [SerializeField] private int currentDiamonds;
+    [SerializeField] private int diamondsEarnedThisRun;
     [SerializeField] private bool loaded;
 
     private PlayerProfileData data;
 
     public int CurrentDiamonds => currentDiamonds;
+    public int DiamondsEarnedThisRun => diamondsEarnedThisRun;
     public PlayerProfileData Data => data;
     public bool IsLoaded => loaded;
 
     public static event Action<int> OnDiamondsChanged;
+    public static event Action<int, int> OnDiamondsGranted;
     public static event Action OnProfileLoaded;
     public static event Action OnProfileSaved;
     public static event Action OnProfileReset;
@@ -56,6 +59,11 @@ public class PlayerProfileManager : MonoBehaviour
     private void Start()
     {
         OnDiamondsChanged?.Invoke(currentDiamonds);
+    }
+
+    public void BeginRun()
+    {
+        diamondsEarnedThisRun = 0;
     }
 
     public void Load()
@@ -110,7 +118,7 @@ public class PlayerProfileManager : MonoBehaviour
         OnProfileSaved?.Invoke();
     }
 
-    public int AddDiamonds(int amount)
+    public int AddDiamonds(int amount, bool countAsRunEarning = true, bool notifyGain = true)
     {
         if (amount <= 0)
             return 0;
@@ -122,8 +130,13 @@ public class PlayerProfileManager : MonoBehaviour
 
         if (granted != 0)
         {
+            if (countAsRunEarning)
+                diamondsEarnedThisRun += granted;
+
             SyncDiamondData();
             OnDiamondsChanged?.Invoke(currentDiamonds);
+            if (notifyGain)
+                OnDiamondsGranted?.Invoke(granted, currentDiamonds);
             if (autoSaveOnDiamondChange) Save();
         }
 
@@ -156,7 +169,6 @@ public class PlayerProfileManager : MonoBehaviour
         if (saveImmediately) Save();
     }
 
-    /// <summary>Clears this profile save only. Audio/settings are deliberately not touched here.</summary>
     public void ResetProfileData(bool saveFreshProfile = true)
     {
         string key = string.IsNullOrWhiteSpace(saveKey) ? "TowerDefense.PlayerProfile" : saveKey;
@@ -169,6 +181,7 @@ public class PlayerProfileManager : MonoBehaviour
         };
         data.Sanitize(Mathf.Max(0, maxDiamonds));
         currentDiamonds = data.diamonds;
+        diamondsEarnedThisRun = 0;
         loaded = true;
 
         if (saveFreshProfile)
