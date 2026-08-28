@@ -1,7 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Defines one enemy type (e.g. Grunt, Runner, Brute).
+/// Defines one enemy type. This asset only owns enemy gameplay/balance data.
+/// Drop models, SFX, VFX and drop animation presentation live on the corresponding drop prefabs/systems.
 /// </summary>
 [CreateAssetMenu(fileName = "NewEnemyData", menuName = "Tower Defense/Enemy Data")]
 public class EnemyData : ScriptableObject
@@ -20,24 +21,19 @@ public class EnemyData : ScriptableObject
     public int goldReward = 10;
     public int damageToPlayer = 1;
 
-    [Header("Diamond Drop - Chance & Amount")]
+    [Header("Diamond Drop - Gameplay Only")]
     [Tooltip("Independent Diamond drop chance for this enemy. This is not connected to Relic drop chance.")]
     [Range(0f, 1f)] public float diamondDropChance = 0f;
     [Min(0)] public int diamondDropMin = 1;
     [Min(0)] public int diamondDropMax = 1;
-    [InspectorName("Diamond Drop Prefab Override (Optional)")]
-    [Tooltip("Optional model/prefab override only for this enemy type. Leave empty to use PlayerProfileManager > DiamondDropSystem > Default Diamond Drop Prefab.")]
-    public GameObject diamondDropPrefab;
-    [Tooltip("Final resting Y offset relative to the enemy death position.")]
-    public float diamondGroundYOffset = 0.2f;
 
-    [Header("Diamond Drop - Boss")]
-    [Tooltip("Boss can always create an extra Diamond drop independently of normal Diamond chance and independently of Relic drops.")]
+    [Header("Diamond Drop - Boss Reward")]
+    [Tooltip("Boss can always create an extra Diamond drop independently of the normal Diamond roll and independently of Relic drops.")]
     public bool bossGuaranteedDiamonds = false;
     [Min(0)] public int bossDiamondMin = 1;
     [Min(0)] public int bossDiamondMax = 3;
 
-    [Header("Relic Drop - Independent From Diamond")]
+    [Header("Relic Drop - Gameplay Only")]
     [Range(0f, 1f)] public float relicDropChance = 0.01f;
     public RelicRarity minimumDropRarity = RelicRarity.Common;
     public bool isBoss = false;
@@ -55,4 +51,9 @@ public class EnemyData : ScriptableObject
     [Header("Appearance")]
     public Color tintColor = Color.white;
     public Color shieldTintColor = new Color(0.3f, 0.85f, 1f, 1f);
+
+    // Legacy serialized presentation fields are intentionally kept hidden for compatibility with
+    // existing EnemyData assets. Runtime drop systems no longer use them.
+    [HideInInspector] public GameObject diamondDropPrefab;
+    [HideInInspector] public float diamondGroundYOffset = 0.2f;
 }
