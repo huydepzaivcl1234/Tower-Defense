@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Independent Diamond drop system.
@@ -10,6 +11,7 @@ public class DiamondDropSystem : MonoBehaviour
 {
     [Header("Diamond Drop Prefab")]
     [Tooltip("The single default Diamond world-drop prefab. Put the 3D model, DiamondDropPickup, SFX/VFX and WorldDropBounceAnimator on this prefab.")]
+    [FormerlySerializedAs("defaultDiamondDropPrefab")]
     public GameObject diamondDropPrefab;
 
     [Header("World Placement")]
@@ -23,9 +25,13 @@ public class DiamondDropSystem : MonoBehaviour
     public Color fallbackColor = new Color(0.25f, 0.9f, 1f, 1f);
 
     [Header("Fallback Bounce - Only When Prefab Has No Animator")]
+    [FormerlySerializedAs("popHeight")]
     [Min(0f)] public float fallbackPopHeight = 1.8f;
+    [FormerlySerializedAs("scatterRadius")]
     [Min(0f)] public float fallbackScatterRadius = 0.8f;
+    [FormerlySerializedAs("bounceCount")]
     [Range(0, 6)] public int fallbackBounceCount = 2;
+    [FormerlySerializedAs("firstBounceHeight")]
     [Min(0f)] public float fallbackFirstBounceHeight = 0.38f;
 
     private void OnEnable() => Enemy.OnAnyEnemyDied += HandleEnemyDied;
