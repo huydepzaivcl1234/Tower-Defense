@@ -30,7 +30,6 @@ public class DiamondGainToast : MonoBehaviour
     public bool useUnscaledTime = true;
 
     [Header("Stacking")]
-    [Tooltip("When another Diamond gain happens while visible, add it to the current toast instead of restarting with only the newest amount.")]
     public bool combineWhileVisible = true;
 
     private Vector2 shownPosition;
@@ -46,10 +45,7 @@ public class DiamondGainToast : MonoBehaviour
         HideInstant();
     }
 
-    private void OnEnable()
-    {
-        PlayerProfileManager.OnDiamondsGranted += HandleGranted;
-    }
+    private void OnEnable() => PlayerProfileManager.OnDiamondsGranted += HandleGranted;
 
     private void OnDisable()
     {
@@ -60,8 +56,7 @@ public class DiamondGainToast : MonoBehaviour
 
     private void HandleGranted(int amount, int total)
     {
-        if (amount <= 0) return;
-        if (!IsGameplayVisible()) return;
+        if (amount <= 0 || !IsGameplayVisible()) return;
         ShowAmount(amount);
     }
 
@@ -92,23 +87,33 @@ public class DiamondGainToast : MonoBehaviour
 
         if (root != null)
         {
-            if (!alreadyVisible)
-                root.anchoredPosition = shownPosition + hiddenOffset;
-            sequence.Join(root.DOAnchorPos(shownPosition, Mathf.Max(0f, enterDuration)).SetEase(enterEase));
+            if (!alreadyVisible) root.anchoredPosition = shownPosition + hiddenOffset;
+            sequence.Append(root.DOAnchorPos(shownPosition, Mathf.Max(0f, enterDuration)).SetEase(enterEase));
+            if (canvasGroup != null)
+            {
+                if (!alreadyVisible) canvasGroup.alpha = 0f;
+                sequence.Join(canvasGroup.DOFade(1f, Mathf.Max(0f, enterDuration)));
+            }
         }
-
-        if (canvasGroup != null)
+        else if (canvasGroup != null)
         {
             if (!alreadyVisible) canvasGroup.alpha = 0f;
-            sequence.Join(canvasGroup.DOFade(1f, Mathf.Max(0f, enterDuration)));
+            sequence.Append(canvasGroup.DOFade(1f, Mathf.Max(0f, enterDuration)));
         }
 
-        if (holdDuration > 0f) sequence.AppendInterval(holdDuration);
+        if (holdDuration > 0f)
+            sequence.AppendInterval(holdDuration);
 
         if (root != null)
-            sequence.Join(root.DOAnchorPos(shownPosition + hiddenOffset, Mathf.Max(0f, exitDuration)).SetEase(exitEase));
-        if (canvasGroup != null)
-            sequence.Join(canvasGroup.DOFade(0f, Mathf.Max(0f, exitDuration)).SetEase(exitEase));
+        {
+            sequence.Append(root.DOAnchorPos(shownPosition + hiddenOffset, Mathf.Max(0f, exitDuration)).SetEase(exitEase));
+            if (canvasGroup != null)
+                sequence.Join(canvasGroup.DOFade(0f, Mathf.Max(0f, exitDuration)).SetEase(exitEase));
+        }
+        else if (canvasGroup != null)
+        {
+            sequence.Append(canvasGroup.DOFade(0f, Mathf.Max(0f, exitDuration)).SetEase(exitEase));
+        }
 
         sequence.OnComplete(() =>
         {
