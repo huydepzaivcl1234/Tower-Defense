@@ -2,31 +2,43 @@ using UnityEngine;
 using DG.Tweening;
 
 /// <summary>
-/// World relic reward pickup. Relic reward logic stays independent from Diamond drops.
-/// Designer-authored prefab visuals are preserved; the procedural card is only a fallback when
-/// RelicManager had no Relic Drop Prefab assigned.
+/// Presentation + collection behavior for the Relic world-drop prefab.
+/// Relic reward logic remains independent from Diamond drops.
+/// Model/SFX/VFX/drop motion are authored on this prefab; EnemyData only controls Relic drop chance/rarity.
 /// </summary>
 [RequireComponent(typeof(SphereCollider))]
 public class RelicDropPickup : MonoBehaviour
 {
-    [Header("Spawn Animation")]
+    [Header("Drop Motion - Prefab Specific")]
     public bool useDropBounceAnimation = true;
     [Tooltip("Fallback distance from current spawn position down to the final resting position when no RelicManager is available.")]
     [Min(0f)] public float fallbackGroundDropDistance = 0.65f;
     [Tooltip("Automatically add WorldDropBounceAnimator when the prefab does not already have one.")]
     public bool autoAddBounceAnimator = true;
 
-    [Header("Fallback Visual")]
-    [Tooltip("Used for manually placed pickups. Runtime fallback objects named RelicDrop/BossRelicDrop automatically build the procedural card. Custom prefabs keep their own visuals.")]
+    [Header("Spawn Presentation - Prefab Specific")]
+    public AudioClip spawnSfx;
+    [Range(0f, 1f)] public float spawnSfxVolume = 1f;
+    public GameObject spawnVfxPrefab;
+    [Min(0.1f)] public float spawnVfxLifetime = 2f;
+
+    [Header("Pickup Presentation - Prefab Specific")]
+    public AudioClip collectSfx;
+    [Range(0f, 1f)] public float collectSfxVolume = 1f;
+    public GameObject collectVfxPrefab;
+    [Min(0.1f)] public float collectVfxLifetime = 2f;
+
+    [Header("Fallback Visual - Only Without Custom Prefab")]
+    [Tooltip("Used for manually placed pickups. Runtime fallback objects named RelicDrop/BossRelicDrop automatically build the procedural card. Custom prefabs keep their own model/visuals.")]
     public bool buildProceduralCardWhenUnconfigured = true;
 
-    [Header("Idle Motion After Landing")]
+    [Header("Idle Motion After Landing - Prefab Specific")]
     public bool bobAfterLanding = true;
     [Min(0f)] public float bobHeight = 0.18f;
     [Min(0.05f)] public float bobDuration = 0.7f;
     public float rotateDegreesPerSecond = 70f;
 
-    [Header("Pickup")]
+    [Header("Collection")]
     [Min(0.1f)] public float hoverColliderRadius = 0.85f;
     public bool allowPickupDuringSpawnAnimation = true;
 
@@ -38,10 +50,6 @@ public class RelicDropPickup : MonoBehaviour
     private bool visualConfigured;
     private WorldDropBounceAnimator dropAnimator;
 
-    /// <summary>
-    /// Canonical runtime path used by the existing RelicManager. It automatically distinguishes
-    /// manager-created fallback objects from designer-authored prefabs without changing RelicManager architecture.
-    /// </summary>
     public void Configure(RelicRarity rarity, bool isBossReward)
     {
         bool fallbackObject = IsManagerFallbackObject();
@@ -65,13 +73,12 @@ public class RelicDropPickup : MonoBehaviour
         if (useProceduralFallbackVisual)
             BuildFallbackCardVisual();
 
+        PlaySpawnPresentation();
         BeginSpawnPresentation();
     }
 
     private bool IsManagerFallbackObject()
     {
-        // These are the exact names assigned by RelicManager only when no custom relicDropPrefab exists.
-        // Instantiate(customPrefab) produces the prefab name + "(Clone)", so it never enters this fallback path.
         return gameObject.name == "RelicDrop" || gameObject.name == "BossRelicDrop";
     }
 
@@ -192,6 +199,9 @@ public class RelicDropPickup : MonoBehaviour
         if (RelicManager.Instance != null)
             RelicManager.Instance.QueueDroppedReward(minimumRarity, bossReward);
 
+        PlayOneShot(collectSfx, collectSfxVolume, transform.position);
+        SpawnTimedVfx(collectVfxPrefab, transform.position, collectVfxLifetime);
+
         bobTween?.Kill();
         if (dropAnimator != null)
         {
@@ -199,6 +209,27 @@ public class RelicDropPickup : MonoBehaviour
             dropAnimator.Kill(false);
         }
         Destroy(gameObject);
+    }
+
+    private void PlaySpawnPresentation()
+    {
+        PlayOneShot(spawnSfx, spawnSfxVolume, transform.position);
+        SpawnTimedVfx(spawnVfxPrefab, transform.position, spawnVfxLifetime);
+    }
+
+    private static void PlayOneShot(AudioClip clip, float volume, Vector3 position)
+    {
+        if (clip != null)
+            AudioSource.PlayClipAtPoint(clip, position, Mathf.Clamp01(volume));
+    }
+
+    private static void SpawnTimedVfx(GameObject prefab, Vector3 position, float lifetime)
+    {
+        if (prefab == null)
+            return;
+
+        GameObject instance = Instantiate(prefab, position, Quaternion.identity);
+        Destroy(instance, Mathf.Max(0.1f, lifetime));
     }
 
     private void OnDestroy()
