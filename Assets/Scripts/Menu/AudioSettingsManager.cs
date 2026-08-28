@@ -80,6 +80,29 @@ public class AudioSettingsManager : MonoBehaviour
         RefreshSources();
     }
 
+    public void ResetToDefaults(bool deleteSavedKeys = true)
+    {
+        masterVolume = Mathf.Clamp01(defaultMaster);
+        musicVolume = Mathf.Clamp01(defaultMusic);
+        sfxVolume = Mathf.Clamp01(defaultSfx);
+
+        if (deleteSavedKeys)
+        {
+            PlayerPrefs.DeleteKey(MasterKey);
+            PlayerPrefs.DeleteKey(MusicKey);
+            PlayerPrefs.DeleteKey(SfxKey);
+        }
+        else
+        {
+            PlayerPrefs.SetFloat(MasterKey, masterVolume);
+            PlayerPrefs.SetFloat(MusicKey, musicVolume);
+            PlayerPrefs.SetFloat(SfxKey, sfxVolume);
+        }
+
+        PlayerPrefs.Save();
+        ApplyAll();
+    }
+
     public void ApplyAll()
     {
         AudioListener.volume = masterVolume;
