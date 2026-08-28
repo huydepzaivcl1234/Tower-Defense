@@ -1,16 +1,23 @@
 using UnityEngine;
 
 /// <summary>
-/// Listens to the existing Enemy death event and creates Diamond world drops from EnemyData.
+/// Independent Diamond drop system. EnemyData controls chance/amount, while this component owns
+/// the default world presentation so the global Diamond model can be changed in one place.
 /// </summary>
 [DisallowMultipleComponent]
 public class DiamondDropSystem : MonoBehaviour
 {
-    [Header("Fallback Drop Presentation")]
+    [Header("Diamond World Drop - Main Configuration")]
+    [Tooltip("Default 3D prefab used for Diamond drops from every enemy. Change this one field to change the global Diamond drop model.")]
+    public GameObject defaultDiamondDropPrefab;
+    [Tooltip("Allow an EnemyData to replace the global prefab using its Diamond Drop Prefab Override field.")]
+    public bool allowPerEnemyPrefabOverride = true;
+
+    [Header("Fallback Visual - Only When No Prefab Is Assigned")]
     public Vector3 fallbackScale = Vector3.one * 0.35f;
     public Color fallbackColor = new Color(0.25f, 0.9f, 1f, 1f);
 
-    [Header("Fallback Bounce Defaults")]
+    [Header("Fallback Bounce - Only Added When Prefab Has No Animator")]
     [Min(0f)] public float popHeight = 1.8f;
     [Min(0f)] public float scatterRadius = 0.8f;
     [Range(0, 6)] public int bounceCount = 2;
@@ -47,8 +54,9 @@ public class DiamondDropSystem : MonoBehaviour
             return;
 
         Vector3 groundPosition = deathPosition + Vector3.up * data.diamondGroundYOffset;
-        GameObject go = data.diamondDropPrefab != null
-            ? Instantiate(data.diamondDropPrefab, deathPosition, Quaternion.identity)
+        GameObject prefab = ResolveDropPrefab(data);
+        GameObject go = prefab != null
+            ? Instantiate(prefab, deathPosition, Quaternion.identity)
             : CreateFallback(deathPosition);
 
         DiamondDropPickup pickup = go.GetComponent<DiamondDropPickup>();
@@ -69,10 +77,18 @@ public class DiamondDropSystem : MonoBehaviour
         pickup.Configure(amount, groundPosition);
     }
 
+    private GameObject ResolveDropPrefab(EnemyData data)
+    {
+        if (allowPerEnemyPrefabOverride && data != null && data.diamondDropPrefab != null)
+            return data.diamondDropPrefab;
+
+        return defaultDiamondDropPrefab;
+    }
+
     private GameObject CreateFallback(Vector3 position)
     {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        go.name = "DiamondDrop";
+        go.name = "DiamondDrop_Fallback";
         go.transform.position = position;
         go.transform.localScale = fallbackScale;
 
