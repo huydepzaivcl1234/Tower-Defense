@@ -5,7 +5,6 @@ using UnityEngine;
 /// Collect by hovering the mouse over it after it settles.
 /// </summary>
 [DisallowMultipleComponent]
-[RequireComponent(typeof(Collider))]
 public class DiamondDropPickup : MonoBehaviour
 {
     [Header("Reward")]
@@ -15,6 +14,8 @@ public class DiamondDropPickup : MonoBehaviour
     public bool collectOnMouseEnter = true;
     [Tooltip("If true, the pickup cannot be collected until the spawn/bounce animation finishes.")]
     public bool waitUntilSettled = true;
+    [Tooltip("Fallback collider radius only used when the custom prefab has no Collider at all.")]
+    [Min(0.05f)] public float fallbackColliderRadius = 0.75f;
 
     [Header("Optional")]
     public WorldDropBounceAnimator bounceAnimator;
@@ -29,6 +30,7 @@ public class DiamondDropPickup : MonoBehaviour
         amount = Mathf.Max(1, diamondAmount);
         collected = false;
         settled = !waitUntilSettled;
+        EnsureCollider();
 
         if (bounceAnimator == null)
             bounceAnimator = GetComponent<WorldDropBounceAnimator>();
@@ -42,8 +44,19 @@ public class DiamondDropPickup : MonoBehaviour
 
     private void Awake()
     {
+        EnsureCollider();
         if (bounceAnimator == null)
             bounceAnimator = GetComponent<WorldDropBounceAnimator>();
+    }
+
+    private void EnsureCollider()
+    {
+        if (GetComponentInChildren<Collider>(true) != null)
+            return;
+
+        SphereCollider sphere = gameObject.AddComponent<SphereCollider>();
+        sphere.radius = Mathf.Max(0.05f, fallbackColliderRadius);
+        sphere.isTrigger = false;
     }
 
     private void OnEnable()
