@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Holy Light
   m_EditorClassIdentifier: Assembly-CSharp::WorldEventData
   eventName: Holy Light
-  description: Holy Light empowers towers, but the blessing may collapse and empower enemies instead.
+  description: Holy Light empowers towers, but the blessing may collapse and empower
+    enemies instead.
   rarity: 1
   eventType: 2
   selectionWeight: 1
@@ -30,6 +31,7 @@ MonoBehaviour:
   goldDropFallDuration: 0.7
   meteorChancePerTick: 0.22
   meteorTickInterval: 0.8
+  meteorTargetTowerChance: 0.25
   meteorTargetEnemyChance: 0.75
   meteorTargetScatterRadius: 2.25
   meteorEnemyMaxHpDamagePercent: 0.1
@@ -45,7 +47,11 @@ MonoBehaviour:
   holyTowerDamageBonusPercent: 0.25
   holyProjectileSpeedBonusPercent: 0.25
   holyCollapseChancePerRound: 0.2
-  holyLightVisualPrefab: {fileID: 6417033564592282063, guid: 5218dc1687cf52743af5fd5e51b125a7, type: 3}
+  holyCollapseMinDelay: 1.5
+  holyCollapseMaxDelay: 5
+  holyLightVisualPrefab: {fileID: 6417033564592282063, guid: 5218dc1687cf52743af5fd5e51b125a7,
+    type: 3}
+  holyLightVisualOffset: {x: 0, y: 12, z: 0}
   collapsePenaltyRounds: 2
   collapseEnemyMaxHpBonusPercent: 0.35
   collapseEnemyCCResistanceBonusPercent: 0.3

@@ -19,7 +19,7 @@ MonoBehaviour:
   eventType: 1
   selectionWeight: 1
   durationRounds: 1
-  icon: {fileID: 21300000, guid: 75ad67d7309f63e41bc2b3c938a17bca, type: 3}
+  icon: {fileID: -1673172507, guid: 0131d310bb5524546b5658a63ed8d211, type: 3}
   accentColor: {r: 1, g: 1, b: 1, a: 1}
   announcementSfx: {fileID: 8300000, guid: 95ceab9577acae041bb02835cd900883, type: 3}
   goldPerDrop: 5
@@ -48,7 +48,10 @@ MonoBehaviour:
   holyTowerDamageBonusPercent: 0.25
   holyProjectileSpeedBonusPercent: 0.25
   holyCollapseChancePerRound: 0.2
+  holyCollapseMinDelay: 1.5
+  holyCollapseMaxDelay: 5
   holyLightVisualPrefab: {fileID: 0}
+  holyLightVisualOffset: {x: 0, y: 12, z: 0}
   collapsePenaltyRounds: 2
   collapseEnemyMaxHpBonusPercent: 0.35
   collapseEnemyCCResistanceBonusPercent: 0.3
