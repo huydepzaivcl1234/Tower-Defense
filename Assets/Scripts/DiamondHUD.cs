@@ -11,6 +11,7 @@ public class DiamondHUD : MonoBehaviour
     public Image iconImage;
 
     [Header("Presentation")]
+    [Tooltip("Optional override Sprite. If empty, a Sprite assigned directly to Icon Image is preserved and used.")]
     public Sprite diamondIcon;
     public bool useCompactNumbers = true;
     public string prefix = "";
@@ -40,13 +41,22 @@ public class DiamondHUD : MonoBehaviour
             ? PlayerProfileManager.Instance.CurrentDiamonds
             : 0;
         HandleDiamondsChanged(value);
+        RefreshIcon();
+    }
 
-        if (iconImage != null)
-        {
+    private void RefreshIcon()
+    {
+        if (iconImage == null)
+            return;
+
+        // Inspector-authored Image.sprite is valid presentation data and must never be erased just
+        // because the optional DiamondHUD override field is empty.
+        Sprite resolved = diamondIcon != null ? diamondIcon : iconImage.sprite;
+        if (diamondIcon != null && iconImage.sprite != diamondIcon)
             iconImage.sprite = diamondIcon;
-            iconImage.enabled = diamondIcon != null || !hideIconWhenNoSprite;
-            iconImage.preserveAspect = true;
-        }
+
+        iconImage.preserveAspect = true;
+        iconImage.enabled = resolved != null || !hideIconWhenNoSprite;
     }
 
     private void HandleDiamondsChanged(int value)
@@ -67,12 +77,7 @@ public class DiamondHUD : MonoBehaviour
 #if UNITY_EDITOR
     private void OnValidate()
     {
-        if (iconImage != null)
-        {
-            iconImage.sprite = diamondIcon;
-            iconImage.enabled = diamondIcon != null || !hideIconWhenNoSprite;
-            iconImage.preserveAspect = true;
-        }
+        RefreshIcon();
 
         if (!Application.isPlaying && valueText != null)
         {
