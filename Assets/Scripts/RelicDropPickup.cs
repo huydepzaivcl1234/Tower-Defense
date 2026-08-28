@@ -4,15 +4,27 @@ using DG.Tweening;
 /// <summary>
 /// World relic reward pickup. No click is required: moving the mouse over it collects it,
 /// queues a relic reward, then removes the world object.
-/// The old sphere fallback is converted into a 3D card visual at runtime.
+/// Spawn motion uses the shared WorldDropBounceAnimator so other drops can reuse the same feel.
 /// </summary>
 [RequireComponent(typeof(SphereCollider))]
 public class RelicDropPickup : MonoBehaviour
 {
-    [Header("Visual Motion")]
-    public float bobHeight = 0.18f;
-    public float bobDuration = 0.7f;
+    [Header("Spawn Animation")]
+    public bool useDropBounceAnimation = true;
+    [Tooltip("Fallback distance from current spawn position down to the final resting position when no RelicManager is available.")]
+    [Min(0f)] public float fallbackGroundDropDistance = 0.65f;
+    [Tooltip("Automatically add WorldDropBounceAnimator when the prefab does not already have one.")]
+    public bool autoAddBounceAnimator = true;
+
+    [Header("Idle Motion After Landing")]
+    public bool bobAfterLanding = true;
+    [Min(0f)] public float bobHeight = 0.18f;
+    [Min(0.05f)] public float bobDuration = 0.7f;
     public float rotateDegreesPerSecond = 70f;
+
+    [Header("Pickup")]
+    [Min(0.1f)] public float hoverColliderRadius = 0.85f;
+    public bool allowPickupDuringSpawnAnimation = true;
 
     private RelicRarity minimumRarity = RelicRarity.Common;
     private bool bossReward;
@@ -20,31 +32,73 @@ public class RelicDropPickup : MonoBehaviour
     private Tween bobTween;
     private Vector3 basePosition;
     private bool cardVisualBuilt;
+    private WorldDropBounceAnimator dropAnimator;
 
     public void Configure(RelicRarity rarity, bool isBossReward)
     {
         minimumRarity = rarity;
         bossReward = isBossReward;
         collected = false;
-        basePosition = transform.position;
 
         SphereCollider hoverCollider = GetComponent<SphereCollider>();
         if (hoverCollider != null)
         {
             hoverCollider.isTrigger = false;
-            hoverCollider.radius = 0.85f;
+            hoverCollider.radius = Mathf.Max(0.1f, hoverColliderRadius);
         }
 
         BuildCardVisual();
-        StartBob();
+        BeginSpawnPresentation();
     }
 
     private void Start()
     {
-        basePosition = transform.position;
         if (!cardVisualBuilt)
             BuildCardVisual();
-        StartBob();
+
+        // Configure() is the normal runtime path. This fallback keeps manually placed pickups usable.
+        if (dropAnimator == null && bobTween == null)
+            BeginSpawnPresentation();
+    }
+
+    private void BeginSpawnPresentation()
+    {
+        bobTween?.Kill();
+
+        float groundDistance = fallbackGroundDropDistance;
+        if (RelicManager.Instance != null)
+            groundDistance = Mathf.Max(0f, RelicManager.Instance.relicDropHeight);
+
+        basePosition = transform.position - Vector3.up * groundDistance;
+
+        if (!useDropBounceAnimation)
+        {
+            transform.position = basePosition;
+            StartIdleMotion();
+            return;
+        }
+
+        dropAnimator = GetComponent<WorldDropBounceAnimator>();
+        if (dropAnimator == null && autoAddBounceAnimator)
+            dropAnimator = gameObject.AddComponent<WorldDropBounceAnimator>();
+
+        if (dropAnimator == null)
+        {
+            transform.position = basePosition;
+            StartIdleMotion();
+            return;
+        }
+
+        dropAnimator.OnSettled -= HandleDropSettled;
+        dropAnimator.OnSettled += HandleDropSettled;
+        dropAnimator.Play(basePosition);
+    }
+
+    private void HandleDropSettled()
+    {
+        if (dropAnimator != null)
+            dropAnimator.OnSettled -= HandleDropSettled;
+        StartIdleMotion();
     }
 
     private void BuildCardVisual()
@@ -72,22 +126,31 @@ public class RelicDropPickup : MonoBehaviour
             visualCollider.enabled = false;
     }
 
-    private void StartBob()
+    private void StartIdleMotion()
     {
+        basePosition = transform.position;
+        if (!bobAfterLanding || bobHeight <= 0f)
+            return;
+
         bobTween?.Kill();
-        transform.position = basePosition;
-        bobTween = transform.DOMoveY(basePosition.y + bobHeight, Mathf.Max(0.1f, bobDuration))
+        bobTween = transform.DOMoveY(basePosition.y + bobHeight, Mathf.Max(0.05f, bobDuration))
             .SetEase(Ease.InOutSine)
             .SetLoops(-1, LoopType.Yoyo);
     }
 
     private void Update()
     {
-        transform.Rotate(Vector3.up, rotateDegreesPerSecond * Time.deltaTime, Space.World);
+        if (dropAnimator != null && dropAnimator.IsAnimating)
+            return;
+
+        if (Mathf.Abs(rotateDegreesPerSecond) > 0.01f)
+            transform.Rotate(Vector3.up, rotateDegreesPerSecond * Time.deltaTime, Space.World);
     }
 
     private void OnMouseEnter()
     {
+        if (!allowPickupDuringSpawnAnimation && dropAnimator != null && dropAnimator.IsAnimating)
+            return;
         Collect();
     }
 
@@ -100,11 +163,18 @@ public class RelicDropPickup : MonoBehaviour
             RelicManager.Instance.QueueDroppedReward(minimumRarity, bossReward);
 
         bobTween?.Kill();
+        if (dropAnimator != null)
+        {
+            dropAnimator.OnSettled -= HandleDropSettled;
+            dropAnimator.Kill(false);
+        }
         Destroy(gameObject);
     }
 
     private void OnDestroy()
     {
         bobTween?.Kill();
+        if (dropAnimator != null)
+            dropAnimator.OnSettled -= HandleDropSettled;
     }
 }
