@@ -10,10 +10,17 @@ public class GameManager : MonoBehaviour
     public int startingGold = 200;
     public int startingLives = 20;
 
+    [Header("Win Reward")]
+    [Tooltip("Persistent Diamonds granted when all waves are cleared. 0 disables the reward.")]
+    [Min(0)] public int winDiamondReward = 20;
+    public bool countWinDiamondsInRunTotal = true;
+    public bool showWinDiamondToast = false;
+
     public int CurrentGold { get; private set; }
     public int CurrentLives { get; private set; }
     public bool IsGameOver { get; private set; }
     public bool HasWon { get; private set; }
+    public int LastWinDiamondRewardGranted { get; private set; }
 
     public static event System.Action<int> OnGoldChanged;
     public static event System.Action<int> OnLivesChanged;
@@ -27,10 +34,12 @@ public class GameManager : MonoBehaviour
         Instance = this;
         CurrentGold = startingGold;
         CurrentLives = startingLives;
+        LastWinDiamondRewardGranted = 0;
     }
 
     private void Start()
     {
+        PlayerProfileManager.Instance?.BeginRun();
         OnGoldChanged?.Invoke(CurrentGold);
         OnLivesChanged?.Invoke(CurrentLives);
     }
@@ -45,10 +54,6 @@ public class GameManager : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// Adds earned gold and returns the actual amount granted after relic bonuses.
-    /// Set applyRelicBonus=false for refunds/selling so bonus-gold relics cannot multiply refunds.
-    /// </summary>
     public int AddGold(int amount, bool applyRelicBonus = true)
     {
         int granted = amount;
@@ -60,7 +65,6 @@ public class GameManager : MonoBehaviour
         return granted;
     }
 
-    /// <summary>Adds lives during the current run (used by permanent run relics).</summary>
     public void AddLives(int amount)
     {
         if (amount <= 0 || IsGameOver) return;
@@ -79,6 +83,16 @@ public class GameManager : MonoBehaviour
     public void HandleAllWavesCleared()
     {
         if (IsGameOver) return;
+
+        LastWinDiamondRewardGranted = 0;
+        if (winDiamondReward > 0 && PlayerProfileManager.Instance != null)
+        {
+            LastWinDiamondRewardGranted = PlayerProfileManager.Instance.AddDiamonds(
+                winDiamondReward,
+                countWinDiamondsInRunTotal,
+                showWinDiamondToast);
+        }
+
         HasWon = true;
         IsGameOver = true;
         OnGameWon?.Invoke();
