@@ -25,7 +25,8 @@ public class EnemyData : ScriptableObject
     [Range(0f, 1f)] public float diamondDropChance = 0f;
     [Min(0)] public int diamondDropMin = 1;
     [Min(0)] public int diamondDropMax = 1;
-    [Tooltip("Optional model/prefab override only for this enemy type. Leave empty to use DiamondDropSystem.Default Diamond Drop Prefab.")]
+    [InspectorName("Diamond Drop Prefab Override (Optional)")]
+    [Tooltip("Optional model/prefab override only for this enemy type. Leave empty to use PlayerProfileManager > DiamondDropSystem > Default Diamond Drop Prefab.")]
     public GameObject diamondDropPrefab;
     [Tooltip("Final resting Y offset relative to the enemy death position.")]
     public float diamondGroundYOffset = 0.2f;
