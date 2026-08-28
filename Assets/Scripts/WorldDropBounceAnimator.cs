@@ -1,3 +1,4 @@
+using System;
 using DG.Tweening;
 using UnityEngine;
 
@@ -35,7 +36,6 @@ public class WorldDropBounceAnimator : MonoBehaviour
     public Vector3 rotationMax = new Vector3(55f, 260f, 35f);
 
     [Header("Landing")]
-    [Tooltip("Optional local visual scale punch when the drop lands.")]
     public bool landingScalePunch = true;
     public Vector3 landingPunchScale = new Vector3(0.10f, -0.08f, 0.10f);
     [Min(0.01f)] public float landingPunchDuration = 0.18f;
@@ -46,11 +46,13 @@ public class WorldDropBounceAnimator : MonoBehaviour
     public bool useUnscaledTime = false;
 
     private Sequence sequence;
+    private Tween rotationTween;
     private Vector3 restingPosition;
     private bool hasRestingPosition;
 
     public bool IsAnimating => sequence != null && sequence.IsActive() && sequence.IsPlaying();
     public Vector3 RestingPosition => restingPosition;
+    public event Action OnSettled;
 
     private void OnEnable()
     {
@@ -58,7 +60,6 @@ public class WorldDropBounceAnimator : MonoBehaviour
             Play(transform.position);
     }
 
-    /// <summary>Play using the supplied final ground/rest position.</summary>
     public void Play(Vector3 groundPosition)
     {
         Kill(false);
@@ -68,10 +69,9 @@ public class WorldDropBounceAnimator : MonoBehaviour
 
         Vector2 scatter = Random.insideUnitCircle * Mathf.Max(0f, horizontalScatterRadius);
         Vector3 launchTarget = groundPosition + new Vector3(scatter.x, Mathf.Max(0f, popHeight), scatter.y);
-
         Vector3 authoredScale = transform.localScale;
-        sequence = DOTween.Sequence().SetUpdate(useUnscaledTime);
 
+        sequence = DOTween.Sequence().SetUpdate(useUnscaledTime);
         sequence.Append(transform.DOMove(launchTarget, Mathf.Max(0.01f, popDuration)).SetEase(popEase));
 
         if (rotateDuringSpawn)
@@ -80,28 +80,21 @@ public class WorldDropBounceAnimator : MonoBehaviour
                 Random.Range(rotationMin.x, rotationMax.x),
                 Random.Range(rotationMin.y, rotationMax.y),
                 Random.Range(rotationMin.z, rotationMax.z));
-            transform.DORotate(spin, Mathf.Max(0.01f, popDuration + fallDuration), RotateMode.LocalAxisAdd)
+            rotationTween = transform.DORotate(spin, Mathf.Max(0.01f, popDuration + fallDuration), RotateMode.LocalAxisAdd)
                 .SetEase(Ease.OutCubic)
-                .SetUpdate(useUnscaledTime)
-                .SetTarget(this);
+                .SetUpdate(useUnscaledTime);
         }
 
         sequence.Append(transform.DOMove(groundPosition, Mathf.Max(0.01f, fallDuration)).SetEase(fallEase));
 
         float height = Mathf.Max(0f, firstBounceHeight);
         float duration = Mathf.Max(0.01f, firstBounceDuration);
-        int count = Mathf.Max(0, bounceCount);
-
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < Mathf.Max(0, bounceCount); i++)
         {
-            if (height <= 0.001f)
-                break;
-
-            Vector3 bounceTop = groundPosition + Vector3.up * height;
+            if (height <= 0.001f) break;
             float half = duration * 0.5f;
-            sequence.Append(transform.DOMove(bounceTop, half).SetEase(bounceUpEase));
+            sequence.Append(transform.DOMove(groundPosition + Vector3.up * height, half).SetEase(bounceUpEase));
             sequence.Append(transform.DOMove(groundPosition, half).SetEase(bounceDownEase));
-
             height *= Mathf.Clamp01(bounceHeightMultiplier);
             duration *= Mathf.Clamp(bounceDurationMultiplier, 0.1f, 1f);
         }
@@ -109,29 +102,25 @@ public class WorldDropBounceAnimator : MonoBehaviour
         if (landingScalePunch)
         {
             sequence.Join(transform.DOPunchScale(
-                    landingPunchScale,
-                    Mathf.Max(0.01f, landingPunchDuration),
-                    Mathf.Max(0, landingPunchVibrato),
-                    Mathf.Clamp01(landingPunchElasticity))
-                .SetUpdate(useUnscaledTime));
+                landingPunchScale,
+                Mathf.Max(0.01f, landingPunchDuration),
+                Mathf.Max(0, landingPunchVibrato),
+                Mathf.Clamp01(landingPunchElasticity)));
         }
 
         sequence.OnComplete(() =>
         {
-            if (transform != null)
-            {
-                transform.position = restingPosition;
-                transform.localScale = authoredScale;
-            }
+            transform.position = restingPosition;
+            transform.localScale = authoredScale;
             sequence = null;
+            OnSettled?.Invoke();
         });
     }
 
     public void SnapToRestingPosition()
     {
         Kill(false);
-        if (hasRestingPosition)
-            transform.position = restingPosition;
+        if (hasRestingPosition) transform.position = restingPosition;
     }
 
     public void Kill(bool complete)
@@ -141,7 +130,11 @@ public class WorldDropBounceAnimator : MonoBehaviour
             sequence.Kill(complete);
             sequence = null;
         }
-        DOTween.Kill(this, complete);
+        if (rotationTween != null)
+        {
+            rotationTween.Kill(complete);
+            rotationTween = null;
+        }
     }
 
     private void OnDisable() => Kill(false);
