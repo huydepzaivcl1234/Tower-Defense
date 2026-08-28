@@ -71,7 +71,7 @@ public class DiamondDropSystem : MonoBehaviour
 
     private GameObject CreateFallback(Vector3 position)
     {
-        GameObject go = GameObject.CreatePrimitive(PrimitiveType.Octahedron);
+        GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         go.name = "DiamondDrop";
         go.transform.position = position;
         go.transform.localScale = fallbackScale;
@@ -79,9 +79,13 @@ public class DiamondDropSystem : MonoBehaviour
         Renderer renderer = go.GetComponent<Renderer>();
         if (renderer != null)
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.color = fallbackColor;
-            renderer.sharedMaterial = material;
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader != null)
+            {
+                Material material = new Material(shader);
+                material.color = fallbackColor;
+                renderer.sharedMaterial = material;
+            }
         }
         return go;
     }
