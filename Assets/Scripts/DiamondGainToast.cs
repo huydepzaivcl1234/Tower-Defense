@@ -20,7 +20,7 @@ public class DiamondGainToast : MonoBehaviour
     public Image iconImage;
 
     [Header("Icon / Text")]
-    [Tooltip("Your own Diamond Sprite. Nothing is hard-coded.")]
+    [Tooltip("Optional override Sprite. If empty, a Sprite assigned directly to Icon Image is preserved and used.")]
     public Sprite diamondIcon;
     public bool hideIconWhenNoSprite = true;
     public bool useCompactNumbers = true;
@@ -64,12 +64,14 @@ public class DiamondGainToast : MonoBehaviour
         CaptureShownPosition();
         displayedTotal = PlayerProfileManager.Instance != null ? PlayerProfileManager.Instance.CurrentDiamonds : 0;
         targetTotal = displayedTotal;
+        RefreshIcon();
         HideInstant();
     }
 
     private void OnEnable()
     {
         PlayerProfileManager.OnDiamondsGranted += HandleGranted;
+        RefreshIcon();
     }
 
     private void OnDisable()
@@ -228,9 +230,14 @@ public class DiamondGainToast : MonoBehaviour
         if (iconImage == null)
             return;
 
-        iconImage.sprite = diamondIcon;
+        // Preserve a Sprite authored directly on the Image. The optional override field only wins
+        // when it actually contains a Sprite; an empty override must never erase user UI setup.
+        Sprite resolved = diamondIcon != null ? diamondIcon : iconImage.sprite;
+        if (diamondIcon != null && iconImage.sprite != diamondIcon)
+            iconImage.sprite = diamondIcon;
+
         iconImage.preserveAspect = true;
-        iconImage.enabled = diamondIcon != null || !hideIconWhenNoSprite;
+        iconImage.enabled = resolved != null || !hideIconWhenNoSprite;
     }
 
     private void CaptureShownPosition()
