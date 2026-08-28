@@ -5,6 +5,7 @@ using DG.Tweening;
 /// World relic reward pickup. No click is required: moving the mouse over it collects it,
 /// queues a relic reward, then removes the world object.
 /// Spawn motion uses the shared WorldDropBounceAnimator so other drops can reuse the same feel.
+/// Custom prefab visuals are preserved; the procedural card is fallback-only.
 /// </summary>
 [RequireComponent(typeof(SphereCollider))]
 public class RelicDropPickup : MonoBehaviour
@@ -15,6 +16,10 @@ public class RelicDropPickup : MonoBehaviour
     [Min(0f)] public float fallbackGroundDropDistance = 0.65f;
     [Tooltip("Automatically add WorldDropBounceAnimator when the prefab does not already have one.")]
     public bool autoAddBounceAnimator = true;
+
+    [Header("Fallback Visual")]
+    [Tooltip("For manually placed pickups only. Runtime RelicManager decides automatically: custom prefab = keep custom visual, no prefab = build fallback card.")]
+    public bool buildProceduralCardWhenUnconfigured = true;
 
     [Header("Idle Motion After Landing")]
     public bool bobAfterLanding = true;
@@ -31,14 +36,26 @@ public class RelicDropPickup : MonoBehaviour
     private bool collected;
     private Tween bobTween;
     private Vector3 basePosition;
-    private bool cardVisualBuilt;
+    private bool visualConfigured;
+    private bool useFallbackVisual;
     private WorldDropBounceAnimator dropAnimator;
 
     public void Configure(RelicRarity rarity, bool isBossReward)
     {
+        Configure(rarity, isBossReward, buildProceduralCardWhenUnconfigured);
+    }
+
+    /// <summary>
+    /// Runtime configuration. useProceduralFallbackVisual should be false when the manager instantiated
+    /// a designer-authored prefab, so the pickup never hides/replaces that prefab's mesh or children.
+    /// </summary>
+    public void Configure(RelicRarity rarity, bool isBossReward, bool useProceduralFallbackVisual)
+    {
         minimumRarity = rarity;
         bossReward = isBossReward;
         collected = false;
+        visualConfigured = true;
+        useFallbackVisual = useProceduralFallbackVisual;
 
         SphereCollider hoverCollider = GetComponent<SphereCollider>();
         if (hoverCollider != null)
@@ -47,14 +64,22 @@ public class RelicDropPickup : MonoBehaviour
             hoverCollider.radius = Mathf.Max(0.1f, hoverColliderRadius);
         }
 
-        BuildCardVisual();
+        if (useFallbackVisual)
+            BuildFallbackCardVisual();
+
         BeginSpawnPresentation();
     }
 
     private void Start()
     {
-        if (!cardVisualBuilt)
-            BuildCardVisual();
+        // Manually placed pickups can still use the procedural fallback if requested.
+        if (!visualConfigured)
+        {
+            useFallbackVisual = buildProceduralCardWhenUnconfigured;
+            visualConfigured = true;
+            if (useFallbackVisual)
+                BuildFallbackCardVisual();
+        }
 
         // Configure() is the normal runtime path. This fallback keeps manually placed pickups usable.
         if (dropAnimator == null && bobTween == null)
@@ -101,16 +126,20 @@ public class RelicDropPickup : MonoBehaviour
         StartIdleMotion();
     }
 
-    private void BuildCardVisual()
+    private void BuildFallbackCardVisual()
     {
-        if (cardVisualBuilt) return;
-        cardVisualBuilt = true;
+        if (transform.Find("CardVisual") != null)
+            return;
 
+        // Only fallback-generated primitive visuals are suppressed here. Designer-authored prefab visuals
+        // never enter this path, so they remain untouched.
         MeshRenderer oldRenderer = GetComponent<MeshRenderer>();
-        if (oldRenderer != null) oldRenderer.enabled = false;
+        if (oldRenderer != null)
+            oldRenderer.enabled = false;
 
         MeshFilter oldFilter = GetComponent<MeshFilter>();
-        if (oldFilter != null) oldFilter.mesh = null;
+        if (oldFilter != null)
+            oldFilter.mesh = null;
 
         transform.localScale = Vector3.one;
 
@@ -156,7 +185,8 @@ public class RelicDropPickup : MonoBehaviour
 
     private void Collect()
     {
-        if (collected) return;
+        if (collected)
+            return;
         collected = true;
 
         if (RelicManager.Instance != null)
