@@ -2,10 +2,9 @@ using UnityEngine;
 using DG.Tweening;
 
 /// <summary>
-/// World relic reward pickup. No click is required: moving the mouse over it collects it,
-/// queues a relic reward, then removes the world object.
-/// Spawn motion uses the shared WorldDropBounceAnimator so other drops can reuse the same feel.
-/// Custom prefab visuals are preserved; the procedural card is fallback-only.
+/// World relic reward pickup. Relic reward logic stays independent from Diamond drops.
+/// Designer-authored prefab visuals are preserved; the procedural card is only a fallback when
+/// RelicManager had no Relic Drop Prefab assigned.
 /// </summary>
 [RequireComponent(typeof(SphereCollider))]
 public class RelicDropPickup : MonoBehaviour
@@ -18,7 +17,7 @@ public class RelicDropPickup : MonoBehaviour
     public bool autoAddBounceAnimator = true;
 
     [Header("Fallback Visual")]
-    [Tooltip("For manually placed pickups only. Runtime RelicManager decides automatically: custom prefab = keep custom visual, no prefab = build fallback card.")]
+    [Tooltip("Used for manually placed pickups. Runtime fallback objects named RelicDrop/BossRelicDrop automatically build the procedural card. Custom prefabs keep their own visuals.")]
     public bool buildProceduralCardWhenUnconfigured = true;
 
     [Header("Idle Motion After Landing")]
@@ -37,25 +36,24 @@ public class RelicDropPickup : MonoBehaviour
     private Tween bobTween;
     private Vector3 basePosition;
     private bool visualConfigured;
-    private bool useFallbackVisual;
     private WorldDropBounceAnimator dropAnimator;
 
+    /// <summary>
+    /// Canonical runtime path used by the existing RelicManager. It automatically distinguishes
+    /// manager-created fallback objects from designer-authored prefabs without changing RelicManager architecture.
+    /// </summary>
     public void Configure(RelicRarity rarity, bool isBossReward)
     {
-        Configure(rarity, isBossReward, buildProceduralCardWhenUnconfigured);
+        bool fallbackObject = IsManagerFallbackObject();
+        Configure(rarity, isBossReward, fallbackObject);
     }
 
-    /// <summary>
-    /// Runtime configuration. useProceduralFallbackVisual should be false when the manager instantiated
-    /// a designer-authored prefab, so the pickup never hides/replaces that prefab's mesh or children.
-    /// </summary>
     public void Configure(RelicRarity rarity, bool isBossReward, bool useProceduralFallbackVisual)
     {
         minimumRarity = rarity;
         bossReward = isBossReward;
         collected = false;
         visualConfigured = true;
-        useFallbackVisual = useProceduralFallbackVisual;
 
         SphereCollider hoverCollider = GetComponent<SphereCollider>();
         if (hoverCollider != null)
@@ -64,24 +62,28 @@ public class RelicDropPickup : MonoBehaviour
             hoverCollider.radius = Mathf.Max(0.1f, hoverColliderRadius);
         }
 
-        if (useFallbackVisual)
+        if (useProceduralFallbackVisual)
             BuildFallbackCardVisual();
 
         BeginSpawnPresentation();
     }
 
+    private bool IsManagerFallbackObject()
+    {
+        // These are the exact names assigned by RelicManager only when no custom relicDropPrefab exists.
+        // Instantiate(customPrefab) produces the prefab name + "(Clone)", so it never enters this fallback path.
+        return gameObject.name == "RelicDrop" || gameObject.name == "BossRelicDrop";
+    }
+
     private void Start()
     {
-        // Manually placed pickups can still use the procedural fallback if requested.
         if (!visualConfigured)
         {
-            useFallbackVisual = buildProceduralCardWhenUnconfigured;
             visualConfigured = true;
-            if (useFallbackVisual)
+            if (buildProceduralCardWhenUnconfigured)
                 BuildFallbackCardVisual();
         }
 
-        // Configure() is the normal runtime path. This fallback keeps manually placed pickups usable.
         if (dropAnimator == null && bobTween == null)
             BeginSpawnPresentation();
     }
@@ -131,8 +133,6 @@ public class RelicDropPickup : MonoBehaviour
         if (transform.Find("CardVisual") != null)
             return;
 
-        // Only fallback-generated primitive visuals are suppressed here. Designer-authored prefab visuals
-        // never enter this path, so they remain untouched.
         MeshRenderer oldRenderer = GetComponent<MeshRenderer>();
         if (oldRenderer != null)
             oldRenderer.enabled = false;
