@@ -67,7 +67,7 @@ public class WorldDropBounceAnimator : MonoBehaviour
         restingPosition = groundPosition;
         hasRestingPosition = true;
 
-        Vector2 scatter = Random.insideUnitCircle * Mathf.Max(0f, horizontalScatterRadius);
+        Vector2 scatter = UnityEngine.Random.insideUnitCircle * Mathf.Max(0f, horizontalScatterRadius);
         Vector3 launchTarget = groundPosition + new Vector3(scatter.x, Mathf.Max(0f, popHeight), scatter.y);
         Vector3 authoredScale = transform.localScale;
 
@@ -77,9 +77,9 @@ public class WorldDropBounceAnimator : MonoBehaviour
         if (rotateDuringSpawn)
         {
             Vector3 spin = new Vector3(
-                Random.Range(rotationMin.x, rotationMax.x),
-                Random.Range(rotationMin.y, rotationMax.y),
-                Random.Range(rotationMin.z, rotationMax.z));
+                UnityEngine.Random.Range(rotationMin.x, rotationMax.x),
+                UnityEngine.Random.Range(rotationMin.y, rotationMax.y),
+                UnityEngine.Random.Range(rotationMin.z, rotationMax.z));
             rotationTween = transform.DORotate(spin, Mathf.Max(0.01f, popDuration + fallDuration), RotateMode.LocalAxisAdd)
                 .SetEase(Ease.OutCubic)
                 .SetUpdate(useUnscaledTime);
