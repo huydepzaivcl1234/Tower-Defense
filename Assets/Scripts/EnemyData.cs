@@ -20,20 +20,23 @@ public class EnemyData : ScriptableObject
     public int goldReward = 10;
     public int damageToPlayer = 1;
 
-    [Header("Diamond Drop (fully customizable per enemy type)")]
+    [Header("Diamond Drop - Chance & Amount")]
+    [Tooltip("Independent Diamond drop chance for this enemy. This is not connected to Relic drop chance.")]
     [Range(0f, 1f)] public float diamondDropChance = 0f;
     [Min(0)] public int diamondDropMin = 1;
     [Min(0)] public int diamondDropMax = 1;
-    [Tooltip("Optional custom world prefab. Add DiamondDropPickup + WorldDropBounceAnimator for full control. If empty, a simple fallback object is created.")]
+    [Tooltip("Optional model/prefab override only for this enemy type. Leave empty to use DiamondDropSystem.Default Diamond Drop Prefab.")]
     public GameObject diamondDropPrefab;
     [Tooltip("Final resting Y offset relative to the enemy death position.")]
     public float diamondGroundYOffset = 0.2f;
-    [Tooltip("Boss can always create an extra Diamond drop independent of the normal chance.")]
+
+    [Header("Diamond Drop - Boss")]
+    [Tooltip("Boss can always create an extra Diamond drop independently of normal Diamond chance and independently of Relic drops.")]
     public bool bossGuaranteedDiamonds = false;
     [Min(0)] public int bossDiamondMin = 1;
     [Min(0)] public int bossDiamondMax = 3;
 
-    [Header("Relic Drop (fully customizable per enemy type)")]
+    [Header("Relic Drop - Independent From Diamond")]
     [Range(0f, 1f)] public float relicDropChance = 0.01f;
     public RelicRarity minimumDropRarity = RelicRarity.Common;
     public bool isBoss = false;
