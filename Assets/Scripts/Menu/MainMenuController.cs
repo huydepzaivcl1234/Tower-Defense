@@ -37,6 +37,24 @@ public class MainMenuController : MonoBehaviour
     public TMP_Text sfxValueText;
     public Button backButton;
 
+    [Header("Reset Data")]
+    [Tooltip("Optional Settings button. First click arms confirmation; second click within the confirmation window resets data.")]
+    public Button resetDataButton;
+    [Tooltip("Optional label belonging to Reset Data button.")]
+    public TMP_Text resetDataButtonText;
+    public string resetDataNormalLabel = "RESET DATA";
+    public string resetDataConfirmLabel = "CLICK AGAIN TO CONFIRM";
+    [Min(0.5f)] public float resetDataConfirmationSeconds = 4f;
+    [Tooltip("Reset persistent PlayerProfileData such as Diamonds/shop progression.")]
+    public bool resetProfileData = true;
+    [Tooltip("Also reset Master/Music/SFX PlayerPrefs to the customizable defaults in AudioSettingsManager.")]
+    public bool resetAudioSettingsToo = false;
+    [Tooltip("After profile reset, immediately create/save a clean profile using PlayerProfileManager starting values.")]
+    public bool saveFreshProfileAfterReset = true;
+    [Tooltip("Optional status label shown after reset.")]
+    public TMP_Text resetDataStatusText;
+    public string resetDataSuccessMessage = "DATA RESET COMPLETE";
+
     [Header("Behaviour")]
     public bool showMenuOnSceneStart = true;
     public float gameplayTimeScale = 1f;
@@ -54,6 +72,7 @@ public class MainMenuController : MonoBehaviour
     private bool menuBlocksGameplay;
     private bool gameplayStarted;
     private bool playTransitionInProgress;
+    private float resetDataArmedUntil = -1f;
     private SettingsReturnTarget settingsReturnTarget = SettingsReturnTarget.MainMenu;
 
     public bool IsMainMenuVisible => mainPanel != null && mainPanel.activeSelf;
@@ -84,12 +103,14 @@ public class MainMenuController : MonoBehaviour
         if (settingsButton != null) settingsButton.onClick.AddListener(OpenSettings);
         if (exitButton != null) exitButton.onClick.AddListener(ExitGame);
         if (backButton != null) backButton.onClick.AddListener(CloseSettings);
+        if (resetDataButton != null) resetDataButton.onClick.AddListener(RequestResetData);
 
         if (masterSlider != null) masterSlider.onValueChanged.AddListener(OnMasterChanged);
         if (musicSlider != null) musicSlider.onValueChanged.AddListener(OnMusicChanged);
         if (sfxSlider != null) sfxSlider.onValueChanged.AddListener(OnSfxChanged);
 
         SyncAudioUI();
+        ResetResetDataConfirmationUI();
 
         if (startGameplayAfterSceneReload)
         {
@@ -102,6 +123,12 @@ public class MainMenuController : MonoBehaviour
             ShowMainMenu();
         else
             EnterGameplayImmediately();
+    }
+
+    private void Update()
+    {
+        if (resetDataArmedUntil > 0f && Time.unscaledTime > resetDataArmedUntil)
+            ResetResetDataConfirmationUI();
     }
 
     private void LateUpdate()
@@ -118,6 +145,7 @@ public class MainMenuController : MonoBehaviour
         menuBlocksGameplay = true;
         Time.timeScale = 0f;
 
+        ResetResetDataConfirmationUI();
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
     }
@@ -184,12 +212,14 @@ public class MainMenuController : MonoBehaviour
         menuBlocksGameplay = true;
         Time.timeScale = 0f;
         SyncAudioUI();
+        ResetResetDataConfirmationUI();
         if (mainPanel != null) mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(true);
     }
 
     public void CloseSettings()
     {
+        ResetResetDataConfirmationUI();
         if (settingsPanel != null) settingsPanel.SetActive(false);
 
         switch (settingsReturnTarget)
@@ -216,6 +246,63 @@ public class MainMenuController : MonoBehaviour
                 Time.timeScale = 0f;
                 break;
         }
+    }
+
+    public void RequestResetData()
+    {
+        if (resetDataArmedUntil > 0f && Time.unscaledTime <= resetDataArmedUntil)
+        {
+            ConfirmResetData();
+            return;
+        }
+
+        resetDataArmedUntil = Time.unscaledTime + Mathf.Max(0.5f, resetDataConfirmationSeconds);
+        if (resetDataButtonText != null)
+            resetDataButtonText.text = resetDataConfirmLabel;
+        if (resetDataStatusText != null)
+            resetDataStatusText.text = string.Empty;
+    }
+
+    public void ConfirmResetData()
+    {
+        resetDataArmedUntil = -1f;
+
+        if (resetProfileData)
+        {
+            PlayerProfileManager profile = PlayerProfileManager.Instance;
+            if (profile == null)
+                profile = Object.FindAnyObjectByType<PlayerProfileManager>(FindObjectsInactive.Include);
+
+            if (profile != null)
+                profile.ResetProfileData(saveFreshProfileAfterReset);
+            else
+                Debug.LogWarning("Reset Data requested but no PlayerProfileManager exists in the scene.", this);
+        }
+
+        if (resetAudioSettingsToo)
+        {
+            if (audioSettings == null)
+                audioSettings = AudioSettingsManager.Instance ?? Object.FindAnyObjectByType<AudioSettingsManager>(FindObjectsInactive.Include);
+            audioSettings?.ResetToDefaults(true);
+            SyncAudioUI();
+        }
+
+        if (resetDataStatusText != null)
+            resetDataStatusText.text = resetDataSuccessMessage;
+        if (resetDataButtonText != null)
+            resetDataButtonText.text = resetDataNormalLabel;
+    }
+
+    public void CancelResetData()
+    {
+        ResetResetDataConfirmationUI();
+    }
+
+    private void ResetResetDataConfirmationUI()
+    {
+        resetDataArmedUntil = -1f;
+        if (resetDataButtonText != null)
+            resetDataButtonText.text = resetDataNormalLabel;
     }
 
     public void ReturnToMainMenuFromGameplay()
