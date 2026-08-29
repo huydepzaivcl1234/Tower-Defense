@@ -351,13 +351,13 @@ public class DiamondGainToast : MonoBehaviour
             tr.sizeDelta = new Vector2(totalWidth, Mathf.Max(1f, root.rect.height));
             tr.anchoredPosition = new Vector2(cursor, 0f);
             totalText.alignment = TextAlignmentOptions.MidlineLeft;
-            totalText.enableWordWrapping = false;
+            totalText.textWrappingMode = TextWrappingModes.NoWrap;
             totalText.overflowMode = TextOverflowModes.Ellipsis;
         }
 
         if (gainText != null)
         {
-            gainText.enableWordWrapping = false;
+            gainText.textWrappingMode = TextWrappingModes.NoWrap;
             gainText.overflowMode = TextOverflowModes.Ellipsis;
         }
     }
