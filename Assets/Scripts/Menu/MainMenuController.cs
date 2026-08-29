@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Main-menu flow for the current gameplay scene. Supports normal main-menu settings
+/// Main-menu flow for the current gameplay scene. Supports main menu, profile, settings,
 /// plus settings opened from active gameplay/pause without forcing the player back to main menu.
 /// </summary>
 public class MainMenuController : MonoBehaviour
@@ -21,10 +21,12 @@ public class MainMenuController : MonoBehaviour
 
     [Header("Panels")]
     public GameObject mainPanel;
+    public GameObject profilePanel;
     public GameObject settingsPanel;
 
     [Header("Main Buttons")]
     public Button playButton;
+    public Button profileButton;
     public Button settingsButton;
     public Button exitButton;
 
@@ -45,7 +47,7 @@ public class MainMenuController : MonoBehaviour
     public string resetDataNormalLabel = "RESET DATA";
     public string resetDataConfirmLabel = "CLICK AGAIN TO CONFIRM";
     [Min(0.5f)] public float resetDataConfirmationSeconds = 4f;
-    [Tooltip("Reset persistent PlayerProfileData such as Diamonds/shop progression.")]
+    [Tooltip("Reset persistent PlayerProfileData such as Diamonds/shop progression/profile lifetime stats.")]
     public bool resetProfileData = true;
     [Tooltip("Also reset Master/Music/SFX PlayerPrefs to the customizable defaults in AudioSettingsManager.")]
     public bool resetAudioSettingsToo = false;
@@ -76,8 +78,9 @@ public class MainMenuController : MonoBehaviour
     private SettingsReturnTarget settingsReturnTarget = SettingsReturnTarget.MainMenu;
 
     public bool IsMainMenuVisible => mainPanel != null && mainPanel.activeSelf;
+    public bool IsProfileVisible => profilePanel != null && profilePanel.activeSelf;
     public bool IsSettingsVisible => settingsPanel != null && settingsPanel.activeSelf;
-    public bool IsAnyMenuVisible => IsMainMenuVisible || IsSettingsVisible;
+    public bool IsAnyMenuVisible => IsMainMenuVisible || IsProfileVisible || IsSettingsVisible;
     public bool GameplayStarted => gameplayStarted;
 
     public static void RequestGameplayAfterSceneReload() => startGameplayAfterSceneReload = true;
@@ -100,6 +103,7 @@ public class MainMenuController : MonoBehaviour
     private void Start()
     {
         if (playButton != null) playButton.onClick.AddListener(PlayGame);
+        if (profileButton != null) profileButton.onClick.AddListener(OpenProfile);
         if (settingsButton != null) settingsButton.onClick.AddListener(OpenSettings);
         if (exitButton != null) exitButton.onClick.AddListener(ExitGame);
         if (backButton != null) backButton.onClick.AddListener(CloseSettings);
@@ -146,8 +150,29 @@ public class MainMenuController : MonoBehaviour
         Time.timeScale = 0f;
 
         ResetResetDataConfirmationUI();
+        if (profilePanel != null) profilePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
+    }
+
+    public void OpenProfile()
+    {
+        if (playTransitionInProgress || gameplayStarted)
+            return;
+
+        menuBlocksGameplay = true;
+        Time.timeScale = 0f;
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(false);
+        if (profilePanel != null) profilePanel.SetActive(true);
+    }
+
+    public void CloseProfile()
+    {
+        if (profilePanel != null) profilePanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(true);
+        menuBlocksGameplay = true;
+        Time.timeScale = 0f;
     }
 
     public void PlayGame()
@@ -213,6 +238,7 @@ public class MainMenuController : MonoBehaviour
         Time.timeScale = 0f;
         SyncAudioUI();
         ResetResetDataConfirmationUI();
+        if (profilePanel != null) profilePanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(true);
     }
@@ -313,6 +339,7 @@ public class MainMenuController : MonoBehaviour
     private void HideAllMenus()
     {
         if (mainPanel != null) mainPanel.SetActive(false);
+        if (profilePanel != null) profilePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
     }
 
