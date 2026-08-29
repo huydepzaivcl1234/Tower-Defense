@@ -10,6 +10,7 @@ using UnityEngine.UI;
 /// Reuses PlayerProfileManager.avatarIndex by reserving one sentinel value for a user-selected image.
 /// The selected image is normalized to PNG and stored under Application.persistentDataPath.
 /// </summary>
+[DefaultExecutionOrder(1000)]
 [DisallowMultipleComponent]
 public class PlayerCustomAvatarPicker : MonoBehaviour
 {
@@ -64,6 +65,18 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
 
         if (customAvatarButton != null)
             customAvatarButton.onClick.RemoveListener(OpenImagePicker);
+    }
+
+    private void LateUpdate()
+    {
+        PlayerProfileManager profile = PlayerProfileManager.Instance;
+        if (profile == null || profile.AvatarIndex != customAvatarIndexSentinel || runtimeSprite == null || avatarImage == null)
+            return;
+
+        if (avatarImage.sprite != runtimeSprite)
+            avatarImage.sprite = runtimeSprite;
+        avatarImage.preserveAspect = true;
+        avatarImage.enabled = true;
     }
 
     private void OnDestroy()
@@ -128,6 +141,17 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
         PlayerProfileManager profile = PlayerProfileManager.Instance;
         if (profile == null || profile.AvatarIndex != customAvatarIndexSentinel)
             return;
+
+        if (runtimeSprite != null)
+        {
+            if (avatarImage != null)
+            {
+                avatarImage.sprite = runtimeSprite;
+                avatarImage.preserveAspect = true;
+                avatarImage.enabled = true;
+            }
+            return;
+        }
 
         LoadSavedAvatar();
     }
