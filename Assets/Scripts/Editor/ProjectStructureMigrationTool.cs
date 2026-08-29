@@ -118,15 +118,13 @@ public static class ProjectStructureMigrationTool
 
         if (!EditorUtility.DisplayDialog(
                 "Run Safe Project Migration",
-                "This will create the target folders and move only the clear mappings shown by Preview.\n\n" +
+                "This will move only the clear mappings shown by Preview, then create any remaining target folders.\n\n" +
                 "Moves use AssetDatabase.MoveAsset so Unity preserves .meta GUID references.\n" +
                 "Namespaces are NOT changed in this phase.\n" +
                 "Ambiguous and third-party folders are NOT moved.\n\nContinue?",
                 "Run Migration",
                 "Cancel"))
             return;
-
-        EnsureTargetFolders();
 
         int moved = 0;
         int skipped = 0;
@@ -163,6 +161,10 @@ public static class ProjectStructureMigrationTool
                 Debug.LogError($"Project Cleanup FAILED: {rule.source} -> {rule.destination}\n{error}");
             }
         }
+
+        // Create the remaining empty target folders only AFTER the moves, otherwise exact
+        // move destinations would already exist and AssetDatabase.MoveAsset would have to skip them.
+        EnsureTargetFolders();
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -229,7 +231,7 @@ public static class ProjectStructureMigrationTool
             if (script == null || string.IsNullOrEmpty(script.text))
                 continue;
 
-            if (script.text.Contains("Resources.Load(" ) || script.text.Contains("Resources.Load<"))
+            if (script.text.Contains("Resources.Load(") || script.text.Contains("Resources.Load<"))
                 hits.Add(path);
         }
 
