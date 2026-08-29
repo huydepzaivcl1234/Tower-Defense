@@ -41,6 +41,7 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
 
     private Texture2D runtimeTexture;
     private Sprite runtimeSprite;
+    private bool pickerOpen;
 
     private void OnEnable()
     {
@@ -65,6 +66,8 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
 
         if (customAvatarButton != null)
             customAvatarButton.onClick.RemoveListener(OpenImagePicker);
+
+        pickerOpen = false;
     }
 
     private void LateUpdate()
@@ -86,54 +89,72 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
 
     public void OpenImagePicker()
     {
-        string selectedPath;
-        if (!NativeImageFilePicker.TryPickImage(pickerTitle, fileFilterLabel, out selectedPath))
+        if (pickerOpen)
             return;
 
-        if (string.IsNullOrWhiteSpace(selectedPath) || !File.Exists(selectedPath))
-            return;
+        pickerOpen = true;
+        if (customAvatarButton != null)
+            customAvatarButton.interactable = false;
 
         try
         {
-            FileInfo info = new FileInfo(selectedPath);
-            if (maxSourceFileSizeMB > 0)
-            {
-                long limitBytes = (long)maxSourceFileSizeMB * 1024L * 1024L;
-                if (info.Length > limitBytes)
-                {
-                    Debug.LogWarning($"Custom avatar rejected: file is larger than {maxSourceFileSizeMB} MB.", this);
-                    return;
-                }
-            }
-
-            byte[] bytes = File.ReadAllBytes(selectedPath);
-            Texture2D source = new Texture2D(2, 2, TextureFormat.RGBA32, generateMipMaps, false);
-            if (!ImageConversion.LoadImage(source, bytes, false))
-            {
-                Destroy(source);
-                Debug.LogWarning("Custom avatar could not be decoded as an image.", this);
+            string selectedPath;
+            if (!NativeImageFilePicker.TryPickImage(pickerTitle, fileFilterLabel, out selectedPath))
                 return;
-            }
 
-            Texture2D normalized = NormalizeTexture(source);
-            if (normalized != source)
-                Destroy(source);
+            if (string.IsNullOrWhiteSpace(selectedPath) || !File.Exists(selectedPath))
+                return;
 
-            byte[] png = normalized.EncodeToPNG();
-            string folder = GetSaveFolderPath();
-            Directory.CreateDirectory(folder);
-            File.WriteAllBytes(GetSavedAvatarPath(), png);
-
-            ApplyRuntimeTexture(normalized);
-
-            PlayerProfileManager profile = PlayerProfileManager.Instance;
-            if (profile != null)
-                profile.SetAvatarIndex(customAvatarIndexSentinel, true);
+            ImportSelectedAvatar(selectedPath);
         }
         catch (Exception ex)
         {
-            Debug.LogError("Failed to import custom avatar: " + ex.Message, this);
+            Debug.LogError("Failed to open/import custom avatar: " + ex.Message, this);
         }
+        finally
+        {
+            pickerOpen = false;
+            if (customAvatarButton != null)
+                customAvatarButton.interactable = true;
+        }
+    }
+
+    private void ImportSelectedAvatar(string selectedPath)
+    {
+        FileInfo info = new FileInfo(selectedPath);
+        if (maxSourceFileSizeMB > 0)
+        {
+            long limitBytes = (long)maxSourceFileSizeMB * 1024L * 1024L;
+            if (info.Length > limitBytes)
+            {
+                Debug.LogWarning($"Custom avatar rejected: file is larger than {maxSourceFileSizeMB} MB.", this);
+                return;
+            }
+        }
+
+        byte[] bytes = File.ReadAllBytes(selectedPath);
+        Texture2D source = new Texture2D(2, 2, TextureFormat.RGBA32, generateMipMaps, false);
+        if (!ImageConversion.LoadImage(source, bytes, false))
+        {
+            Destroy(source);
+            Debug.LogWarning("Custom avatar could not be decoded as an image.", this);
+            return;
+        }
+
+        Texture2D normalized = NormalizeTexture(source);
+        if (normalized != source)
+            Destroy(source);
+
+        byte[] png = normalized.EncodeToPNG();
+        string folder = GetSaveFolderPath();
+        Directory.CreateDirectory(folder);
+        File.WriteAllBytes(GetSavedAvatarPath(), png);
+
+        ApplyRuntimeTexture(normalized);
+
+        PlayerProfileManager profile = PlayerProfileManager.Instance;
+        if (profile != null)
+            profile.SetAvatarIndex(customAvatarIndexSentinel, true);
     }
 
     public void RefreshFromProfile()
@@ -144,12 +165,7 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
 
         if (runtimeSprite != null)
         {
-            if (avatarImage != null)
-            {
-                avatarImage.sprite = runtimeSprite;
-                avatarImage.preserveAspect = true;
-                avatarImage.enabled = true;
-            }
+            ApplySpriteToImage();
             return;
         }
 
@@ -240,13 +256,17 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
             new Vector2(0.5f, 0.5f),
             100f);
         runtimeSprite.name = "RuntimeCustomAvatarSprite";
+        ApplySpriteToImage();
+    }
 
-        if (avatarImage != null)
-        {
-            avatarImage.sprite = runtimeSprite;
-            avatarImage.preserveAspect = true;
-            avatarImage.enabled = true;
-        }
+    private void ApplySpriteToImage()
+    {
+        if (avatarImage == null || runtimeSprite == null)
+            return;
+
+        avatarImage.sprite = runtimeSprite;
+        avatarImage.preserveAspect = true;
+        avatarImage.enabled = true;
     }
 
     private void ReleaseRuntimeAvatar()
@@ -275,7 +295,7 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
 
     private static class NativeImageFilePicker
     {
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         private struct OpenFileName
         {
@@ -304,9 +324,9 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
             public int flagsEx;
         }
 
-        [DllImport("Comdlg32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [DllImport("Comdlg32.dll", EntryPoint = "GetOpenFileNameW", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Winapi, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetOpenFileName(ref OpenFileName ofn);
+        private static extern bool GetOpenFileNameW(ref OpenFileName ofn);
 
         private const int OFN_FILEMUSTEXIST = 0x00001000;
         private const int OFN_PATHMUSTEXIST = 0x00000800;
@@ -314,36 +334,48 @@ public class PlayerCustomAvatarPicker : MonoBehaviour
         private const int OFN_EXPLORER = 0x00080000;
 #endif
 
-        public static bool TryPickImage(string title, string filterLabel, out string selectedPath)
+        public static bool TryPickImage(string dialogTitle, string filterLabel, out string selectedPath)
         {
             selectedPath = null;
 
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+#if UNITY_EDITOR
+            string path = UnityEditor.EditorUtility.OpenFilePanel(
+                string.IsNullOrWhiteSpace(dialogTitle) ? "Choose profile avatar" : dialogTitle,
+                string.Empty,
+                "png,jpg,jpeg,bmp");
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            selectedPath = path;
+            return true;
+#elif UNITY_STANDALONE_WIN
             StringBuilder fileBuffer = new StringBuilder(4096);
             StringBuilder titleBuffer = new StringBuilder(512);
             string label = string.IsNullOrWhiteSpace(filterLabel) ? "Image Files" : filterLabel;
 
             OpenFileName ofn = new OpenFileName
             {
-                structSize = Marshal.SizeOf(typeof(OpenFileName)),
+                // OPENFILENAMEW is 152 bytes on 64-bit Windows and 88 bytes on 32-bit Windows.
+                // Avoid Marshal.SizeOf here because some Unity/Mono editor/runtime combinations can recurse badly.
+                structSize = IntPtr.Size == 8 ? 152 : 88,
                 filter = label + "\0*.png;*.jpg;*.jpeg;*.bmp\0PNG\0*.png\0JPEG\0*.jpg;*.jpeg\0Bitmap\0*.bmp\0All Files\0*.*\0\0",
                 filterIndex = 1,
                 file = fileBuffer,
                 maxFile = fileBuffer.Capacity,
                 fileTitle = titleBuffer,
                 maxFileTitle = titleBuffer.Capacity,
-                title = string.IsNullOrWhiteSpace(title) ? "Choose profile avatar" : title,
+                title = string.IsNullOrWhiteSpace(dialogTitle) ? "Choose profile avatar" : dialogTitle,
                 flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
                 defExt = "png"
             };
 
-            if (!GetOpenFileName(ref ofn))
+            if (!GetOpenFileNameW(ref ofn))
                 return false;
 
             selectedPath = ofn.file.ToString();
             return !string.IsNullOrWhiteSpace(selectedPath);
 #else
-            Debug.LogWarning("Custom avatar native file picker is currently implemented for Windows standalone/editor only.");
+            Debug.LogWarning("Custom avatar native file picker is currently implemented for Unity Editor and Windows standalone only.");
             return false;
 #endif
         }
