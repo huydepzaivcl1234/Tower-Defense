@@ -6,6 +6,7 @@ using UnityEngine.UI;
 /// <summary>
 /// Gameplay-only Diamond notification. Slides in, counts from the previous total to the new total,
 /// optionally shows the amount gained, then slides back out.
+/// Keeps Icon / Total / Gain in separate layout regions so long values cannot overlap each other.
 /// </summary>
 [DisallowMultipleComponent]
 public class DiamondGainToast : MonoBehaviour
@@ -29,6 +30,23 @@ public class DiamondGainToast : MonoBehaviour
     public bool showGainText = true;
     public string gainPrefix = "+";
     public string gainSuffix = "";
+
+    [Header("Safe Auto Layout")]
+    [Tooltip("Keeps Icon, Total and +Gain in separate horizontal regions so they never overlap. Disable only if you want to position every child manually.")]
+    public bool autoLayoutChildren = true;
+    [Tooltip("Resize the toast width to fit its current text content.")]
+    public bool autoFitRootWidth = true;
+    [Min(0f)] public float horizontalPadding = 14f;
+    [Min(1f)] public float iconSize = 34f;
+    [Min(0f)] public float iconToTotalGap = 10f;
+    [Min(0f)] public float totalToGainGap = 12f;
+    [Min(0f)] public float textHorizontalPadding = 8f;
+    [Min(1f)] public float minimumTotalWidth = 72f;
+    [Min(1f)] public float minimumGainWidth = 54f;
+    [Min(1f)] public float minimumRootWidth = 220f;
+    [Min(1f)] public float maximumRootWidth = 520f;
+    [Tooltip("0 keeps the current root height. Any value above 0 forces this height while Auto Layout is enabled.")]
+    [Min(0f)] public float rootHeight = 62f;
 
     [Header("Count Animation")]
     [Min(0f)] public float countDelayAfterEnter = 0.05f;
@@ -65,6 +83,9 @@ public class DiamondGainToast : MonoBehaviour
         displayedTotal = PlayerProfileManager.Instance != null ? PlayerProfileManager.Instance.CurrentDiamonds : 0;
         targetTotal = displayedTotal;
         RefreshIcon();
+        RefreshGainText();
+        RefreshTotalText(displayedTotal);
+        ApplySafeLayout();
         HideInstant();
     }
 
@@ -72,6 +93,7 @@ public class DiamondGainToast : MonoBehaviour
     {
         PlayerProfileManager.OnDiamondsGranted += HandleGranted;
         RefreshIcon();
+        ApplySafeLayout();
     }
 
     private void OnDisable()
@@ -120,6 +142,7 @@ public class DiamondGainToast : MonoBehaviour
         RefreshGainText();
         RefreshTotalText(displayedTotal);
         RefreshIcon();
+        ApplySafeLayout();
 
         KillAnimation(false);
         sequence = DOTween.Sequence().SetUpdate(useUnscaledTime);
@@ -167,6 +190,8 @@ public class DiamondGainToast : MonoBehaviour
             displayedTotal = targetTotal;
             RefreshTotalText(displayedTotal);
             accumulatedGain = 0;
+            RefreshGainText();
+            ApplySafeLayout();
             sequence = null;
         });
     }
@@ -179,6 +204,7 @@ public class DiamondGainToast : MonoBehaviour
         {
             displayedTotal = targetTotal;
             RefreshTotalText(displayedTotal);
+            ApplySafeLayout();
             return;
         }
 
@@ -190,6 +216,7 @@ public class DiamondGainToast : MonoBehaviour
                     value = x;
                     displayedTotal = Mathf.RoundToInt(x);
                     RefreshTotalText(displayedTotal);
+                    ApplySafeLayout();
                 },
                 targetTotal,
                 countDuration)
@@ -199,6 +226,7 @@ public class DiamondGainToast : MonoBehaviour
             {
                 displayedTotal = targetTotal;
                 RefreshTotalText(displayedTotal);
+                ApplySafeLayout();
                 countTween = null;
             });
     }
@@ -217,8 +245,9 @@ public class DiamondGainToast : MonoBehaviour
         if (gainText == null)
             return;
 
-        gainText.gameObject.SetActive(showGainText);
-        if (!showGainText)
+        bool shouldShow = showGainText && accumulatedGain > 0;
+        gainText.gameObject.SetActive(shouldShow);
+        if (!shouldShow)
             return;
 
         string formatted = useCompactNumbers ? CompactNumber.Format(accumulatedGain) : accumulatedGain.ToString("N0");
@@ -230,14 +259,107 @@ public class DiamondGainToast : MonoBehaviour
         if (iconImage == null)
             return;
 
-        // Preserve a Sprite authored directly on the Image. The optional override field only wins
-        // when it actually contains a Sprite; an empty override must never erase user UI setup.
         Sprite resolved = diamondIcon != null ? diamondIcon : iconImage.sprite;
         if (diamondIcon != null && iconImage.sprite != diamondIcon)
             iconImage.sprite = diamondIcon;
 
         iconImage.preserveAspect = true;
         iconImage.enabled = resolved != null || !hideIconWhenNoSprite;
+    }
+
+    /// <summary>
+    /// Optional designer-friendly layout guard. This only touches this toast's own children and
+    /// never changes anchors/position of the toast itself. Disable Auto Layout to author manually.
+    /// </summary>
+    public void ApplySafeLayout()
+    {
+        if (!autoLayoutChildren || root == null)
+            return;
+
+        float padding = Mathf.Max(0f, horizontalPadding);
+        float cursor = padding;
+        bool hasIcon = iconImage != null && iconImage.enabled;
+        bool hasGain = gainText != null && gainText.gameObject.activeSelf;
+
+        if (hasIcon)
+        {
+            RectTransform ir = iconImage.rectTransform;
+            ir.anchorMin = ir.anchorMax = new Vector2(0f, 0.5f);
+            ir.pivot = new Vector2(0.5f, 0.5f);
+            ir.sizeDelta = new Vector2(Mathf.Max(1f, iconSize), Mathf.Max(1f, iconSize));
+            ir.anchoredPosition = new Vector2(cursor + ir.sizeDelta.x * 0.5f, 0f);
+            cursor += ir.sizeDelta.x + Mathf.Max(0f, iconToTotalGap);
+        }
+
+        float totalPreferred = totalText != null
+            ? totalText.GetPreferredValues(totalText.text).x + Mathf.Max(0f, textHorizontalPadding) * 2f
+            : 0f;
+        float totalWidth = Mathf.Max(Mathf.Max(1f, minimumTotalWidth), totalPreferred);
+
+        float gainWidth = 0f;
+        if (hasGain)
+        {
+            float gainPreferred = gainText.GetPreferredValues(gainText.text).x + Mathf.Max(0f, textHorizontalPadding) * 2f;
+            gainWidth = Mathf.Max(Mathf.Max(1f, minimumGainWidth), gainPreferred);
+        }
+
+        float desiredWidth = cursor + totalWidth + padding;
+        if (hasGain)
+            desiredWidth += Mathf.Max(0f, totalToGainGap) + gainWidth;
+
+        if (autoFitRootWidth)
+        {
+            float minWidth = Mathf.Max(1f, minimumRootWidth);
+            float maxWidth = Mathf.Max(minWidth, maximumRootWidth);
+            Vector2 size = root.sizeDelta;
+            size.x = Mathf.Clamp(desiredWidth, minWidth, maxWidth);
+            if (rootHeight > 0f)
+                size.y = rootHeight;
+            root.sizeDelta = size;
+        }
+        else if (rootHeight > 0f)
+        {
+            Vector2 size = root.sizeDelta;
+            size.y = rootHeight;
+            root.sizeDelta = size;
+        }
+
+        float availableRight = root.rect.width - padding;
+
+        if (hasGain)
+        {
+            float gainLeft = availableRight - gainWidth;
+            RectTransform gr = gainText.rectTransform;
+            gr.anchorMin = gr.anchorMax = new Vector2(0f, 0.5f);
+            gr.pivot = new Vector2(0f, 0.5f);
+            gr.sizeDelta = new Vector2(gainWidth, Mathf.Max(1f, root.rect.height));
+            gr.anchoredPosition = new Vector2(gainLeft, 0f);
+            gainText.alignment = TextAlignmentOptions.MidlineRight;
+
+            totalWidth = Mathf.Max(1f, gainLeft - Mathf.Max(0f, totalToGainGap) - cursor);
+        }
+        else
+        {
+            totalWidth = Mathf.Max(1f, availableRight - cursor);
+        }
+
+        if (totalText != null)
+        {
+            RectTransform tr = totalText.rectTransform;
+            tr.anchorMin = tr.anchorMax = new Vector2(0f, 0.5f);
+            tr.pivot = new Vector2(0f, 0.5f);
+            tr.sizeDelta = new Vector2(totalWidth, Mathf.Max(1f, root.rect.height));
+            tr.anchoredPosition = new Vector2(cursor, 0f);
+            totalText.alignment = TextAlignmentOptions.MidlineLeft;
+            totalText.enableWordWrapping = false;
+            totalText.overflowMode = TextOverflowModes.Ellipsis;
+        }
+
+        if (gainText != null)
+        {
+            gainText.enableWordWrapping = false;
+            gainText.overflowMode = TextOverflowModes.Ellipsis;
+        }
     }
 
     private void CaptureShownPosition()
@@ -270,6 +392,8 @@ public class DiamondGainToast : MonoBehaviour
     {
         KillAnimation();
         accumulatedGain = 0;
+        RefreshGainText();
+        ApplySafeLayout();
         if (root != null)
             root.anchoredPosition = shownPosition + hiddenOffset;
         if (canvasGroup != null)
@@ -282,8 +406,8 @@ public class DiamondGainToast : MonoBehaviour
         if (root == null) root = transform as RectTransform;
         if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
         RefreshIcon();
-        if (gainText != null)
-            gainText.gameObject.SetActive(showGainText);
+        RefreshGainText();
+        ApplySafeLayout();
     }
 #endif
 }
