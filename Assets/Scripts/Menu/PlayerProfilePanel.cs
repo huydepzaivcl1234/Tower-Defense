@@ -134,11 +134,18 @@ public class PlayerProfilePanel : MonoBehaviour
         if (playTimeText != null)
             playTimeText.text = playTimePrefix + FormatPlayTime(profile.TotalPlaySeconds);
 
-        if (diamondsText != null)
-            diamondsText.text = diamondsPrefix + FormatNumber(profile.CurrentDiamonds);
+        HandleDiamondsChanged(profile.CurrentDiamonds);
 
         if (enemiesKilledText != null)
             enemiesKilledText.text = enemiesKilledPrefix + FormatLong(profile.TotalEnemiesKilled);
+    }
+
+    private void HandleDiamondsChanged(int value)
+    {
+        if (diamondsText == null)
+            return;
+
+        diamondsText.text = diamondsPrefix + FormatNumber(value);
     }
 
     public void CommitPlayerName()
