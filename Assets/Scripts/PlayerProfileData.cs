@@ -2,23 +2,42 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// Persistent meta-progression data. This is intentionally separate from per-run state such as Gold/Lives.
-/// Add future shop/unlock/profile fields here so all persistent data stays in one save payload.
+/// Persistent meta-progression/profile data. Per-run Gold/Lives remain outside this payload.
+/// Keep future shop/unlock/profile fields here so persistent state stays under one save architecture.
 /// </summary>
 [Serializable]
 public class PlayerProfileData
 {
-    public int saveVersion = 1;
-    public int diamonds = 0;
+    public int saveVersion = 2;
 
-    // Reserved for the future shop/progression system. Keeping these in the profile now avoids
-    // needing a second save architecture later.
+    // Player identity. Avatar stores an index into the designer-authored avatar list on PlayerProfilePanel.
+    public string playerName = "Player";
+    public int avatarIndex = 0;
+
+    // Persistent currency / lifetime stats.
+    public int diamonds = 0;
+    public double totalPlaySeconds = 0d;
+    public long totalEnemiesKilled = 0L;
+
+    // Reserved for shop/progression systems.
     public List<string> purchasedShopItemIds = new List<string>();
     public List<string> unlockedContentIds = new List<string>();
 
-    public void Sanitize(int maxDiamonds)
+    public void Sanitize(int maxDiamonds, int maxPlayerNameLength = 24)
     {
         diamonds = Math.Max(0, Math.Min(diamonds, Math.Max(0, maxDiamonds)));
+        totalPlaySeconds = Math.Max(0d, totalPlaySeconds);
+        totalEnemiesKilled = Math.Max(0L, totalEnemiesKilled);
+        avatarIndex = Math.Max(0, avatarIndex);
+
+        if (string.IsNullOrWhiteSpace(playerName))
+            playerName = "Player";
+
+        playerName = playerName.Trim();
+        int safeNameLength = Math.Max(1, maxPlayerNameLength);
+        if (playerName.Length > safeNameLength)
+            playerName = playerName.Substring(0, safeNameLength);
+
         if (purchasedShopItemIds == null) purchasedShopItemIds = new List<string>();
         if (unlockedContentIds == null) unlockedContentIds = new List<string>();
     }
