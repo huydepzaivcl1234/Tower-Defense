@@ -21,6 +21,12 @@ MonoBehaviour:
   hpRegenTickInterval: 1
   goldReward: 6
   damageToPlayer: 1
+  diamondDropChance: 0.01
+  diamondDropMin: 1
+  diamondDropMax: 1
+  bossGuaranteedDiamonds: 0
+  bossDiamondMin: 1
+  bossDiamondMax: 3
   relicDropChance: 0.001
   minimumDropRarity: 0
   isBoss: 0
@@ -32,3 +38,5 @@ MonoBehaviour:
   shieldTriggerDuration: 0
   tintColor: {r: 1, g: 1, b: 1, a: 1}
   shieldTintColor: {r: 0.3, g: 0.85, b: 1, a: 1}
+  diamondDropPrefab: {fileID: 0}
+  diamondGroundYOffset: 0.2
