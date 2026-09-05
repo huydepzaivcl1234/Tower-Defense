@@ -24,6 +24,8 @@ public class MainMenuController : MonoBehaviour
     public GameObject profilePanel;
     public GameObject settingsPanel;
     public GameObject shopPanel;
+    [Tooltip("Optional. If empty, the Story / Endless panel is created at runtime using the current Play button style.")]
+    public GameObject gameModePanel;
 
     [Header("Main Buttons")]
     public Button playButton;
@@ -83,7 +85,8 @@ public class MainMenuController : MonoBehaviour
     public bool IsProfileVisible => profilePanel != null && profilePanel.activeSelf;
     public bool IsSettingsVisible => settingsPanel != null && settingsPanel.activeSelf;
     public bool IsShopVisible => shopPanel != null && shopPanel.activeSelf;
-    public bool IsAnyMenuVisible => IsMainMenuVisible || IsProfileVisible || IsSettingsVisible || IsShopVisible;
+    public bool IsGameModeVisible => gameModePanel != null && gameModePanel.activeSelf;
+    public bool IsAnyMenuVisible => IsMainMenuVisible || IsProfileVisible || IsSettingsVisible || IsShopVisible || IsGameModeVisible;
     public bool GameplayStarted => gameplayStarted;
 
     public static void RequestGameplayAfterSceneReload() => startGameplayAfterSceneReload = true;
@@ -105,7 +108,7 @@ public class MainMenuController : MonoBehaviour
 
     private void Start()
     {
-        if (playButton != null) playButton.onClick.AddListener(PlayGame);
+        if (playButton != null) playButton.onClick.AddListener(OpenGameModeSelection);
         if (profileButton != null) profileButton.onClick.AddListener(OpenProfile);
         if (settingsButton != null) settingsButton.onClick.AddListener(OpenSettings);
         if (exitButton != null) exitButton.onClick.AddListener(ExitGame);
@@ -157,6 +160,7 @@ public class MainMenuController : MonoBehaviour
         if (profilePanel != null) profilePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (shopPanel != null) shopPanel.SetActive(false);
+        if (gameModePanel != null) gameModePanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
     }
 
@@ -169,6 +173,7 @@ public class MainMenuController : MonoBehaviour
         Time.timeScale = 0f;
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (shopPanel != null) shopPanel.SetActive(false);
+        if (gameModePanel != null) gameModePanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(false);
         if (profilePanel != null) profilePanel.SetActive(true);
     }
@@ -190,6 +195,7 @@ public class MainMenuController : MonoBehaviour
         Time.timeScale = 0f;
         if (profilePanel != null) profilePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (gameModePanel != null) gameModePanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(false);
         if (shopPanel != null) shopPanel.SetActive(true);
     }
@@ -197,6 +203,52 @@ public class MainMenuController : MonoBehaviour
     public void CloseShop()
     {
         if (shopPanel != null) shopPanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(true);
+        menuBlocksGameplay = true;
+        Time.timeScale = 0f;
+    }
+
+    public void OpenGameModeSelection()
+    {
+        if (playTransitionInProgress || gameplayStarted)
+            return;
+
+        // Returning to the menu from Pause keeps the current run alive; Play resumes it.
+        if (WaveManager.Instance != null && WaveManager.Instance.CurrentWaveNumber > 0)
+        {
+            PlayGame();
+            return;
+        }
+
+        GameModeSelectionPanel selector = gameModePanel != null
+            ? gameModePanel.GetComponent<GameModeSelectionPanel>()
+            : null;
+        if (selector == null)
+        {
+            selector = GameModeSelectionPanel.CreateRuntime(this, playButton);
+            gameModePanel = selector != null ? selector.gameObject : null;
+        }
+
+        // A scene without a usable selector keeps the old Play behaviour.
+        if (selector == null)
+        {
+            WaveManager.Instance?.ConfigureStoryMode(0);
+            PlayGame();
+            return;
+        }
+
+        menuBlocksGameplay = true;
+        Time.timeScale = 0f;
+        if (profilePanel != null) profilePanel.SetActive(false);
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (shopPanel != null) shopPanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(false);
+        selector.ShowModeChoices();
+    }
+
+    public void CloseGameModeSelection()
+    {
+        if (gameModePanel != null) gameModePanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
         menuBlocksGameplay = true;
         Time.timeScale = 0f;
@@ -267,6 +319,7 @@ public class MainMenuController : MonoBehaviour
         ResetResetDataConfirmationUI();
         if (profilePanel != null) profilePanel.SetActive(false);
         if (shopPanel != null) shopPanel.SetActive(false);
+        if (gameModePanel != null) gameModePanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(true);
     }
@@ -370,6 +423,7 @@ public class MainMenuController : MonoBehaviour
         if (profilePanel != null) profilePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (shopPanel != null) shopPanel.SetActive(false);
+        if (gameModePanel != null) gameModePanel.SetActive(false);
     }
 
     public void RestoreGameplaySpeed()
