@@ -25,6 +25,17 @@ public class BuildMenuUI : MonoBehaviour
         foreach (var binding in towerButtons)
         {
             if (binding.button == null || binding.towerData == null) continue;
+
+            // Defensive UI safety: generated/styled Images must still receive pointer events.
+            if (binding.button.targetGraphic != null)
+                binding.button.targetGraphic.raycastTarget = true;
+            Graphic[] buttonGraphics = binding.button.GetComponentsInChildren<Graphic>(true);
+            for (int g = 0; g < buttonGraphics.Length; g++)
+            {
+                if (buttonGraphics[g] != null && buttonGraphics[g].gameObject == binding.button.gameObject)
+                    buttonGraphics[g].raycastTarget = true;
+            }
+
             TowerButtonBinding capturedBinding = binding;
             TowerData data = binding.towerData;
             binding.button.onClick.AddListener(() => SelectTower(capturedBinding, data));
