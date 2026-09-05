@@ -1,0 +1,207 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a76b6444718e52a4299c917957238ae7, type: 3}
+  m_Name: EnemyDropDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyDropDatabase
+  entries:
+  - enemy: {fileID: 11400000, guid: 36c91c07dc0f5914492e1ca7c657c76e, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: 237126a2071a9d8459d0d17d00c2222e, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 1
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.01
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: 94930cf74dff1b743a5b670a1d0701a6, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: 08414f13777746746bc4ee65ea7dba1e, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: 147b59a273ba2fc4494824744b96c061, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: b21c676da2c924b489e275af11d641f9, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: 7a971da910846b84b972a59744acdfa4, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: e9ce3221fac74d342975d98ae0746b4d, type: 2}
+    diamondDropChance: 0.01
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: c68ce9bd3fa1dae4a94a08e136659213, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: adbc06336ce255e4a9ede72f3e55f403, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: d768a13c02945e3488e74ae9d49c059d, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: 4eaaf0e56c3ba084a839932bfb4a171d, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: daef191a410df9847a030bcbff69e0e2, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: 84fecd8287cfcd843bfc31fbb85be3d6, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: d535a89edc37ddb44b9528ef01ac2ab9, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 0
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.001
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2
+  - enemy: {fileID: 11400000, guid: d91df9224e223e040a2f3a39472c4887, type: 2}
+    diamondDropChance: 0
+    diamondDropMin: 1
+    diamondDropMax: 1
+    isBoss: 1
+    bossGuaranteedDiamonds: 0
+    bossDiamondMin: 1
+    bossDiamondMax: 3
+    relicDropChance: 0.005
+    minimumDropRarity: 0
+    bossGuaranteedRelic: 1
+    bossGuaranteedMinimumRarity: 2

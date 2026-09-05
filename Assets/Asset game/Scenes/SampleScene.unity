@@ -3261,6 +3261,7 @@ GameObject:
   - component: {fileID: 139052101}
   - component: {fileID: 139052100}
   - component: {fileID: 139052102}
+  - component: {fileID: 139052103}
   m_Layer: 0
   m_Name: ResetDataButton
   m_TagString: Untagged
@@ -3370,6 +3371,28 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &139052103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 139052098}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ec764687d142fd4ea19b9db8352d6aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonSFX
+  clickClip: {fileID: 0}
+  volume: 1
+  pitch: 1
+  randomPitchRange: 0
+  playWhenDisabled: 0
+  enableHoverSound: 0
+  hoverClip: {fileID: 0}
+  hoverVolume: 0.55
+  hoverPitch: 1
+  loopHoverWhileInside: 0
 --- !u!1 &147924673
 GameObject:
   m_ObjectHideFlags: 0
@@ -3419,7 +3442,7 @@ MonoBehaviour:
   choiceUI: {fileID: 857685274}
   rewardNotificationUI: {fileID: 1316198409}
   relicDropPrefab: {fileID: 0}
-  relicDropHeight: 0.65
+  relicDropHeight: 0.8
 --- !u!4 &147924675
 Transform:
   m_ObjectHideFlags: 0
@@ -12989,6 +13012,7 @@ GameObject:
   - component: {fileID: 714670066}
   - component: {fileID: 714670065}
   - component: {fileID: 714670064}
+  - component: {fileID: 714670067}
   m_Layer: 0
   m_Name: PreviousAvatarButton
   m_TagString: Untagged
@@ -13098,6 +13122,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 714670062}
   m_CullTransparentMesh: 1
+--- !u!114 &714670067
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 714670062}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ec764687d142fd4ea19b9db8352d6aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonSFX
+  clickClip: {fileID: 0}
+  volume: 1
+  pitch: 1
+  randomPitchRange: 0
+  playWhenDisabled: 0
+  enableHoverSound: 0
+  hoverClip: {fileID: 0}
+  hoverVolume: 0.55
+  hoverPitch: 1
+  loopHoverWhileInside: 0
 --- !u!1 &729669964
 GameObject:
   m_ObjectHideFlags: 0
@@ -22637,6 +22683,7 @@ GameObject:
   - component: {fileID: 1278307586}
   - component: {fileID: 1278307585}
   - component: {fileID: 1278307584}
+  - component: {fileID: 1278307587}
   m_Layer: 0
   m_Name: CloseButton
   m_TagString: Untagged
@@ -22746,6 +22793,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1278307582}
   m_CullTransparentMesh: 1
+--- !u!114 &1278307587
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1278307582}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ec764687d142fd4ea19b9db8352d6aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonSFX
+  clickClip: {fileID: 8300000, guid: aae73e9bc8aacec49abbc0f6a4961d30, type: 3}
+  volume: 1
+  pitch: 1
+  randomPitchRange: 0
+  playWhenDisabled: 0
+  enableHoverSound: 0
+  hoverClip: {fileID: 0}
+  hoverVolume: 0.55
+  hoverPitch: 1
+  loopHoverWhileInside: 0
 --- !u!1 &1278455715
 GameObject:
   m_ObjectHideFlags: 0
@@ -22758,6 +22827,7 @@ GameObject:
   - component: {fileID: 1278455719}
   - component: {fileID: 1278455718}
   - component: {fileID: 1278455717}
+  - component: {fileID: 1278455720}
   m_Layer: 0
   m_Name: CustomAvatarButton
   m_TagString: Untagged
@@ -22867,6 +22937,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1278455715}
   m_CullTransparentMesh: 1
+--- !u!114 &1278455720
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1278455715}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ec764687d142fd4ea19b9db8352d6aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonSFX
+  clickClip: {fileID: 0}
+  volume: 1
+  pitch: 1
+  randomPitchRange: 0
+  playWhenDisabled: 0
+  enableHoverSound: 0
+  hoverClip: {fileID: 0}
+  hoverVolume: 0.55
+  hoverPitch: 1
+  loopHoverWhileInside: 0
 --- !u!1 &1288100698
 GameObject:
   m_ObjectHideFlags: 0
@@ -32627,6 +32719,7 @@ GameObject:
   - component: {fileID: 1777456390}
   - component: {fileID: 1777456389}
   - component: {fileID: 1777456388}
+  - component: {fileID: 1777456391}
   m_Layer: 0
   m_Name: NextAvatarButton
   m_TagString: Untagged
@@ -32736,6 +32829,28 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1777456386}
   m_CullTransparentMesh: 1
+--- !u!114 &1777456391
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1777456386}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ec764687d142fd4ea19b9db8352d6aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIButtonSFX
+  clickClip: {fileID: 0}
+  volume: 1
+  pitch: 1
+  randomPitchRange: 0
+  playWhenDisabled: 0
+  enableHoverSound: 0
+  hoverClip: {fileID: 0}
+  hoverVolume: 0.55
+  hoverPitch: 1
+  loopHoverWhileInside: 0
 --- !u!1 &1792073045
 GameObject:
   m_ObjectHideFlags: 0
@@ -34902,6 +35017,56 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1971850676}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1973785382
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1973785384}
+  - component: {fileID: 1973785383}
+  m_Layer: 0
+  m_Name: EnemyDropController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1973785383
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973785382}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbbf73d0028f65345b86e595c43b82c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyDropController
+  dropDatabase: {fileID: 11400000, guid: 8345fde98f07966469c3aa7da9d5ddea, type: 2}
+  diamondDropSystem: {fileID: 938705246}
+  relicManager: {fileID: 147924674}
+  bossDiamondSpawnOffset: {x: 0.4, y: 0, z: 0.2}
+  bossRelicSpawnOffset: {x: 0.45, y: 0, z: 0.15}
+  warnWhenEntryMissing: 1
+--- !u!4 &1973785384
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973785382}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -37587,3 +37752,4 @@ SceneRoots:
   - {fileID: 1191645942}
   - {fileID: 1792073047}
   - {fileID: 938705245}
+  - {fileID: 1973785384}
