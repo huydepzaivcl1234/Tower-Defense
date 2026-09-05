@@ -68,8 +68,8 @@ public class WaveManager : MonoBehaviour
     public bool autoSeedEndlessRulesFromStory = true;
     [Min(1)] public int endlessMaximumEnemiesPerWave = 300;
     [Min(0f)] public float endlessWaveStartDelay = 1f;
-    [Tooltip("0 means true Endless with no Win. Set a wave number to allow a beta victory milestone.")]
-    [Min(0)] public int endlessVictoryWave = 0;
+    [Tooltip("Beta victory milestone. Set 0 later for true Endless with no Win.")]
+    [Min(0)] public int endlessVictoryWave = 50;
 
     [Header("Spawn Portal Animation")]
     [Tooltip("Root Transform of your existing Portal VFX. Leave empty to auto-find a GameObject named 'Portal'.")]
