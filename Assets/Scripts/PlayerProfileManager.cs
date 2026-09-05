@@ -8,6 +8,9 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class PlayerProfileManager : MonoBehaviour
 {
+    public const int MaxDiamondDropChanceUpgradeLevel = 10;
+    public const float DiamondDropChanceBonusPerLevel = 0.01f;
+
     public static PlayerProfileManager Instance { get; private set; }
 
     [Header("Persistence")]
@@ -51,6 +54,8 @@ public class PlayerProfileManager : MonoBehaviour
     public int AvatarIndex => data != null ? data.avatarIndex : 0;
     public double TotalPlaySeconds => totalPlaySeconds;
     public long TotalEnemiesKilled => totalEnemiesKilled;
+    public int DiamondDropChanceUpgradeLevel => data != null ? data.diamondDropChanceUpgradeLevel : 0;
+    public float DiamondDropChanceBonus => DiamondDropChanceUpgradeLevel * DiamondDropChanceBonusPerLevel;
     public PlayerProfileData Data => data;
     public bool IsLoaded => loaded;
 
@@ -242,6 +247,22 @@ public class PlayerProfileManager : MonoBehaviour
         OnDiamondsChanged?.Invoke(currentDiamonds);
         OnProfileStatsChanged?.Invoke();
         if (autoSaveOnDiamondChange) Save();
+        return true;
+    }
+
+    public bool TryUpgradeDiamondDropChance(int diamondCost)
+    {
+        EnsureData();
+        int safeCost = Mathf.Max(0, diamondCost);
+        if (data.diamondDropChanceUpgradeLevel >= MaxDiamondDropChanceUpgradeLevel || currentDiamonds < safeCost)
+            return false;
+
+        currentDiamonds -= safeCost;
+        data.diamondDropChanceUpgradeLevel++;
+        SyncDiamondData();
+        OnDiamondsChanged?.Invoke(currentDiamonds);
+        OnProfileStatsChanged?.Invoke();
+        Save();
         return true;
     }
 

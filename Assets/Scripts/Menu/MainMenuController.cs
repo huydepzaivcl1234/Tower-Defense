@@ -23,12 +23,14 @@ public class MainMenuController : MonoBehaviour
     public GameObject mainPanel;
     public GameObject profilePanel;
     public GameObject settingsPanel;
+    public GameObject shopPanel;
 
     [Header("Main Buttons")]
     public Button playButton;
     public Button profileButton;
     public Button settingsButton;
     public Button exitButton;
+    public Button shopButton;
 
     [Header("Settings")]
     public Slider masterSlider;
@@ -80,7 +82,8 @@ public class MainMenuController : MonoBehaviour
     public bool IsMainMenuVisible => mainPanel != null && mainPanel.activeSelf;
     public bool IsProfileVisible => profilePanel != null && profilePanel.activeSelf;
     public bool IsSettingsVisible => settingsPanel != null && settingsPanel.activeSelf;
-    public bool IsAnyMenuVisible => IsMainMenuVisible || IsProfileVisible || IsSettingsVisible;
+    public bool IsShopVisible => shopPanel != null && shopPanel.activeSelf;
+    public bool IsAnyMenuVisible => IsMainMenuVisible || IsProfileVisible || IsSettingsVisible || IsShopVisible;
     public bool GameplayStarted => gameplayStarted;
 
     public static void RequestGameplayAfterSceneReload() => startGameplayAfterSceneReload = true;
@@ -106,6 +109,7 @@ public class MainMenuController : MonoBehaviour
         if (profileButton != null) profileButton.onClick.AddListener(OpenProfile);
         if (settingsButton != null) settingsButton.onClick.AddListener(OpenSettings);
         if (exitButton != null) exitButton.onClick.AddListener(ExitGame);
+        if (shopButton != null) shopButton.onClick.AddListener(OpenShop);
         if (backButton != null) backButton.onClick.AddListener(CloseSettings);
         if (resetDataButton != null) resetDataButton.onClick.AddListener(RequestResetData);
 
@@ -152,6 +156,7 @@ public class MainMenuController : MonoBehaviour
         ResetResetDataConfirmationUI();
         if (profilePanel != null) profilePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (shopPanel != null) shopPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
     }
 
@@ -163,6 +168,7 @@ public class MainMenuController : MonoBehaviour
         menuBlocksGameplay = true;
         Time.timeScale = 0f;
         if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (shopPanel != null) shopPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(false);
         if (profilePanel != null) profilePanel.SetActive(true);
     }
@@ -170,6 +176,27 @@ public class MainMenuController : MonoBehaviour
     public void CloseProfile()
     {
         if (profilePanel != null) profilePanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(true);
+        menuBlocksGameplay = true;
+        Time.timeScale = 0f;
+    }
+
+    public void OpenShop()
+    {
+        if (playTransitionInProgress || gameplayStarted)
+            return;
+
+        menuBlocksGameplay = true;
+        Time.timeScale = 0f;
+        if (profilePanel != null) profilePanel.SetActive(false);
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (mainPanel != null) mainPanel.SetActive(false);
+        if (shopPanel != null) shopPanel.SetActive(true);
+    }
+
+    public void CloseShop()
+    {
+        if (shopPanel != null) shopPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(true);
         menuBlocksGameplay = true;
         Time.timeScale = 0f;
@@ -239,6 +266,7 @@ public class MainMenuController : MonoBehaviour
         SyncAudioUI();
         ResetResetDataConfirmationUI();
         if (profilePanel != null) profilePanel.SetActive(false);
+        if (shopPanel != null) shopPanel.SetActive(false);
         if (mainPanel != null) mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(true);
     }
@@ -341,6 +369,7 @@ public class MainMenuController : MonoBehaviour
         if (mainPanel != null) mainPanel.SetActive(false);
         if (profilePanel != null) profilePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (shopPanel != null) shopPanel.SetActive(false);
     }
 
     public void RestoreGameplaySpeed()

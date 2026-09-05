@@ -80,7 +80,10 @@ public class EnemyDropController : MonoBehaviour
         if (diamondDropSystem == null)
             return;
 
-        float chance = Mathf.Clamp01(entry.diamondDropChance);
+        float profileBonus = PlayerProfileManager.Instance != null
+            ? PlayerProfileManager.Instance.DiamondDropChanceBonus
+            : 0f;
+        float chance = Mathf.Clamp01(entry.diamondDropChance + profileBonus);
         if (chance > 0f && UnityEngine.Random.value < chance)
             diamondDropSystem.SpawnDrop(deathPosition, RollAmount(entry.diamondDropMin, entry.diamondDropMax));
 
