@@ -25,7 +25,7 @@ MonoBehaviour:
   goldPerDrop: 5
   goldDropInterval: 0.8
   enemyMaxHpBonusPercent: 0.3
-  goldDropPrefab: {fileID: 100100000, guid: 333df4937f974b56bbda6490819b53f5,
+  goldDropPrefab: {fileID: 919132149155446097, guid: 333df4937f974b56bbda6490819b53f5,
     type: 3}
   goldDropAreaSize: {x: 30, y: 18}
   goldDropHeight: 18

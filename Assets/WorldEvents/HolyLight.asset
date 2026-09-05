@@ -49,7 +49,7 @@ MonoBehaviour:
   holyCollapseChancePerRound: 0.2
   holyCollapseMinDelay: 1.5
   holyCollapseMaxDelay: 5
-  holyLightVisualPrefab: {fileID: 100100000, guid: e7c45657efab4333a51365516280b1fe,
+  holyLightVisualPrefab: {fileID: 919132149155446097, guid: e7c45657efab4333a51365516280b1fe,
     type: 3}
   holyLightVisualOffset: {x: 0, y: 12, z: 0}
   collapsePenaltyRounds: 2
