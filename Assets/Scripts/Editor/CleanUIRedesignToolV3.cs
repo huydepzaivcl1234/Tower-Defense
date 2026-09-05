@@ -28,22 +28,44 @@ public static class CleanUIRedesignToolV3
     [MenuItem("Tower Defense/UI/Apply Aurora Gameplay UI")]
     public static void Apply()
     {
-        Canvas canvas = FindSceneObject<Canvas>();
+        ApplyGameplay(true);
+    }
+
+    public static bool ApplyGameplay(bool showDialog)
+    {
         HUDManager hud = FindSceneObject<HUDManager>();
-        BuildMenuUI buildMenu = FindSceneObject<BuildMenuUI>();
-        TowerUpgradeUI upgrade = FindSceneObject<TowerUpgradeUI>();
+        if (hud == null)
+        {
+            if (showDialog)
+                EditorUtility.DisplayDialog("Aurora Gameplay UI", "Could not find HUDManager in the open scene.", "OK");
+            return false;
+        }
+
+        Canvas canvas = hud.GetComponentInParent<Canvas>(true);
+        if (canvas == null)
+        {
+            if (showDialog)
+                EditorUtility.DisplayDialog("Aurora Gameplay UI", "HUDManager is not under a Canvas.", "OK");
+            return false;
+        }
+
+        BuildMenuUI buildMenu = canvas.GetComponentInChildren<BuildMenuUI>(true);
+        TowerUpgradeUI upgrade = canvas.GetComponentInChildren<TowerUpgradeUI>(true);
         GameSpeedController speed = FindSceneObject<GameSpeedController>();
 
-        if (canvas == null || hud == null || buildMenu == null || upgrade == null)
+        if (buildMenu == null || upgrade == null)
         {
-            EditorUtility.DisplayDialog(
-                "Aurora Gameplay UI",
-                "Could not find Canvas, HUDManager, BuildMenuUI and TowerUpgradeUI in the open scene.",
-                "OK");
-            return;
+            if (showDialog)
+                EditorUtility.DisplayDialog(
+                    "Aurora Gameplay UI",
+                    "Could not find BuildMenuUI and TowerUpgradeUI inside the same gameplay Canvas as HUDManager. Nothing was changed.",
+                    "OK");
+            return false;
         }
 
         Undo.RegisterFullObjectHierarchyUndo(canvas.gameObject, "Apply Aurora Gameplay UI");
+
+        DestroyGeneratedRoots(canvas.gameObject.scene);
 
         CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
         if (scaler == null)
@@ -102,10 +124,28 @@ public static class CleanUIRedesignToolV3
         EditorSceneManager.SaveScene(canvas.gameObject.scene);
         Selection.activeGameObject = root.gameObject;
 
-        EditorUtility.DisplayDialog(
-            "Aurora Gameplay UI",
-            "Aurora gameplay UI applied. Existing gameplay references were reconnected; old visuals were only disabled.\n\nTest Gold, Lives, Wave, Build, Upgrade, Sell, Close and speed buttons in Play Mode.",
-            "OK");
+        if (showDialog)
+        {
+            EditorUtility.DisplayDialog(
+                "Aurora Gameplay UI",
+                "Aurora gameplay UI applied to the Canvas that owns HUDManager. Wrong/generated CleanUIRoot objects were removed first.\n\nTest Gold, Lives, Wave, Build, Upgrade, Sell, Close and speed buttons in Play Mode.",
+                "OK");
+        }
+
+        return true;
+    }
+
+    private static void DestroyGeneratedRoots(UnityEngine.SceneManagement.Scene scene)
+    {
+        Transform[] all = Resources.FindObjectsOfTypeAll<Transform>();
+        for (int i = all.Length - 1; i >= 0; i--)
+        {
+            Transform t = all[i];
+            if (t == null || t.name != RootName || !t.gameObject.scene.IsValid() || t.gameObject.scene != scene)
+                continue;
+
+            Undo.DestroyObjectImmediate(t.gameObject);
+        }
     }
 
     private static void BuildResources(RectTransform root, HUDManager hud)
