@@ -332,6 +332,10 @@ public class WaveManager : MonoBehaviour
             return false;
 
         int safeIndex = Mathf.Clamp(storyLevelIndex, 0, Mathf.Max(0, StoryLevelCount - 1));
+        PlayerProfileManager profile = PlayerProfileManager.Instance;
+        if (safeIndex > 0 && (profile == null || !profile.IsStoryLevelUnlocked(safeIndex)))
+            return false;
+
         List<Wave> configuredWaves = GetStoryWaves(safeIndex);
         if (configuredWaves == null || configuredWaves.Count == 0)
             return false;

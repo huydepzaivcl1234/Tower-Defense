@@ -15,6 +15,7 @@ public class GameModeSelectionPanel : MonoBehaviour
     private GameObject storyChoices;
     private RectTransform storyContent;
     private Button storyButtonTemplate;
+    private TMP_Text storyHeading;
     private TMP_Text statusText;
     private readonly List<GameObject> generatedStoryButtons = new List<GameObject>();
 
@@ -94,8 +95,8 @@ public class GameModeSelectionPanel : MonoBehaviour
         Stretch(root);
         storyChoices = root.gameObject;
 
-        TMP_Text heading = CreateText("Heading", root, "SELECT STORY LEVEL", 28f, FontStyles.Bold);
-        SetRect(heading.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -145f), new Vector2(600f, 50f));
+        storyHeading = CreateText("Heading", root, "SELECT STORY LEVEL", 28f, FontStyles.Bold);
+        SetRect(storyHeading.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -145f), new Vector2(600f, 50f));
 
         RectTransform viewport = CreateRect("Viewport", root);
         viewport.anchorMin = new Vector2(0.5f, 0.5f);
@@ -154,23 +155,36 @@ public class GameModeSelectionPanel : MonoBehaviour
         RebuildStoryButtons();
         modeChoices.SetActive(false);
         storyChoices.SetActive(true);
-        SetStatus(string.Empty);
+        SetStatus("COMPLETE A LEVEL TO UNLOCK THE NEXT ONE");
     }
 
     private void RebuildStoryButtons()
     {
         for (int i = 0; i < generatedStoryButtons.Count; i++)
-            if (generatedStoryButtons[i] != null) Destroy(generatedStoryButtons[i]);
+        {
+            if (generatedStoryButtons[i] == null) continue;
+            generatedStoryButtons[i].SetActive(false);
+            Destroy(generatedStoryButtons[i]);
+        }
         generatedStoryButtons.Clear();
 
         int count = WaveManager.Instance.StoryLevelCount;
+        PlayerProfileManager profile = PlayerProfileManager.Instance;
+        int unlockedCount = profile != null ? Mathf.Min(count, profile.HighestUnlockedStoryLevel) : 1;
+        if (storyHeading != null)
+            storyHeading.text = $"STORY  •  UNLOCKED {unlockedCount}/{count}";
+
         for (int i = 0; i < count; i++)
         {
             int levelIndex = i;
+            bool unlocked = profile != null ? profile.IsStoryLevelUnlocked(i) : i == 0;
+            bool completed = profile != null && i + 1 < profile.HighestUnlockedStoryLevel;
             Button button = Instantiate(storyButtonTemplate, storyContent);
             button.name = $"StoryLevel{i + 1}Button";
             button.onClick = new Button.ButtonClickedEvent();
-            SetButtonLabel(button, WaveManager.Instance.GetStoryLevelName(i));
+            string levelName = WaveManager.Instance.GetStoryLevelName(i);
+            SetButtonLabel(button, completed ? $"{levelName}  -  COMPLETED" : unlocked ? levelName : $"{levelName}  -  LOCKED");
+            button.interactable = unlocked;
             button.onClick.AddListener(() => StartStory(levelIndex));
             button.gameObject.SetActive(true);
             generatedStoryButtons.Add(button.gameObject);
@@ -179,6 +193,13 @@ public class GameModeSelectionPanel : MonoBehaviour
 
     private void StartStory(int levelIndex)
     {
+        PlayerProfileManager profile = PlayerProfileManager.Instance;
+        if (levelIndex > 0 && (profile == null || !profile.IsStoryLevelUnlocked(levelIndex)))
+        {
+            SetStatus($"COMPLETE STORY LEVEL {levelIndex} FIRST");
+            return;
+        }
+
         if (WaveManager.Instance == null || !WaveManager.Instance.ConfigureStoryMode(levelIndex))
         {
             SetStatus("THIS STORY LEVEL HAS NO WAVES");

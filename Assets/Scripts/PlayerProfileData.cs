@@ -22,6 +22,9 @@ public class PlayerProfileData
     // Permanent Shop upgrades. Missing fields in older JSON saves safely default to zero.
     public int diamondDropChanceUpgradeLevel = 0;
 
+    // Sequential Story progression. Level 1 is always available on new and older saves.
+    public int highestUnlockedStoryLevel = 1;
+
     // Reserved for shop/progression systems.
     public List<string> purchasedShopItemIds = new List<string>();
     public List<string> unlockedContentIds = new List<string>();
@@ -33,6 +36,7 @@ public class PlayerProfileData
         totalEnemiesKilled = Math.Max(0L, totalEnemiesKilled);
         avatarIndex = Math.Max(0, avatarIndex);
         diamondDropChanceUpgradeLevel = Math.Max(0, Math.Min(diamondDropChanceUpgradeLevel, 10));
+        highestUnlockedStoryLevel = Math.Max(1, highestUnlockedStoryLevel);
 
         if (string.IsNullOrWhiteSpace(playerName))
             playerName = "Player";

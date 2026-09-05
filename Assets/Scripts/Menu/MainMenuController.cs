@@ -381,7 +381,10 @@ public class MainMenuController : MonoBehaviour
                 profile = Object.FindAnyObjectByType<PlayerProfileManager>(FindObjectsInactive.Include);
 
             if (profile != null)
+            {
                 profile.ResetProfileData(saveFreshProfileAfterReset);
+                WaveManager.ResetRunSelection();
+            }
             else
                 Debug.LogWarning("Reset Data requested but no PlayerProfileManager exists in the scene.", this);
         }
