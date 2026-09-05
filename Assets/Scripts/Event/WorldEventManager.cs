@@ -400,9 +400,7 @@ public class WorldEventManager : MonoBehaviour
         Vector3 start = end + Vector3.up * data.goldDropHeight;
         int goldAmount = Mathf.Max(0, data.goldPerDrop);
 
-        GameObject drop = data.goldDropPrefab != null
-            ? Instantiate(data.goldDropPrefab, start, Random.rotation)
-            : null;
+        GameObject drop = InstantiateWorldEventVisual(data.goldDropPrefab, start, Random.rotation);
 
         float duration = Mathf.Max(0.05f, data.goldDropFallDuration);
 
@@ -456,9 +454,7 @@ public class WorldEventManager : MonoBehaviour
         Vector3 start = end + Vector3.up * data.meteorSpawnHeight + new Vector3(-data.meteorSpawnHeight * 0.35f, 0f, 0f);
         float duration = Mathf.Max(0.05f, data.meteorFallDuration);
 
-        GameObject meteor = data.meteorPrefab != null
-            ? Instantiate(data.meteorPrefab, start, Quaternion.identity)
-            : null;
+        GameObject meteor = InstantiateWorldEventVisual(data.meteorPrefab, start, Quaternion.identity);
 
         if (meteor == null)
         {
@@ -942,7 +938,10 @@ public class WorldEventManager : MonoBehaviour
             return;
 
         Vector3 position = (worldCenter != null ? worldCenter.position : Vector3.zero) + data.holyLightVisualOffset;
-        holyVisualInstance = Instantiate(data.holyLightVisualPrefab, position, Quaternion.identity);
+        holyVisualInstance = InstantiateWorldEventVisual(data.holyLightVisualPrefab, position, Quaternion.identity);
+        if (holyVisualInstance == null)
+            return;
+
         EnsureHolyVisualMotion(holyVisualInstance);
 
         Vector3 authoredScale = holyVisualInstance.transform.localScale;
@@ -951,6 +950,28 @@ public class WorldEventManager : MonoBehaviour
             .DOScale(authoredScale, Mathf.Max(0.05f, holyLightFadeDuration))
             .SetEase(Ease.OutCubic)
             .SetUpdate(true);
+    }
+
+    private static GameObject InstantiateWorldEventVisual(GameObject visualAsset, Vector3 position, Quaternion rotation)
+    {
+        if (visualAsset == null)
+            return null;
+
+        UnityEngine.Object instance = UnityEngine.Object.Instantiate(
+            (UnityEngine.Object)visualAsset,
+            position,
+            rotation);
+
+        if (instance is GameObject gameObjectInstance)
+            return gameObjectInstance;
+
+        Debug.LogError(
+            $"World event visual '{visualAsset.name}' instantiated as '{instance?.GetType().Name ?? "null"}' instead of GameObject.");
+
+        if (instance != null)
+            UnityEngine.Object.Destroy(instance);
+
+        return null;
     }
 
     private static void EnsureHolyVisualMotion(GameObject instance)
