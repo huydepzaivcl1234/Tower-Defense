@@ -160,7 +160,10 @@ public class EndGameUIController : MonoBehaviour
         if (retry)
             MainMenuController.RequestGameplayAfterSceneReload();
         else
+        {
             MainMenuController.ClearSceneReloadRequest();
+            WaveManager.ResetRunSelection();
+        }
 
         Time.timeScale = 0f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

@@ -14,7 +14,7 @@ public class MainMenuShopPanel : MonoBehaviour
         public string productId = "diamonds.starter";
         public string displayName = "STARTER PACK";
         public string displayPrice = "$0.99";
-        [Min(1)] public int diamondAmount = 100;
+        [Min(0)] public int diamondAmount = 100;
         public Sprite icon;
     }
 

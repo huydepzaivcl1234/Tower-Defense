@@ -154,6 +154,14 @@ public class HUDManager : MonoBehaviour
     private void UpdateWaveText()
     {
         if (waveText == null || WaveManager.Instance == null) return;
+
+        if (WaveManager.Instance.IsEndlessMode && WaveManager.Instance.TotalWaves == int.MaxValue)
+        {
+            int endlessWave = Mathf.Max(1, WaveManager.Instance.CurrentWaveNumber);
+            waveText.text = $"Wave {CompactNumber.Format(endlessWave)} / ∞";
+            return;
+        }
+
         int total = Mathf.Max(1, WaveManager.Instance.TotalWaves);
         int current = Mathf.Clamp(WaveManager.Instance.CurrentWaveNumber, 1, total);
         waveText.text = $"Wave {CompactNumber.Format(current)} / {CompactNumber.Format(total)}";
