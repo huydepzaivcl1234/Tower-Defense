@@ -19,6 +19,9 @@ public class PlayerProfileData
     public double totalPlaySeconds = 0d;
     public long totalEnemiesKilled = 0L;
 
+    // Permanent Shop upgrades. Missing fields in older JSON saves safely default to zero.
+    public int diamondDropChanceUpgradeLevel = 0;
+
     // Reserved for shop/progression systems.
     public List<string> purchasedShopItemIds = new List<string>();
     public List<string> unlockedContentIds = new List<string>();
@@ -29,6 +32,7 @@ public class PlayerProfileData
         totalPlaySeconds = Math.Max(0d, totalPlaySeconds);
         totalEnemiesKilled = Math.Max(0L, totalEnemiesKilled);
         avatarIndex = Math.Max(0, avatarIndex);
+        diamondDropChanceUpgradeLevel = Math.Max(0, Math.Min(diamondDropChanceUpgradeLevel, 10));
 
         if (string.IsNullOrWhiteSpace(playerName))
             playerName = "Player";
