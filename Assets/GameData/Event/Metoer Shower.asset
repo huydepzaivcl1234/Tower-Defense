@@ -37,7 +37,7 @@ MonoBehaviour:
   meteorEnemyMaxHpDamagePercent: 0.01
   meteorTowerAttackSpeedPenaltyPercent: 0.2
   meteorTowerDebuffDuration: 4
-  meteorPrefab: {fileID: 3530315664873638944, guid: 059b58b214a839e43815911eba66f205,
+  meteorPrefab: {fileID: 100100000, guid: 68c6f8230f0a4e6a8ea864d2f557478d,
     type: 3}
   meteorImpactVfxPrefab: {fileID: 0}
   meteorAreaSize: {x: 34, y: 22}

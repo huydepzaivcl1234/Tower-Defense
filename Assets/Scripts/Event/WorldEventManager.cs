@@ -943,6 +943,7 @@ public class WorldEventManager : MonoBehaviour
 
         Vector3 position = (worldCenter != null ? worldCenter.position : Vector3.zero) + data.holyLightVisualOffset;
         holyVisualInstance = Instantiate(data.holyLightVisualPrefab, position, Quaternion.identity);
+        EnsureHolyVisualMotion(holyVisualInstance);
 
         Vector3 authoredScale = holyVisualInstance.transform.localScale;
         holyVisualInstance.transform.localScale = Vector3.zero;
@@ -950,6 +951,53 @@ public class WorldEventManager : MonoBehaviour
             .DOScale(authoredScale, Mathf.Max(0.05f, holyLightFadeDuration))
             .SetEase(Ease.OutCubic)
             .SetUpdate(true);
+    }
+
+    private static void EnsureHolyVisualMotion(GameObject instance)
+    {
+        if (instance == null || instance.GetComponent<WorldEventVisualAnimator>() != null)
+            return;
+
+        Transform baseHalo = FindWorldEventChild(instance.transform, "BaseHalo");
+        Transform haloA = FindWorldEventChild(instance.transform, "HaloVertical_A");
+        Transform haloB = FindWorldEventChild(instance.transform, "HaloVertical_B");
+        Transform crownHalo = FindWorldEventChild(instance.transform, "HaloCrown");
+        Transform crystal = FindWorldEventChild(instance.transform, "HolyCrystal");
+
+        if (baseHalo == null && haloA == null && haloB == null && crownHalo == null && crystal == null)
+            return;
+
+        WorldEventVisualAnimator animator = instance.AddComponent<WorldEventVisualAnimator>();
+        animator.rotatingParts = new[]
+        {
+            new WorldEventVisualAnimator.RotatingPart { target = baseHalo, degreesPerSecond = new Vector3(0f, 22f, 0f) },
+            new WorldEventVisualAnimator.RotatingPart { target = haloA, degreesPerSecond = new Vector3(28f, 0f, 0f) },
+            new WorldEventVisualAnimator.RotatingPart { target = haloB, degreesPerSecond = new Vector3(0f, 0f, -34f) },
+            new WorldEventVisualAnimator.RotatingPart { target = crownHalo, degreesPerSecond = new Vector3(0f, 42f, 0f) }
+        };
+        animator.pulseTarget = crystal;
+        animator.pulseAmount = 0.055f;
+        animator.pulseSpeed = 0.82f;
+        animator.floatTarget = instance.transform;
+        animator.floatHeight = 0.10f;
+        animator.floatSpeed = 0.42f;
+        animator.Recapture();
+    }
+
+    private static Transform FindWorldEventChild(Transform root, string childName)
+    {
+        if (root == null)
+            return null;
+        if (root.name == childName)
+            return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindWorldEventChild(root.GetChild(i), childName);
+            if (found != null)
+                return found;
+        }
+        return null;
     }
 
     private void EndHolyVisuals()

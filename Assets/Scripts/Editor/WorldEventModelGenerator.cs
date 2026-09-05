@@ -5,12 +5,12 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// Generates lightweight URP-friendly 3D prefabs for the three current World Events.
-/// The generated prefabs use only Unity meshes/materials, so no external model package is required.
-/// Re-running the tool safely refreshes the prefab hierarchy and reuses generated material/mesh assets.
+/// Assigns the authored Blender/OBJ models to the three current World Events.
+/// Gameplay tuning and other designer-authored event fields are left unchanged.
 /// </summary>
 public static class WorldEventModelGenerator
 {
+    private const string AuthoredModelFolder = "Assets/Models/WorldEvents";
     private const string RootFolder = "Assets/WorldEvents";
     private const string ModelFolder = RootFolder + "/GeneratedModels";
     private const string MaterialFolder = ModelFolder + "/Materials";
@@ -19,28 +19,18 @@ public static class WorldEventModelGenerator
     [MenuItem("Tower Defense/Event/Generate 3 World Event Models")]
     public static void GenerateAll()
     {
-        EnsureFolders();
+        GameObject dogPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AuthoredModelFolder + "/DogCatRain_LuckyPawDrop.obj");
+        GameObject meteorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AuthoredModelFolder + "/MeteorShower_Meteor.obj");
+        GameObject holyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AuthoredModelFolder + "/HolyLight_Shrine.obj");
 
-        Material gold = GetMaterial("Event_Gold", new Color(1f, 0.57f, 0.08f), new Color(3.0f, 1.35f, 0.12f));
-        Material paleGold = GetMaterial("Event_PaleGold", new Color(1f, 0.87f, 0.43f), new Color(2.2f, 1.7f, 0.55f));
-        Material darkRock = GetMaterial("Event_MeteorRock", new Color(0.075f, 0.055f, 0.07f), Color.black, 0.72f, 0.05f);
-        Material magma = GetMaterial("Event_Magma", new Color(1f, 0.16f, 0.015f), new Color(7f, 0.45f, 0.015f), 0.25f, 0f);
-        Material holyStone = GetMaterial("Event_HolyStone", new Color(0.72f, 0.76f, 0.82f), Color.black, 0.5f, 0.25f);
-        Material cyan = GetMaterial("Event_HolyCyan", new Color(0.16f, 0.82f, 1f), new Color(0.15f, 3.2f, 5.5f), 0.2f, 0.1f);
-        Material holyWhite = GetMaterial("Event_HolyWhite", new Color(1f, 0.96f, 0.78f), new Color(4.5f, 4.0f, 2.3f), 0.1f, 0f);
-        Material transparentBeam = GetTransparentMaterial("Event_HolyBeam", new Color(1f, 0.91f, 0.48f, 0.18f), new Color(2.8f, 2.25f, 0.75f));
-
-        GameObject dogCat = BuildDogCatRainDrop(gold, paleGold);
-        GameObject meteor = BuildMeteor(darkRock, magma);
-        GameObject holy = BuildHolyLightShrine(gold, holyStone, cyan, holyWhite, transparentBeam);
-
-        string dogPath = ModelFolder + "/DogCatRain_LuckyPawDrop.prefab";
-        string meteorPath = ModelFolder + "/MeteorShower_Meteor.prefab";
-        string holyPath = ModelFolder + "/HolyLight_Shrine.prefab";
-
-        GameObject dogPrefab = SavePrefabAndDestroy(dogCat, dogPath);
-        GameObject meteorPrefab = SavePrefabAndDestroy(meteor, meteorPath);
-        GameObject holyPrefab = SavePrefabAndDestroy(holy, holyPath);
+        if (dogPrefab == null || meteorPrefab == null || holyPrefab == null)
+        {
+            EditorUtility.DisplayDialog(
+                "World Event Models Missing",
+                "The authored OBJ models must exist in Assets/Models/WorldEvents before assignment.",
+                "OK");
+            return;
+        }
 
         AssignGeneratedPrefabs(dogPrefab, meteorPrefab, holyPrefab);
         AssetDatabase.SaveAssets();
@@ -50,11 +40,11 @@ public static class WorldEventModelGenerator
         EditorGUIUtility.PingObject(holyPrefab);
         EditorUtility.DisplayDialog(
             "World Event Models Ready",
-            "Created 3 Unity prefabs:\n\n" +
+            "Assigned the 3 authored world-event models:\n\n" +
             "• DogCatRain_LuckyPawDrop\n" +
             "• MeteorShower_Meteor\n" +
             "• HolyLight_Shrine\n\n" +
-            "They were automatically assigned to matching WorldEventData assets when found.",
+            "They were automatically assigned to matching WorldEventData assets when found. Existing gameplay tuning was not changed.",
             "OK");
     }
 

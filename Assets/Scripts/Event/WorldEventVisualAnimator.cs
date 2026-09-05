@@ -33,6 +33,12 @@ public class WorldEventVisualAnimator : MonoBehaviour
     private void Awake() => Capture();
     private void OnEnable() => Capture();
 
+    public void Recapture()
+    {
+        captured = false;
+        Capture();
+    }
+
     private void Capture()
     {
         if (pulseTarget != null) pulseBaseScale = pulseTarget.localScale;
