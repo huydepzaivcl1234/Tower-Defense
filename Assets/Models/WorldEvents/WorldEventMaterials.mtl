@@ -1,0 +1,71 @@
+# Tower Defense world-event materials
+newmtl AntiqueGold
+Kd 0.50 0.27 0.055
+Ks 0.70 0.52 0.20
+Ns 180
+illum 2
+newmtl PaleGold
+Kd 0.92 0.67 0.18
+Ks 0.90 0.78 0.40
+Ns 220
+illum 2
+newmtl DeepGold
+Kd 0.29 0.12 0.025
+Ks 0.45 0.25 0.08
+Ns 120
+illum 2
+newmtl CyanCrystal
+Kd 0.02 0.50 0.82
+Ke 0.00 0.55 1.00
+Ks 0.70 0.95 1.00
+Ns 300
+d 0.86
+illum 2
+newmtl CloudBlue
+Kd 0.46 0.58 0.79
+Ks 0.15 0.23 0.38
+Ns 70
+illum 2
+newmtl MeteorRock
+Kd 0.075 0.050 0.060
+Ks 0.10 0.08 0.08
+Ns 18
+illum 2
+newmtl Magma
+Kd 0.95 0.075 0.008
+Ke 1.00 0.12 0.005
+Ks 0.55 0.16 0.04
+Ns 140
+illum 2
+newmtl HotMagma
+Kd 1.00 0.42 0.025
+Ke 1.00 0.35 0.015
+Ks 1.00 0.52 0.12
+Ns 220
+illum 2
+newmtl FlameOrange
+Kd 0.98 0.16 0.01
+Ke 1.00 0.12 0.005
+d 0.80
+illum 2
+newmtl CoolStone
+Kd 0.29 0.36 0.44
+Ks 0.13 0.18 0.23
+Ns 55
+illum 2
+newmtl IvoryStone
+Kd 0.72 0.74 0.70
+Ks 0.28 0.30 0.27
+Ns 80
+illum 2
+newmtl HolyWhite
+Kd 1.00 0.93 0.63
+Ke 0.95 0.78 0.34
+Ks 1.00 0.98 0.82
+Ns 320
+illum 2
+newmtl HolyBeam
+Kd 0.30 0.72 1.00
+Ke 0.08 0.48 1.00
+d 0.18
+illum 2
