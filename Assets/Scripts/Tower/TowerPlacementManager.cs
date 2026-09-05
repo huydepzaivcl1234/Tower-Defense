@@ -17,12 +17,20 @@ public class TowerPlacementManager : MonoBehaviour
     [Header("Overlap Prevention")]
     public float minSpacingBetweenTowers = 1.5f;
 
+    [Header("Ground Alignment")]
+    [Tooltip("When TowerData.placementYOffset is 0, automatically measure the prefab visual bounds so its lowest visible point sits on the ground instead of being buried.")]
+    public bool autoAlignVisualBottomWhenOffsetIsZero = true;
+    [Min(0f)]
+    [Tooltip("Small extra lift above the raycast surface to avoid z-fighting/intersection with the ground or path surface.")]
+    public float surfaceClearance = 0.05f;
+
     public bool IsPlacing => selectedTowerData != null;
 
     private TowerData selectedTowerData;
     private GameObject ghostInstance;
     private bool currentPositionValid;
     private Vector3 currentGhostPosition;
+    private float resolvedPlacementYOffset;
 
     private void Awake()
     {
@@ -73,6 +81,8 @@ public class TowerPlacementManager : MonoBehaviour
         Tower ghostTowerScript = ghostInstance.GetComponent<Tower>();
         if (ghostTowerScript != null) ghostTowerScript.enabled = false;
         foreach (var col in ghostInstance.GetComponentsInChildren<Collider>()) col.enabled = false;
+
+        resolvedPlacementYOffset = ResolvePlacementYOffset(ghostInstance);
         ghostInstance.SetActive(false);
     }
 
@@ -84,7 +94,7 @@ public class TowerPlacementManager : MonoBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, 500f, mask))
         {
-            currentGhostPosition = hit.point + Vector3.up * selectedTowerData.placementYOffset;
+            currentGhostPosition = hit.point + Vector3.up * (resolvedPlacementYOffset + surfaceClearance);
             ghostInstance.transform.position = currentGhostPosition;
             ghostInstance.SetActive(true);
 
@@ -110,6 +120,46 @@ public class TowerPlacementManager : MonoBehaviour
             currentPositionValid = false;
             if (placementRangeIndicator != null) placementRangeIndicator.Hide();
         }
+    }
+
+    private float ResolvePlacementYOffset(GameObject preview)
+    {
+        if (selectedTowerData == null)
+            return 0f;
+
+        // Respect explicit designer tuning first.
+        if (Mathf.Abs(selectedTowerData.placementYOffset) > 0.0001f)
+            return selectedTowerData.placementYOffset;
+
+        if (!autoAlignVisualBottomWhenOffsetIsZero || preview == null)
+            return 0f;
+
+        Renderer[] renderers = preview.GetComponentsInChildren<Renderer>(true);
+        bool hasBounds = false;
+        Bounds combined = default;
+
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null || renderer is ParticleSystemRenderer)
+                continue;
+
+            if (!hasBounds)
+            {
+                combined = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                combined.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasBounds)
+            return 0f;
+
+        // Preview is instantiated at the root origin. Raise the root by the distance
+        // between its Y position and the lowest visible renderer point.
+        return Mathf.Max(0f, preview.transform.position.y - combined.min.y);
     }
 
     private void ApplyGhostTint(Color color)
