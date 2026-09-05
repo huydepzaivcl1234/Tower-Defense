@@ -2,9 +2,9 @@ using UnityEngine;
 using UnityEngine.Serialization;
 
 /// <summary>
-/// Independent Diamond drop system.
-/// EnemyData owns only chance/amount; this component owns global Diamond world-drop placement/prefab.
-/// Model, pickup SFX/VFX and authored bounce animation belong on the Diamond drop prefab itself.
+/// Diamond world-drop presentation/spawn system.
+/// EnemyDropController owns enemy death rolls and amount rules; this component only spawns the configured
+/// Diamond world object. Model, pickup SFX/VFX and authored bounce animation belong on the prefab itself.
 /// </summary>
 [DisallowMultipleComponent]
 public class DiamondDropSystem : MonoBehaviour
@@ -34,32 +34,7 @@ public class DiamondDropSystem : MonoBehaviour
     [FormerlySerializedAs("firstBounceHeight")]
     [Min(0f)] public float fallbackFirstBounceHeight = 0.38f;
 
-    private void OnEnable() => Enemy.OnAnyEnemyDied += HandleEnemyDied;
-    private void OnDisable() => Enemy.OnAnyEnemyDied -= HandleEnemyDied;
-
-    private void HandleEnemyDied(Enemy enemy)
-    {
-        if (enemy == null || enemy.data == null)
-            return;
-
-        EnemyData data = enemy.data;
-        Vector3 deathPosition = enemy.transform.position;
-
-        if (data.diamondDropChance > 0f && UnityEngine.Random.value < Mathf.Clamp01(data.diamondDropChance))
-            SpawnDrop(deathPosition, RollAmount(data.diamondDropMin, data.diamondDropMax));
-
-        if (data.isBoss && data.bossGuaranteedDiamonds)
-            SpawnDrop(deathPosition + bossDropSpawnOffset, RollAmount(data.bossDiamondMin, data.bossDiamondMax));
-    }
-
-    private static int RollAmount(int min, int max)
-    {
-        int safeMin = Mathf.Max(0, Mathf.Min(min, max));
-        int safeMax = Mathf.Max(safeMin, Mathf.Max(min, max));
-        return safeMax <= safeMin ? safeMin : UnityEngine.Random.Range(safeMin, safeMax + 1);
-    }
-
-    private void SpawnDrop(Vector3 deathPosition, int amount)
+    public void SpawnDrop(Vector3 deathPosition, int amount)
     {
         if (amount <= 0)
             return;
