@@ -25,7 +25,7 @@ public static class AuroraAllUISetupTool
     [MenuItem("Tower Defense/UI/Apply Aurora ALL UI")]
     public static void ApplyAll()
     {
-        bool gameplayApplied = CleanUIRedesignToolV3.ApplyGameplay(false);
+        bool gameplayApplied = AuroraSafeUIUpgradeTool.RepairAndUpgradeGameplay(false);
 
         int styledRoots = 0;
 
@@ -251,6 +251,12 @@ public static class AuroraAllUISetupTool
             outline.effectDistance = new Vector2(2f, -2f);
             outline.useGraphicAlpha = true;
         }
+
+        if (button.targetGraphic != null)
+            button.targetGraphic.raycastTarget = true;
+        Graphic ownGraphic = button.GetComponent<Graphic>();
+        if (ownGraphic != null)
+            ownGraphic.raycastTarget = true;
 
         button.transition = Selectable.Transition.None;
 
