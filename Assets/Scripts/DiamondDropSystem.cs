@@ -17,8 +17,8 @@ public class DiamondDropSystem : MonoBehaviour
     [Header("World Placement")]
     [Tooltip("Final resting Y offset relative to the enemy death position.")]
     public float groundYOffset = 0.2f;
-    [Tooltip("Additional spawn offset for the guaranteed Boss Diamond drop so it does not perfectly overlap the normal drop.")]
-    public Vector3 bossDropSpawnOffset = new Vector3(0.4f, 0f, 0.2f);
+    // Legacy serialized value retained only so old scenes do not lose data. Boss offset is now owned by EnemyDropController.
+    [HideInInspector] public Vector3 bossDropSpawnOffset = new Vector3(0.4f, 0f, 0.2f);
 
     [Header("Fallback Visual - Only When No Prefab Is Assigned")]
     public Vector3 fallbackScale = Vector3.one * 0.35f;
