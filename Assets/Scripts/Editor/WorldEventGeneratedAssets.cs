@@ -7,6 +7,7 @@ using UnityEngine;
 
 public static class WorldEventGeneratedAssets
 {
+    private const string AuthoredModelFolder = "Assets/Models/WorldEvents";
     private const string RootFolder = "Assets/WorldEvents/Generated";
     private const string AudioFolder = RootFolder + "/Audio";
     private const string PrefabFolder = RootFolder + "/Prefabs";
@@ -26,9 +27,9 @@ public static class WorldEventGeneratedAssets
         AudioClip holySfx = EnsureHolySfx();
         AudioClip holyCollapseSfx = EnsureHolyCollapseSfx();
 
-        GameObject dogPrefab = EnsureDogCatDropPrefab();
-        GameObject meteorPrefab = EnsureMeteorPrefab();
-        GameObject holyPrefab = EnsureHolyLightPrefab();
+        GameObject dogPrefab = LoadAuthoredModel("DogCatRain_LuckyPawDrop.obj");
+        GameObject meteorPrefab = LoadAuthoredModel("MeteorShower_Meteor.obj");
+        GameObject holyPrefab = LoadAuthoredModel("HolyLight_Shrine.obj");
 
         if (dogCat != null)
         {
@@ -54,6 +55,14 @@ public static class WorldEventGeneratedAssets
             if (holy.holyLightVisualPrefab == null) holy.holyLightVisualPrefab = holyPrefab;
             EditorUtility.SetDirty(holy);
         }
+    }
+
+    private static GameObject LoadAuthoredModel(string fileName)
+    {
+        GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(AuthoredModelFolder + "/" + fileName);
+        if (model == null)
+            Debug.LogError("World event model is missing: " + AuthoredModelFolder + "/" + fileName);
+        return model;
     }
 
     private static void EnsureFolders()
