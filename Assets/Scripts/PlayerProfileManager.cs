@@ -56,6 +56,7 @@ public class PlayerProfileManager : MonoBehaviour
     public long TotalEnemiesKilled => totalEnemiesKilled;
     public int DiamondDropChanceUpgradeLevel => data != null ? data.diamondDropChanceUpgradeLevel : 0;
     public float DiamondDropChanceBonus => DiamondDropChanceUpgradeLevel * DiamondDropChanceBonusPerLevel;
+    public int HighestUnlockedStoryLevel => data != null ? Mathf.Max(1, data.highestUnlockedStoryLevel) : 1;
     public PlayerProfileData Data => data;
     public bool IsLoaded => loaded;
 
@@ -279,6 +280,27 @@ public class PlayerProfileManager : MonoBehaviour
         if (saveImmediately) Save();
     }
 
+    public bool IsStoryLevelUnlocked(int zeroBasedLevelIndex)
+    {
+        return zeroBasedLevelIndex >= 0 && zeroBasedLevelIndex + 1 <= HighestUnlockedStoryLevel;
+    }
+
+    public bool CompleteStoryLevel(int zeroBasedLevelIndex, bool saveImmediately = true)
+    {
+        if (zeroBasedLevelIndex < 0)
+            return false;
+
+        EnsureData();
+        int nextUnlockedLevel = zeroBasedLevelIndex + 2;
+        if (nextUnlockedLevel <= data.highestUnlockedStoryLevel)
+            return false;
+
+        data.highestUnlockedStoryLevel = nextUnlockedLevel;
+        OnProfileStatsChanged?.Invoke();
+        if (saveImmediately) Save();
+        return true;
+    }
+
     public void ResetProfileData(bool saveFreshProfile = true)
     {
         string key = string.IsNullOrWhiteSpace(saveKey) ? "TowerDefense.PlayerProfile" : saveKey;
@@ -313,7 +335,8 @@ public class PlayerProfileManager : MonoBehaviour
             avatarIndex = 0,
             diamonds = Mathf.Clamp(startingDiamonds, 0, Mathf.Max(0, maxDiamonds)),
             totalPlaySeconds = 0d,
-            totalEnemiesKilled = 0L
+            totalEnemiesKilled = 0L,
+            highestUnlockedStoryLevel = 1
         };
     }
 

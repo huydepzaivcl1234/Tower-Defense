@@ -84,10 +84,14 @@ public class GameManager : MonoBehaviour
     {
         if (IsGameOver) return;
 
+        PlayerProfileManager profile = PlayerProfileManager.Instance;
+        if (profile != null && WaveManager.Instance != null && !WaveManager.Instance.IsEndlessMode)
+            profile.CompleteStoryLevel(WaveManager.Instance.ActiveStoryLevelIndex);
+
         LastWinDiamondRewardGranted = 0;
-        if (winDiamondReward > 0 && PlayerProfileManager.Instance != null)
+        if (winDiamondReward > 0 && profile != null)
         {
-            LastWinDiamondRewardGranted = PlayerProfileManager.Instance.AddDiamonds(
+            LastWinDiamondRewardGranted = profile.AddDiamonds(
                 winDiamondReward,
                 countWinDiamondsInRunTotal,
                 showWinDiamondToast);
