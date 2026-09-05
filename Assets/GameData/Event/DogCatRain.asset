@@ -24,7 +24,7 @@ MonoBehaviour:
   goldPerDrop: 5
   goldDropInterval: 0.8
   enemyMaxHpBonusPercent: 0.3
-  goldDropPrefab: {fileID: 100100000, guid: 333df4937f974b56bbda6490819b53f5,
+  goldDropPrefab: {fileID: 919132149155446097, guid: 333df4937f974b56bbda6490819b53f5,
     type: 3}
   goldDropAreaSize: {x: 30, y: 18}
   goldDropHeight: 18
@@ -47,7 +47,10 @@ MonoBehaviour:
   holyTowerDamageBonusPercent: 0.25
   holyProjectileSpeedBonusPercent: 0.25
   holyCollapseChancePerRound: 0.2
+  holyCollapseMinDelay: 1.5
+  holyCollapseMaxDelay: 5
   holyLightVisualPrefab: {fileID: 0}
+  holyLightVisualOffset: {x: 0, y: 12, z: 0}
   collapsePenaltyRounds: 2
   collapseEnemyMaxHpBonusPercent: 0.35
   collapseEnemyCCResistanceBonusPercent: 0.3
