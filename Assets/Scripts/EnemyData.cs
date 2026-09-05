@@ -21,25 +21,6 @@ public class EnemyData : ScriptableObject
     public int goldReward = 10;
     public int damageToPlayer = 1;
 
-    [Header("Diamond Drop - Gameplay Only")]
-    [Tooltip("Independent Diamond drop chance for this enemy. This is not connected to Relic drop chance.")]
-    [Range(0f, 1f)] public float diamondDropChance = 0f;
-    [Min(0)] public int diamondDropMin = 1;
-    [Min(0)] public int diamondDropMax = 1;
-
-    [Header("Diamond Drop - Boss Reward")]
-    [Tooltip("Boss can always create an extra Diamond drop independently of the normal Diamond roll and independently of Relic drops.")]
-    public bool bossGuaranteedDiamonds = false;
-    [Min(0)] public int bossDiamondMin = 1;
-    [Min(0)] public int bossDiamondMax = 3;
-
-    [Header("Relic Drop - Gameplay Only")]
-    [Range(0f, 1f)] public float relicDropChance = 0.01f;
-    public RelicRarity minimumDropRarity = RelicRarity.Common;
-    public bool isBoss = false;
-    public bool bossGuaranteedRelic = true;
-    public RelicRarity bossGuaranteedMinimumRarity = RelicRarity.Rare;
-
     [Header("Kháng khống chế (CC Resist)")]
     [Range(0f, 1f)] public float ccResistPercent = 0f;
 
@@ -52,8 +33,21 @@ public class EnemyData : ScriptableObject
     public Color tintColor = Color.white;
     public Color shieldTintColor = new Color(0.3f, 0.85f, 1f, 1f);
 
-    // Legacy serialized presentation fields are intentionally kept hidden for compatibility with
-    // existing EnemyData assets. Runtime drop systems no longer use them.
+    // Legacy serialized drop fields are kept hidden only so existing EnemyData assets can be migrated
+    // safely into EnemyDropDatabase without losing their current values. Runtime systems never read them.
+    [HideInInspector] public float diamondDropChance = 0f;
+    [HideInInspector] public int diamondDropMin = 1;
+    [HideInInspector] public int diamondDropMax = 1;
+    [HideInInspector] public bool bossGuaranteedDiamonds = false;
+    [HideInInspector] public int bossDiamondMin = 1;
+    [HideInInspector] public int bossDiamondMax = 3;
+    [HideInInspector] public float relicDropChance = 0.01f;
+    [HideInInspector] public RelicRarity minimumDropRarity = RelicRarity.Common;
+    [HideInInspector] public bool isBoss = false;
+    [HideInInspector] public bool bossGuaranteedRelic = true;
+    [HideInInspector] public RelicRarity bossGuaranteedMinimumRarity = RelicRarity.Rare;
+
+    // Older Diamond presentation fields are also retained only for serialization compatibility.
     [HideInInspector] public GameObject diamondDropPrefab;
     [HideInInspector] public float diamondGroundYOffset = 0.2f;
 }
