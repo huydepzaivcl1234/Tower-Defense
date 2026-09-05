@@ -78,19 +78,11 @@ public class RelicManager : MonoBehaviour
     private void OnEnable()
     {
         WaveManager.OnWaveCleared += HandleWaveCleared;
-        Enemy.OnAnyEnemyDied += HandleEnemyDied;
     }
 
     private void OnDisable()
     {
         WaveManager.OnWaveCleared -= HandleWaveCleared;
-        Enemy.OnAnyEnemyDied -= HandleEnemyDied;
-    }
-
-    private void HandleEnemyDied(Enemy enemy)
-    {
-        if (enemy == null || enemy.data == null) return;
-        TrySpawnEnemyRelicDrops(enemy.data, enemy.transform.position);
     }
 
     private void HandleWaveCleared()
@@ -144,14 +136,18 @@ public class RelicManager : MonoBehaviour
         RefreshRewardNotification();
     }
 
-    public void TrySpawnEnemyRelicDrops(EnemyData enemyData, Vector3 deathPosition)
+    public float GetEffectiveEnemyRelicDropChance(float baseChance)
     {
-        if (enemyData == null) return;
-        float chance = Mathf.Clamp01(enemyData.relicDropChance + relicDropChanceFlat);
-        if (chance > 0f && Random.value <= chance)
-            SpawnWorldReward(deathPosition, enemyData.minimumDropRarity, false);
-        if (enemyData.isBoss && enemyData.bossGuaranteedRelic)
-            SpawnWorldReward(deathPosition + new Vector3(0.45f, 0f, 0.15f), enemyData.bossGuaranteedMinimumRarity, true);
+        return Mathf.Clamp01(baseChance + relicDropChanceFlat);
+    }
+
+    /// <summary>
+    /// Spawn one already-approved Relic world reward. EnemyDropController owns all enemy-specific
+    /// chance, boss and rarity rules; RelicManager keeps ownership of the actual Relic reward flow.
+    /// </summary>
+    public void SpawnDroppedRelicReward(Vector3 deathPosition, RelicRarity minimumRarity, bool bossReward)
+    {
+        SpawnWorldReward(deathPosition, minimumRarity, bossReward);
     }
 
     private void SpawnWorldReward(Vector3 position, RelicRarity minimumRarity, bool bossReward)
