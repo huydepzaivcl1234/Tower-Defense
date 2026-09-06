@@ -101,6 +101,25 @@ public class WaveManager : MonoBehaviour
     public TowerDefenseGameMode ActiveGameMode => activeGameMode;
     public int ActiveStoryLevelIndex => activeStoryLevelIndex;
     public int StoryLevelCount => 1 + (additionalStoryLevels != null ? additionalStoryLevels.Count : 0);
+    public bool CanContinueToNextStoryLevel
+    {
+        get
+        {
+            if (IsEndlessMode)
+                return false;
+
+            int nextLevelIndex = activeStoryLevelIndex + 1;
+            if (nextLevelIndex >= StoryLevelCount)
+                return false;
+
+            PlayerProfileManager profile = PlayerProfileManager.Instance;
+            if (profile == null || !profile.IsStoryLevelUnlocked(nextLevelIndex))
+                return false;
+
+            List<Wave> nextLevelWaves = GetStoryWaves(nextLevelIndex);
+            return nextLevelWaves != null && nextLevelWaves.Count > 0;
+        }
+    }
     public bool HasEndlessConfiguration => HasEndlessEnemyForWave(1);
     public bool AllWavesComplete
     {
@@ -344,6 +363,16 @@ public class WaveManager : MonoBehaviour
         activeStoryLevelIndex = safeIndex;
         selectedGameMode = activeGameMode;
         selectedStoryLevelIndex = safeIndex;
+        return true;
+    }
+
+    public bool SelectNextStoryLevelForReload()
+    {
+        if (!CanContinueToNextStoryLevel)
+            return false;
+
+        selectedGameMode = TowerDefenseGameMode.Story;
+        selectedStoryLevelIndex = activeStoryLevelIndex + 1;
         return true;
     }
 
