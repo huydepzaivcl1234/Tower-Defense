@@ -13,3 +13,6 @@ Developed NPC Dialogue + Quest system with Easy/Medium/Hard quests and dynamic q
 Created responsive gameplay HUD, upgrade UI, Relic HUD and Quest Live HUD.
 Implemented enemy/projectile/VFX pooling and MaterialPropertyBlock optimizations.
 Designed systems to be highly configurable through Unity Inspector and ScriptableObjects.
+
+my game link:
+https://shadybalt.itch.io/student-fisrt-project
